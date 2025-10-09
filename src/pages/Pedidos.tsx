@@ -1,0 +1,175 @@
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import { Plus, Search, Filter, Package, Calendar, User } from "lucide-react";
+import { Link } from "react-router-dom";
+
+export default function Pedidos() {
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const orders = [
+    {
+      id: "PED-001",
+      client: "Maria Silva",
+      type: "Bordado Computadorizado",
+      description: "Logo empresa em 50 camisetas",
+      value: 850,
+      paid: 425,
+      delivery: "2025-10-12",
+      status: "Em produção",
+    },
+    {
+      id: "PED-002",
+      client: "João Santos",
+      type: "Uniforme Escolar",
+      description: "15 uniformes tam. P-M-G",
+      value: 1200,
+      paid: 1200,
+      delivery: "2025-10-10",
+      status: "Pronto",
+    },
+    {
+      id: "PED-003",
+      client: "Ana Costa",
+      type: "Personalizado",
+      description: "Toalhinhas com bordado nome",
+      value: 320,
+      paid: 160,
+      delivery: "2025-10-15",
+      status: "Aguardando aprovação",
+    },
+    {
+      id: "PED-004",
+      client: "Pedro Oliveira",
+      type: "Camiseta Estampada",
+      description: "30 camisetas estampa personalizada",
+      value: 600,
+      paid: 300,
+      delivery: "2025-10-13",
+      status: "Em produção",
+    },
+  ];
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "Pronto":
+        return "bg-accent/20 text-accent border-accent/30";
+      case "Em produção":
+        return "bg-secondary/20 text-secondary border-secondary/30";
+      case "Aguardando aprovação":
+        return "bg-muted text-muted-foreground border-muted-foreground/30";
+      default:
+        return "bg-muted text-muted-foreground border-muted-foreground/30";
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
+        <div className="flex items-center justify-between p-4">
+          <div className="flex items-center gap-4">
+            <SidebarTrigger />
+            <div>
+              <h1 className="text-2xl font-semibold text-foreground">Gestão de Pedidos</h1>
+              <p className="text-sm text-muted-foreground">Gerencie todos os pedidos do ateliê</p>
+            </div>
+          </div>
+          <Link to="/pedidos/novo">
+            <Button className="bg-primary hover:bg-primary/90">
+              <Plus className="w-4 h-4 mr-2" />
+              Novo Pedido
+            </Button>
+          </Link>
+        </div>
+      </header>
+
+      <div className="p-6 space-y-6">
+        {/* Filters */}
+        <Card className="border-border">
+          <CardContent className="p-4">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por cliente, tipo ou pedido..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 border-input"
+                />
+              </div>
+              <Button variant="outline" className="border-border">
+                <Filter className="w-4 h-4 mr-2" />
+                Filtrar
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Orders List */}
+        <div className="grid gap-4">
+          {orders.map((order) => (
+            <Card
+              key={order.id}
+              className="border-border hover:shadow-md transition-all animate-fade-in cursor-pointer"
+            >
+              <CardHeader>
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1">
+                    <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
+                      <Package className="w-5 h-5 text-primary" />
+                      {order.id}
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground">{order.type}</p>
+                  </div>
+                  <Badge variant="outline" className={getStatusColor(order.status)}>
+                    {order.status}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <p className="text-foreground">{order.description}</p>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-3 border-t border-border">
+                    <div className="flex items-center gap-2">
+                      <User className="w-4 h-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Cliente</p>
+                        <p className="text-sm font-medium text-foreground">{order.client}</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Entrega</p>
+                        <p className="text-sm font-medium text-foreground">
+                          {new Date(order.delivery).toLocaleDateString('pt-BR')}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 flex items-center justify-center">
+                        <span className="text-accent">R$</span>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Valor / Pago</p>
+                        <p className="text-sm font-medium text-foreground">
+                          R$ {order.value} / R$ {order.paid}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
