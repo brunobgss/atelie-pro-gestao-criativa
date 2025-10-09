@@ -6,11 +6,9 @@ import {
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
 
@@ -28,31 +26,30 @@ export function AppSidebar() {
   const isCollapsed = state === "collapsed";
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-sidebar-border">
-      <div className="p-6 border-b border-sidebar-border">
+    <Sidebar collapsible="icon" className="bg-card border-r border-border">
+      <div className="p-6 border-b border-border">
         {!isCollapsed && (
           <div className="flex items-center justify-center">
             <img 
               src={logoAteliePro} 
               alt="Ateliê Pro" 
-              className="h-12 w-auto object-contain"
+              className="h-10 w-auto object-contain"
             />
           </div>
         )}
         {isCollapsed && (
           <div className="flex items-center justify-center">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-md">
-              <span className="text-sidebar-foreground font-bold text-lg">A</span>
+            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+              <span className="text-primary-foreground font-bold text-sm">A</span>
             </div>
           </div>
         )}
       </div>
 
-      <SidebarContent>
+      <SidebarContent className="bg-card">
         <SidebarGroup>
-          <SidebarGroupLabel className="text-sidebar-foreground/60">Menu Principal</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="space-y-1 px-3 py-4">
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
@@ -60,15 +57,15 @@ export function AppSidebar() {
                       to={item.url}
                       end={item.url === "/"}
                       className={({ isActive }) =>
-                        `flex items-center gap-3 px-3 py-2 rounded-lg transition-all ${
+                        `flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
                           isActive
-                            ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                            : "text-sidebar-foreground/80 hover:bg-sidebar-accent/50"
+                            ? "bg-secondary text-secondary-foreground font-medium shadow-sm"
+                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
                         }`
                       }
                     >
                       <item.icon className="w-5 h-5" />
-                      {!isCollapsed && <span>{item.title}</span>}
+                      {!isCollapsed && <span className="text-sm">{item.title}</span>}
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
