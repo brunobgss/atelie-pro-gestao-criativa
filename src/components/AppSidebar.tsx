@@ -7,7 +7,7 @@ import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
-  SidebarMenuButton,
+  
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar";
@@ -26,7 +26,7 @@ export function AppSidebar() {
   const isCollapsed = state === "collapsed";
 
   return (
-    <Sidebar collapsible="icon" className="bg-card border-r border-border">
+    <Sidebar collapsible="none" className="bg-card border-r border-border">
       <div className="p-6 border-b border-border">
         {!isCollapsed && (
           <div className="flex items-center justify-center">
@@ -52,22 +52,20 @@ export function AppSidebar() {
             <SidebarMenu className="space-y-1 px-3 py-4">
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <NavLink
-                      to={item.url}
-                      end={item.url === "/"}
-                      className={({ isActive }) =>
-                        `flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
-                          isActive
-                            ? "bg-secondary text-secondary-foreground font-medium shadow-sm"
-                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                        }`
-                      }
-                    >
-                      <item.icon className="w-5 h-5" />
-                      {!isCollapsed && <span className="text-sm">{item.title}</span>}
-                    </NavLink>
-                  </SidebarMenuButton>
+                  <NavLink
+                    to={item.url}
+                    end={item.url === "/"}
+                    className={({ isActive }) =>
+                      `flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                        isActive
+                          ? "bg-secondary text-secondary-foreground font-medium shadow-sm"
+                          : "text-foreground hover:bg-muted"
+                      }`
+                    }
+                  >
+                    <item.icon className="w-5 h-5" />
+                    <span className="text-sm">{item.title}</span>
+                  </NavLink>
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>

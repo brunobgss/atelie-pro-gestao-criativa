@@ -4,19 +4,38 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { ArrowLeft, Save, Share2, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Save, Share2, Plus, Trash2, MessageCircle, Printer } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useState } from "react";
+import { createQuote, generateQuoteCode } from "@/integrations/supabase/quotes";
 
 export default function NovoOrcamento() {
   const navigate = useNavigate();
   const [items, setItems] = useState([{ description: "", quantity: 1, value: 0 }]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const clientInput = (document.getElementById("client") as HTMLInputElement)?.value;
+    const dateInput = (document.getElementById("date") as HTMLInputElement)?.value || new Date().toISOString().split('T')[0];
+    const observations = (document.getElementById("observations") as HTMLTextAreaElement)?.value || undefined;
+    const code = generateQuoteCode();
+
+    const result = await createQuote({
+      code,
+      customer_name: clientInput,
+      date: dateInput,
+      observations,
+      items,
+    });
+
+    if (!result.ok) {
+      toast.error(result.error || "Erro ao criar orçamento");
+      return;
+    }
+
     toast.success("Orçamento criado com sucesso!");
-    navigate("/orcamentos");
+    navigate(`/orcamento/${code}`);
   };
 
   const addItem = () => {
@@ -28,6 +47,19 @@ export default function NovoOrcamento() {
   };
 
   const total = items.reduce((sum, item) => sum + item.quantity * item.value, 0);
+
+  const handleOpenPublic = () => {
+    const code = generateQuoteCode();
+    window.open(`${window.location.origin}/orcamento/${code}`, "_blank");
+  };
+
+  const handleWhatsApp = () => {
+    const clientInput = (document.getElementById("client") as HTMLInputElement)?.value || "cliente";
+    const message = encodeURIComponent(
+      `Olá ${clientInput}! Segue o seu orçamento no Ateliê Pro. Total: R$ ${total.toFixed(2)}.`
+    );
+    window.open(`https://wa.me/?text=${message}`, "_blank");
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -182,14 +214,35 @@ export default function NovoOrcamento() {
                   <Save className="w-4 h-4 mr-2" />
                   Salvar Orçamento
                 </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="border-secondary text-secondary"
-                >
-                  <Share2 className="w-4 h-4 mr-2" />
-                  Salvar e Compartilhar
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-secondary text-secondary"
+                    onClick={handleOpenPublic}
+                  >
+                    <Share2 className="w-4 h-4 mr-2" />
+                    Visualizar
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-border"
+                    onClick={() => window.print()}
+                  >
+                    <Printer className="w-4 h-4 mr-2" />
+                    Imprimir
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-green-600 text-green-600 hover:bg-green-600/10"
+                    onClick={handleWhatsApp}
+                  >
+                    <MessageCircle className="w-4 h-4 mr-2" />
+                    WhatsApp
+                  </Button>
+                </div>
                 <Button
                   type="button"
                   variant="outline"

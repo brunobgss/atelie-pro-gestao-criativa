@@ -5,6 +5,10 @@ import { Badge } from "@/components/ui/badge";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Search, Phone, Mail, Package, Plus } from "lucide-react";
 import { useState } from "react";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { createCustomer } from "@/integrations/supabase/customers";
+import { toast } from "sonner";
 
 export default function Clientes() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -55,10 +59,53 @@ export default function Clientes() {
               <p className="text-sm text-muted-foreground">Gerencie seus clientes</p>
             </div>
           </div>
-          <Button className="bg-primary hover:bg-primary/90">
-            <Plus className="w-4 h-4 mr-2" />
-            Novo Cliente
-          </Button>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button className="bg-primary hover:bg-primary/90">
+                <Plus className="w-4 h-4 mr-2" />
+                Novo Cliente
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Novo Cliente</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 py-2">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="name" className="text-right">
+                    Nome
+                  </Label>
+                  <Input id="name" className="col-span-3" />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="phone" className="text-right">
+                    Telefone
+                  </Label>
+                  <Input id="phone" className="col-span-3" />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="email" className="text-right">
+                    Email
+                  </Label>
+                  <Input id="email" className="col-span-3" />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  onClick={async () => {
+                    const name = (document.getElementById("name") as HTMLInputElement)?.value;
+                    const phone = (document.getElementById("phone") as HTMLInputElement)?.value;
+                    const email = (document.getElementById("email") as HTMLInputElement)?.value;
+                    const res = await createCustomer({ name, phone, email });
+                    if (!res.ok) return toast.error(res.error || "Erro ao criar cliente");
+                    toast.success("Cliente criado");
+                  }}
+                >
+                  Salvar
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </header>
 

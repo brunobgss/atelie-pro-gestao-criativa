@@ -5,53 +5,30 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Plus, Search, Filter, Package, Calendar, User } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { listOrders } from "@/integrations/supabase/orders";
 
 export default function Pedidos() {
   const [searchTerm, setSearchTerm] = useState("");
+  const navigate = useNavigate();
 
-  const orders = [
-    {
-      id: "PED-001",
-      client: "Maria Silva",
-      type: "Bordado Computadorizado",
-      description: "Logo empresa em 50 camisetas",
-      value: 850,
-      paid: 425,
-      delivery: "2025-10-12",
-      status: "Em produção",
+  const { data: orders = [] } = useQuery({
+    queryKey: ["orders"],
+    queryFn: async () => {
+      const rows = await listOrders();
+      return rows.map((r) => ({
+        id: r.code,
+        client: r.customer_name,
+        type: r.type,
+        description: r.description ?? "",
+        value: Number(r.value || 0),
+        paid: Number(r.paid || 0),
+        delivery: r.delivery_date ?? "",
+        status: r.status,
+      }));
     },
-    {
-      id: "PED-002",
-      client: "João Santos",
-      type: "Uniforme Escolar",
-      description: "15 uniformes tam. P-M-G",
-      value: 1200,
-      paid: 1200,
-      delivery: "2025-10-10",
-      status: "Pronto",
-    },
-    {
-      id: "PED-003",
-      client: "Ana Costa",
-      type: "Personalizado",
-      description: "Toalhinhas com bordado nome",
-      value: 320,
-      paid: 160,
-      delivery: "2025-10-15",
-      status: "Aguardando aprovação",
-    },
-    {
-      id: "PED-004",
-      client: "Pedro Oliveira",
-      type: "Camiseta Estampada",
-      description: "30 camisetas estampa personalizada",
-      value: 600,
-      paid: 300,
-      delivery: "2025-10-13",
-      status: "Em produção",
-    },
-  ];
+  });
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -114,6 +91,7 @@ export default function Pedidos() {
             <Card
               key={order.id}
               className="border-border hover:shadow-md transition-all animate-fade-in cursor-pointer"
+              onClick={() => navigate(`/pedidos/${order.id}`)}
             >
               <CardHeader>
                 <div className="flex items-start justify-between">

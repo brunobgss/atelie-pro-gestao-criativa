@@ -2,36 +2,27 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Plus, FileText, Calendar, DollarSign, Share2 } from "lucide-react";
+import { Plus, FileText, Calendar, DollarSign, Share2, Printer, MessageCircle } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { listQuotes } from "@/integrations/supabase/quotes";
 
 export default function Orcamentos() {
-  const quotes = [
-    {
-      id: "ORC-001",
-      client: "Roberto Alves",
-      description: "100 camisetas bordadas logo empresa",
-      value: 2500,
-      date: "2025-10-08",
-      status: "Pendente",
+  const { data: quotes = [], isLoading } = useQuery({
+    queryKey: ["quotes"],
+    queryFn: async () => {
+      const rows = await listQuotes();
+      // map para manter UI existente
+      return rows.map((r) => ({
+        id: r.code,
+        client: r.customer_name,
+        description: r.observations ?? "",
+        value: 0,
+        date: r.date,
+        status: "Pendente",
+      }));
     },
-    {
-      id: "ORC-002",
-      client: "Escola Municipal",
-      description: "200 uniformes escolares diversos tamanhos",
-      value: 4800,
-      date: "2025-10-07",
-      status: "Aprovado",
-    },
-    {
-      id: "ORC-003",
-      client: "Mariana Souza",
-      description: "Kit toalhinhas personalizadas",
-      value: 480,
-      date: "2025-10-09",
-      status: "Enviado",
-    },
-  ];
+  });
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -42,6 +33,18 @@ export default function Orcamentos() {
       default:
         return "bg-muted text-muted-foreground border-muted-foreground/30";
     }
+  };
+
+  const openPublicView = (id: string) => {
+    const url = `${window.location.origin}/orcamento/${id}`;
+    window.open(url, "_blank");
+  };
+
+  const openWhatsApp = (client: string, id: string, value: number) => {
+    const message = encodeURIComponent(
+      `Olá ${client}! Segue o seu orçamento ${id} no Ateliê Pro. Total: R$ ${value.toLocaleString('pt-BR')}. Link: ${window.location.origin}/orcamento/${id}`
+    );
+    window.open(`https://wa.me/?text=${message}`, "_blank");
   };
 
   return (
@@ -66,6 +69,11 @@ export default function Orcamentos() {
 
       <div className="p-6">
         <div className="grid gap-4">
+          {isLoading && (
+            <Card className="border-border animate-shimmer">
+              <CardContent className="h-24" />
+            </Card>
+          )}
           {quotes.map((quote) => (
             <Card
               key={quote.id}
@@ -112,10 +120,35 @@ export default function Orcamentos() {
                       </div>
                     </div>
 
-                    <Button variant="outline" size="sm" className="border-secondary text-secondary hover:bg-secondary/10">
-                      <Share2 className="w-4 h-4 mr-2" />
-                      Compartilhar
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-secondary text-secondary hover:bg-secondary/10"
+                        onClick={() => openPublicView(quote.id)}
+                      >
+                        <Share2 className="w-4 h-4 mr-2" />
+                        Abrir
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-border"
+                        onClick={() => window.print()}
+                      >
+                        <Printer className="w-4 h-4 mr-2" />
+                        Imprimir
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-green-600 text-green-600 hover:bg-green-600/10"
+                        onClick={() => openWhatsApp(quote.client, quote.id, quote.value)}
+                      >
+                        <MessageCircle className="w-4 h-4 mr-2" />
+                        WhatsApp
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </CardContent>

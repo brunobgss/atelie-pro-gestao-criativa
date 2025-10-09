@@ -8,14 +8,52 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { ArrowLeft, Upload, Save } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { createOrder, generateOrderCode } from "@/integrations/supabase/orders";
+import { uploadOrderFile } from "@/integrations/supabase/storage";
 
 export default function NovoPedido() {
   const navigate = useNavigate();
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [quantity, setQuantity] = useState<number>(1);
+  const [color, setColor] = useState<string>("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const client = (document.getElementById("client") as HTMLInputElement)?.value;
+    const type = (document.querySelector("[data-select-type]") as HTMLButtonElement)?.dataset.value || "outro";
+    const description = (document.getElementById("description") as HTMLTextAreaElement)?.value || "";
+    const value = Number((document.getElementById("value") as HTMLInputElement)?.value || 0);
+    const paid = Number((document.getElementById("paid") as HTMLInputElement)?.value || 0);
+    const delivery = (document.getElementById("delivery") as HTMLInputElement)?.value || undefined;
+    const code = generateOrderCode();
+
+    let file_url: string | undefined;
+    if (selectedFile) {
+      const upload = await uploadOrderFile(selectedFile, code);
+      if (!upload.ok) {
+        toast.error(upload.error || "Falha no upload");
+        return;
+      }
+      file_url = upload.url;
+    }
+
+    const result = await createOrder({
+      code,
+      customer_name: client,
+      type,
+      description,
+      value,
+      paid,
+      delivery_date: delivery,
+      description: `${description}\nQtd: ${quantity}${color ? ` | Cor: ${color}` : ""}`,
+      file_url,
+    });
+    if (!result.ok) {
+      toast.error(result.error || "Erro ao criar pedido");
+      return;
+    }
     toast.success("Pedido criado com sucesso!");
-    navigate("/pedidos");
+    navigate(`/pedidos/${code}`);
   };
 
   return (
@@ -60,7 +98,7 @@ export default function NovoPedido() {
                 <div className="space-y-2">
                   <Label htmlFor="type">Tipo de Pedido *</Label>
                   <Select required>
-                    <SelectTrigger className="border-input">
+                    <SelectTrigger className="border-input" data-select-type>
                       <SelectValue placeholder="Selecione o tipo" />
                     </SelectTrigger>
                     <SelectContent>
@@ -87,16 +125,16 @@ export default function NovoPedido() {
 
               <div className="space-y-2">
                 <Label htmlFor="file">Arquivo / Arte</Label>
-                <div className="border-2 border-dashed border-input rounded-lg p-6 text-center hover:border-secondary transition-colors cursor-pointer">
+                <label htmlFor="file" className="block border-2 border-dashed border-input rounded-lg p-6 text-center hover:border-secondary transition-colors cursor-pointer">
                   <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">
-                    Clique para fazer upload ou arraste o arquivo
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    PNG, JPG, PDF até 10MB
-                  </p>
-                  <Input id="file" type="file" className="hidden" />
-                </div>
+                  <p className="text-sm text-muted-foreground">Clique para fazer upload ou arraste o arquivo</p>
+                  <p className="text-xs text-muted-foreground mt-1">PNG, JPG, PDF até 10MB</p>
+                </label>
+                <Input 
+                  id="file" 
+                  type="file" 
+                  onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -131,6 +169,17 @@ export default function NovoPedido() {
                     required
                     className="border-input"
                   />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="qty">Quantidade</Label>
+                  <Input id="qty" type="number" min="1" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="color">Cor</Label>
+                  <Input id="color" placeholder="Ex.: Preto, Azul..." value={color} onChange={(e) => setColor(e.target.value)} />
                 </div>
               </div>
 

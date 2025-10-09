@@ -13,6 +13,8 @@ import NovoOrcamento from "./pages/NovoOrcamento";
 import Clientes from "./pages/Clientes";
 import Estoque from "./pages/Estoque";
 import NotFound from "./pages/NotFound";
+import PedidoDetalhe from "./pages/PedidoDetalhe";
+import OrcamentoPublico from "./pages/OrcamentoPublico";
 
 const queryClient = new QueryClient();
 
@@ -26,6 +28,7 @@ const App = () => (
           <Route element={<Layout />}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/pedidos" element={<Pedidos />} />
+            <Route path="/pedidos/:id" element={<PedidoDetalhe />} />
             <Route path="/pedidos/novo" element={<NovoPedido />} />
             <Route path="/agenda" element={<Agenda />} />
             <Route path="/orcamentos" element={<Orcamentos />} />
@@ -33,6 +36,7 @@ const App = () => (
             <Route path="/clientes" element={<Clientes />} />
             <Route path="/estoque" element={<Estoque />} />
           </Route>
+          <Route path="/orcamento/:id" element={<OrcamentoPublico />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

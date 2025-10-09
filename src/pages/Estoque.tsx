@@ -3,18 +3,28 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Plus, AlertTriangle, TrendingDown } from "lucide-react";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
+import { listInventory } from "@/integrations/supabase/inventory";
 
 export default function Estoque() {
-  const items = [
-    { name: "Linha Preta", quantity: 45, unit: "bobinas", min: 20, status: "ok" },
-    { name: "Linha Branca", quantity: 32, unit: "bobinas", min: 20, status: "ok" },
-    { name: "Linha Azul", quantity: 8, unit: "bobinas", min: 15, status: "low" },
-    { name: "Tecido Algodão", quantity: 150, unit: "metros", min: 50, status: "ok" },
-    { name: "Tecido Poliéster", quantity: 25, unit: "metros", min: 40, status: "low" },
-    { name: "Zíperes", quantity: 3, unit: "unidades", min: 20, status: "critical" },
-    { name: "Botões", quantity: 180, unit: "unidades", min: 100, status: "ok" },
-    { name: "Elástico", quantity: 12, unit: "metros", min: 15, status: "low" },
-  ];
+  const { data: items = [], isLoading } = useQuery({
+    queryKey: ["inventory"],
+    queryFn: async () => {
+      const rows = await listInventory();
+      return rows.map((r) => ({
+        name: r.name,
+        quantity: Number(r.quantity || 0),
+        unit: r.unit,
+        min: Number(r.min_quantity || 0),
+        status: r.status,
+      }));
+    },
+  });
 
   const getStatusInfo = (status: string, quantity: number, min: number) => {
     switch (status) {
@@ -53,10 +63,52 @@ export default function Estoque() {
               <p className="text-sm text-muted-foreground">Gerencie materiais e insumos</p>
             </div>
           </div>
-          <Button className="bg-secondary hover:bg-secondary/90 text-secondary-foreground">
-            <Plus className="w-4 h-4 mr-2" />
-            Adicionar Item
-          </Button>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button className="bg-secondary hover:bg-secondary/90 text-secondary-foreground">
+                <Plus className="w-4 h-4 mr-2" />
+                Adicionar Item
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Novo Item de Estoque</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 py-2">
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="iname" className="text-right">Nome</Label>
+                  <Input id="iname" className="col-span-3" />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="iunit" className="text-right">Unidade</Label>
+                  <Input id="iunit" defaultValue="unidades" className="col-span-3" />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="iqty" className="text-right">Quantidade</Label>
+                  <Input id="iqty" type="number" defaultValue={0} className="col-span-3" />
+                </div>
+                <div className="grid grid-cols-4 items-center gap-4">
+                  <Label htmlFor="imin" className="text-right">Mínimo</Label>
+                  <Input id="imin" type="number" defaultValue={0} className="col-span-3" />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button
+                  onClick={async () => {
+                    const name = (document.getElementById("iname") as HTMLInputElement)?.value;
+                    const unit = (document.getElementById("iunit") as HTMLInputElement)?.value;
+                    const quantity = Number((document.getElementById("iqty") as HTMLInputElement)?.value || 0);
+                    const min = Number((document.getElementById("imin") as HTMLInputElement)?.value || 0);
+                    const { error } = await supabase.from("inventory_items").insert({ name, unit, quantity, min_quantity: min, status: quantity <= 0 ? "critical" : quantity < min ? "low" : "ok" });
+                    if (error) return toast.error(error.message);
+                    toast.success("Item adicionado");
+                  }}
+                >
+                  Salvar
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </header>
 
@@ -100,6 +152,9 @@ export default function Estoque() {
 
         {/* Items List */}
         <div className="grid gap-3">
+          {isLoading && (
+            <Card className="border-border animate-shimmer"><CardContent className="h-20" /></Card>
+          )}
           {items.map((item, index) => {
             const statusInfo = getStatusInfo(item.status, item.quantity, item.min);
             

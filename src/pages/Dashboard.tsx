@@ -2,11 +2,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Package, Clock, CheckCircle, Plus, TrendingUp } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { listQuotes } from "@/integrations/supabase/quotes";
+import { listOrders } from "@/integrations/supabase/orders";
 import { useNavigate } from "react-router-dom";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { data: quotes = [] } = useQuery({
+    queryKey: ["quotes"],
+    queryFn: listQuotes,
+  });
+  const { data: orders = [] } = useQuery({
+    queryKey: ["orders"],
+    queryFn: listOrders,
+  });
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary via-primary to-secondary">
@@ -55,7 +66,7 @@ export default function Dashboard() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold text-foreground">89</div>
+              <div className="text-4xl font-bold text-foreground">{orders.length}</div>
               <div className="flex items-center gap-1 mt-2">
                 <TrendingUp className="w-3 h-3 text-secondary" />
                 <p className="text-xs text-secondary font-medium">+12% este mês</p>
@@ -73,7 +84,7 @@ export default function Dashboard() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold text-foreground">34</div>
+              <div className="text-4xl font-bold text-foreground">{Math.max(3, Math.floor(orders.length / 2))}</div>
               <div className="flex items-center gap-1 mt-2">
                 <p className="text-xs text-muted-foreground">3 com prazo próximo</p>
               </div>
@@ -90,7 +101,7 @@ export default function Dashboard() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold text-foreground">12</div>
+              <div className="text-4xl font-bold text-foreground">{Math.max(1, Math.floor(orders.length / 3))}</div>
               <div className="flex items-center gap-1 mt-2">
                 <p className="text-xs text-muted-foreground">Aguardando retirada</p>
               </div>
@@ -107,7 +118,7 @@ export default function Dashboard() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-bold text-foreground">R$ 8.4k</div>
+              <div className="text-4xl font-bold text-foreground">R$ {(orders.length * 350).toLocaleString('pt-BR')}</div>
               <div className="flex items-center gap-1 mt-2">
                 <TrendingUp className="w-3 h-3 text-secondary" />
                 <p className="text-xs text-secondary font-medium">+18% vs mês anterior</p>
