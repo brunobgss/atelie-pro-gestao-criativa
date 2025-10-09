@@ -1,5 +1,6 @@
-import { LayoutDashboard, Package, Calendar, FileText, Users, Archive, Menu } from "lucide-react";
+import { LayoutDashboard, Package, Calendar, FileText, Users, Archive } from "lucide-react";
 import { NavLink } from "react-router-dom";
+import logoAteliePro from "@/assets/logo-atelie-pro.png";
 import {
   Sidebar,
   SidebarContent,
@@ -30,19 +31,19 @@ export function AppSidebar() {
     <Sidebar collapsible="icon" className="border-r border-sidebar-border">
       <div className="p-6 border-b border-sidebar-border">
         {!isCollapsed && (
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-accent to-secondary flex items-center justify-center shadow-md">
-              <span className="text-sidebar-background font-bold text-lg">A</span>
-            </div>
-            <div>
-              <h1 className="font-semibold text-sidebar-foreground text-lg">Ateliê Pro</h1>
-              <p className="text-xs text-sidebar-foreground/60">Gestão Premium</p>
-            </div>
+          <div className="flex items-center justify-center">
+            <img 
+              src={logoAteliePro} 
+              alt="Ateliê Pro" 
+              className="h-12 w-auto object-contain"
+            />
           </div>
         )}
         {isCollapsed && (
-          <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-accent to-secondary flex items-center justify-center shadow-md mx-auto">
-            <span className="text-sidebar-background font-bold text-lg">A</span>
+          <div className="flex items-center justify-center">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-md">
+              <span className="text-sidebar-foreground font-bold text-lg">A</span>
+            </div>
           </div>
         )}
       </div>
