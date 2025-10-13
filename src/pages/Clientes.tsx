@@ -7,7 +7,7 @@ import { Search, Phone, Mail, Package, Plus, Edit, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { createCustomer } from "@/integrations/supabase/customers";
+import { createCustomer, deleteCustomer } from "@/integrations/supabase/customers";
 import { toast } from "sonner";
 
 export default function Clientes() {
@@ -21,8 +21,14 @@ export default function Clientes() {
   const handleDeleteClient = async (client: any) => {
     if (confirm(`Tem certeza que deseja excluir "${client.name}"?`)) {
       try {
-        // Implementar exclusão
+        const result = await deleteCustomer(client.id);
+        if (!result.ok) {
+          toast.error(result.error || "Erro ao excluir cliente");
+          return;
+        }
         toast.success("Cliente excluído com sucesso!");
+        // Recarregar a página para atualizar a lista
+        window.location.reload();
       } catch (error) {
         toast.error("Erro ao excluir cliente");
       }
