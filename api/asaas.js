@@ -167,6 +167,8 @@ async function createPayment(paymentData) {
   }
 
   console.log('🔄 Criando pagamento ASAAS:', payload);
+  console.log('🔑 API Key presente:', process.env.VITE_ASAAS_API_KEY ? 'SIM' : 'NÃO');
+  console.log('🔑 Primeiros 10 caracteres da API Key:', process.env.VITE_ASAAS_API_KEY?.substring(0, 10) + '...');
 
   const response = await fetch('https://www.asaas.com/api/v3/payments', {
     method: 'POST',
