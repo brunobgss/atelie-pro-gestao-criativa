@@ -1,6 +1,6 @@
 import { LayoutDashboard, Package, Calendar, FileText, Users, Archive, LogOut, Calculator, BookOpen, BarChart3, Crown, DollarSign, User } from "lucide-react";
 import { NavLink } from "react-router-dom";
-import logoAteliePro from "@/assets/logo-atelie-pro.png";
+import logoAteliePro from "@/assets/logo-atelie-pro.svg";
 import {
   Sidebar,
   SidebarContent,
@@ -40,15 +40,17 @@ export function AppSidebar() {
           <div className="flex flex-col items-center space-y-4">
             {/* Logo oficial do Ateliê Pro */}
             <div className="flex flex-col items-center space-y-3">
-              <img 
-                src={logoAteliePro} 
-                alt="Ateliê Pro" 
-                className="h-16 w-auto object-contain"
-                onError={(e) => {
-                  console.log("Erro ao carregar logo SVG, usando fallback");
-                  e.currentTarget.style.display = 'none';
-                }}
-              />
+              <div className="bg-white rounded-lg p-2 shadow-sm border border-gray-200">
+                <img 
+                  src={logoAteliePro} 
+                  alt="Ateliê Pro" 
+                  className="h-12 w-auto object-contain"
+                  onError={(e) => {
+                    console.log("Erro ao carregar logo SVG, usando fallback");
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              </div>
               <div className="text-center">
                 <p className="text-sm text-gray-600 font-medium">Sistema de Gestão</p>
               </div>
