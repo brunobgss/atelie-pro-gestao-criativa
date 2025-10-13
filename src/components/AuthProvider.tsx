@@ -67,9 +67,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchEmpresa = async (userId: string) => {
     try {
-      // Timeout reduzido para 3 segundos para melhor performance
+      // Timeout aumentado para 10 segundos para melhor conectividade
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout')), 3000)
+        setTimeout(() => reject(new Error('Timeout')), 10000)
       );
 
       const fetchPromise = supabase
@@ -152,9 +152,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await supabase.auth.signOut();
       setUser(null);
       setEmpresa(null);
+      // Limpar dados persistidos do localStorage
+      clearTrialData();
       toast.success("Logout realizado com sucesso");
     } catch (error: any) {
-      toast.error("Erro ao fazer logout");
+      console.error("Erro ao fazer logout:", error);
+      // Mesmo com erro, limpar dados locais
+      setUser(null);
+      setEmpresa(null);
+      clearTrialData();
+      toast.error("Erro ao fazer logout, mas dados locais foram limpos");
     }
   };
 
