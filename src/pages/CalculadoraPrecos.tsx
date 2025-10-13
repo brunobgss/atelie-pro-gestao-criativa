@@ -11,6 +11,7 @@ import { Calculator, Zap, Clock, Package, Save, FileText, Shirt, Coffee, Crown, 
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { saveProduct } from "@/integrations/supabase/inventory";
 
 interface Material {
   id: string;
@@ -177,23 +178,33 @@ _Orçamento gerado pela Calculadora Profissional_
     toast.success("Orçamento copiado para área de transferência!");
   };
 
-  const saveAsProduct = () => {
-    const productData = {
-      name: productType === "personalizado" ? "Produto Personalizado" : productTemplates[productType]?.name || "Bordado",
-      type: productType,
-      materials,
-      workHours,
-      unitPrice: unitPrice,
-      profitMargin,
-      createdAt: new Date().toISOString()
-    };
-    
-    // Salvar no localStorage para futuro uso
-    const savedProducts = JSON.parse(localStorage.getItem('savedProducts') || '[]');
-    savedProducts.push(productData);
-    localStorage.setItem('savedProducts', JSON.stringify(savedProducts));
-    
-    toast.success("Produto salvo no catálogo!");
+  const saveAsProduct = async () => {
+    try {
+      const productData = {
+        name: productType === "personalizado" ? "Produto Personalizado" : productTemplates[productType]?.name || "Bordado",
+        type: productType,
+        materials,
+        workHours,
+        unitPrice: unitPrice,
+        profitMargin,
+      };
+      
+      const result = await saveProduct(productData);
+      
+      if (!result.ok) {
+        toast.error(result.error || "Erro ao salvar produto");
+        return;
+      }
+      
+      // Salvar também no localStorage para backup
+      const savedProducts = JSON.parse(localStorage.getItem('savedProducts') || '[]');
+      savedProducts.push({ ...productData, id: result.id, createdAt: new Date().toISOString() });
+      localStorage.setItem('savedProducts', JSON.stringify(savedProducts));
+      
+      toast.success("Produto salvo no catálogo!");
+    } catch (error) {
+      toast.error("Erro ao salvar produto");
+    }
   };
 
   const createQuoteFromCalculation = () => {

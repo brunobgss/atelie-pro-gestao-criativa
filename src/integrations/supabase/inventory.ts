@@ -31,4 +31,45 @@ export async function listInventory(): Promise<InventoryRow[]> {
   }
 }
 
+export type ProductRow = {
+  id: string;
+  name: string;
+  type: string;
+  materials: any;
+  work_hours: number;
+  unit_price: number;
+  profit_margin: number;
+  created_at: string;
+};
+
+export async function saveProduct(productData: {
+  name: string;
+  type: string;
+  materials: any;
+  workHours: number;
+  unitPrice: number;
+  profitMargin: number;
+}): Promise<{ ok: boolean; id?: string; error?: string }> {
+  try {
+    const { data, error } = await supabase
+      .from("atelie_products")
+      .insert({
+        name: productData.name,
+        type: productData.type,
+        materials: productData.materials,
+        work_hours: productData.workHours,
+        unit_price: productData.unitPrice,
+        profit_margin: productData.profitMargin,
+        created_at: new Date().toISOString()
+      })
+      .select("id")
+      .single();
+    
+    if (error) throw error;
+    return { ok: true, id: data?.id };
+  } catch (e: any) {
+    return { ok: false, error: e?.message ?? "Erro ao salvar produto" };
+  }
+}
+
 
