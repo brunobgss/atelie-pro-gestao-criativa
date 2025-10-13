@@ -68,9 +68,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchEmpresa = async (userId: string) => {
     try {
-      // Timeout aumentado para 10 segundos para melhor conectividade
+      // Timeout reduzido para 5 segundos para melhor performance
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout')), 10000)
+        setTimeout(() => reject(new Error('Timeout')), 5000)
       );
 
       const fetchPromise = supabase
