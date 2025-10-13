@@ -18,11 +18,5 @@
       "src": "/(.*)",
       "dest": "/index.html"
     }
-  ],
-  "env": {
-    "VITE_SUPABASE_URL": "https://xthioxkfkxjvqcjqllfy.supabase.co",
-    "VITE_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh0aGlveGtma3hqdnFjanFsbGZ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAwMTI2MTIsImV4cCI6MjA3NTU4ODYxMn0.JejxFLLbf9cDyACJvkFe5WQEs5hGfpmkO3DqF01tuLE",
-    "VITE_ASAAS_API_URL": "https://www.asaas.com/api/v3",
-    "VITE_ASAAS_API_KEY": "$aact_prod_000MzkwODA2MWY2OGM3MWRlMDU2NWM3MzJlNzZmNGZhZGY6OmY0OWFiYzRhLTVhZDAtNDAwMS1iMWZjLTQxOWZlM2ViOTkxOTo6JGFhY2hfYWYxZTdlOGUtOWU5Yi00ZDQzLTlhN2ItMzQzNjAwYTEzZjU3"
-  }
+  ]
 }
