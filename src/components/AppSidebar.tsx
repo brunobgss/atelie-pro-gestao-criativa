@@ -38,33 +38,43 @@ export function AppSidebar() {
       <div className="p-6 border-b border-border/50">
         {!isCollapsed && (
           <div className="flex flex-col items-center space-y-4">
+            {/* Logo estilizada como no design original */}
             <div className="flex items-center space-x-3">
-              <img 
-                src={logoAteliePro} 
-                alt="Ateliê Pro" 
-                className="h-14 w-auto object-contain"
-                onError={(e) => {
-                  console.log("Erro ao carregar logo, usando fallback");
-                  e.currentTarget.style.display = 'none';
-                }}
-              />
+              <div className="relative">
+                <div className="w-16 h-16 bg-gradient-to-br from-purple-600 to-purple-800 rounded-xl flex items-center justify-center shadow-lg">
+                  <span className="text-white font-bold text-2xl">A</span>
+                </div>
+                {/* Engrenagem pequena no canto */}
+                <div className="absolute -top-1 -right-1 w-6 h-6 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center">
+                  <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+                  </svg>
+                </div>
+              </div>
               <div className="text-left">
-                <h1 className="text-lg font-bold text-foreground">Ateliê Pro</h1>
-                <p className="text-xs text-muted-foreground">Gestão Criativa</p>
+                <h1 className="text-xl font-bold text-gray-900">Ateliê Pro</h1>
+                <p className="text-sm text-gray-600">Sistema de Gestão</p>
               </div>
             </div>
             {empresa && (
-              <div className="text-center bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-3 w-full">
-                <p className="text-sm font-semibold text-purple-700">{empresa.nome}</p>
-                <p className="text-xs text-purple-600">Sistema de Gestão</p>
+              <div className="text-center bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-3 w-full border border-purple-200">
+                <p className="text-sm font-semibold text-purple-800">{empresa.nome}</p>
+                <p className="text-xs text-purple-600">Empresa Ativa</p>
               </div>
             )}
           </div>
         )}
         {isCollapsed && (
           <div className="flex items-center justify-center">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center shadow-lg">
-              <span className="text-white font-bold text-xl">A</span>
+            <div className="relative">
+              <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-purple-800 rounded-xl flex items-center justify-center shadow-lg">
+                <span className="text-white font-bold text-xl">A</span>
+              </div>
+              <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center">
+                <svg className="w-2 h-2 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+                </svg>
+              </div>
             </div>
           </div>
         )}
@@ -80,15 +90,15 @@ export function AppSidebar() {
                     to={item.url}
                     end={item.url === "/"}
                     className={({ isActive }) =>
-                      `flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                      `flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
                         isActive
-                          ? "bg-secondary text-secondary-foreground font-medium shadow-sm"
-                          : "text-foreground hover:bg-muted"
+                          ? "bg-gradient-to-r from-purple-100 to-pink-100 text-purple-800 font-semibold shadow-sm border-l-4 border-purple-500"
+                          : "text-gray-700 hover:bg-gray-50 hover:text-purple-600"
                       }`
                     }
                   >
-                    <item.icon className="w-5 h-5" />
-                    <span className="text-sm">{item.title}</span>
+                    <item.icon className={`w-5 h-5 ${item.title === "Dashboard" ? "text-purple-600" : ""}`} />
+                    <span className="text-sm font-medium">{item.title}</span>
                   </NavLink>
                 </SidebarMenuItem>
               ))}
