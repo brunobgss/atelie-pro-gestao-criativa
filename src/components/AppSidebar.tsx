@@ -37,24 +37,34 @@ export function AppSidebar() {
     <Sidebar collapsible="none" className="bg-card border-r border-border">
       <div className="p-6 border-b border-border/50">
         {!isCollapsed && (
-          <div className="flex flex-col items-center space-y-3">
-            <img 
-              src={logoAteliePro} 
-              alt="Ateliê Pro" 
-              className="h-12 w-auto object-contain"
-            />
+          <div className="flex flex-col items-center space-y-4">
+            <div className="flex items-center space-x-3">
+              <img 
+                src={logoAteliePro} 
+                alt="Ateliê Pro" 
+                className="h-14 w-auto object-contain"
+                onError={(e) => {
+                  console.log("Erro ao carregar logo, usando fallback");
+                  e.currentTarget.style.display = 'none';
+                }}
+              />
+              <div className="text-left">
+                <h1 className="text-lg font-bold text-foreground">Ateliê Pro</h1>
+                <p className="text-xs text-muted-foreground">Gestão Criativa</p>
+              </div>
+            </div>
             {empresa && (
-              <div className="text-center">
-                <p className="text-sm font-medium text-foreground">{empresa.nome}</p>
-                <p className="text-xs text-muted-foreground">Sistema de Gestão</p>
+              <div className="text-center bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-3 w-full">
+                <p className="text-sm font-semibold text-purple-700">{empresa.nome}</p>
+                <p className="text-xs text-purple-600">Sistema de Gestão</p>
               </div>
             )}
           </div>
         )}
         {isCollapsed && (
           <div className="flex items-center justify-center">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg">
-              <span className="text-white font-bold text-lg">A</span>
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center shadow-lg">
+              <span className="text-white font-bold text-xl">A</span>
             </div>
           </div>
         )}

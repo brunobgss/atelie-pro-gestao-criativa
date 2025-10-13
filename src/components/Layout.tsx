@@ -25,7 +25,7 @@ export function Layout() {
   }
 
   return (
-    <SidebarProvider defaultOpen={false}>
+    <SidebarProvider defaultOpen={true}>
       <TrialProtectedRoute>
         <div className="min-h-screen flex w-full bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100">
           <AppSidebar />
