@@ -30,21 +30,16 @@ class ASAASService {
   private async makeRequest(endpoint: string, data: any) {
     console.log(`🔄 ASAAS Request: ${endpoint}`, data);
 
-    // Usar proxy público que funciona com CORS
-    const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
-    const asaasUrl = `${ASAAS_API_URL}/${endpoint}`;
-    const fullUrl = `${proxyUrl}${asaasUrl}`;
-
-    console.log(`🌐 Usando proxy: ${fullUrl}`);
-
-    const response = await fetch(fullUrl, {
+    // Usar nossa API intermediária local
+    const response = await fetch('/api/asaas', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'access_token': ASAAS_API_KEY,
-        'X-Requested-With': 'XMLHttpRequest'
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify({ 
+        action: endpoint === 'customers' ? 'createCustomer' : 'createPayment',
+        data: data 
+      }),
     });
 
     if (!response.ok) {
@@ -55,7 +50,12 @@ class ASAASService {
 
     const result = await response.json();
     console.log(`✅ ASAAS Response: ${endpoint}`, result);
-    return result;
+    
+    if (!result.success) {
+      throw new Error(result.error || 'Erro desconhecido');
+    }
+    
+    return result.data;
   }
 
   async createCustomer(customerData: ASAASCustomer) {
