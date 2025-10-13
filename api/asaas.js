@@ -1,4 +1,4 @@
-// api/asaas.js - API ASAAS para Vercel
+// api/asaas.js - API ASAAS simplificada
 export default async function handler(req, res) {
   console.log('🚀 ASAAS API chamada:', req.method, req.url);
   
@@ -91,24 +91,19 @@ export default async function handler(req, res) {
 
 // Função para criar cliente no ASAAS
 async function createCustomer(customerData) {
-  const { name, email, phone, cpfCnpj } = customerData;
-
-  // Validar dados obrigatórios
-  if (!name || !email) {
-    throw new Error('Dados obrigatórios: name, email');
-  }
+  console.log('🔄 Criando cliente ASAAS:', customerData);
 
   const payload = {
-    name,
-    email,
+    name: customerData.name,
+    email: customerData.email,
     notificationDisabled: false
   };
 
   // Adicionar campos opcionais se fornecidos
-  if (phone) payload.phone = phone;
-  if (cpfCnpj) payload.cpfCnpj = cpfCnpj;
+  if (customerData.phone) payload.phone = customerData.phone;
+  if (customerData.cpfCnpj) payload.cpfCnpj = customerData.cpfCnpj;
 
-  console.log('🔄 Criando cliente ASAAS:', payload);
+  console.log('📤 Payload para ASAAS:', payload);
 
   const response = await fetch('https://www.asaas.com/api/v3/customers', {
     method: 'POST',
@@ -119,7 +114,10 @@ async function createCustomer(customerData) {
     body: JSON.stringify(payload)
   });
 
+  console.log('📡 Status da resposta:', response.status);
+
   const data = await response.json();
+  console.log('📡 Dados da resposta:', data);
 
   if (!response.ok) {
     console.error('❌ Erro ASAAS createCustomer:', data);
@@ -132,6 +130,8 @@ async function createCustomer(customerData) {
 
 // Função para criar pagamento único (link de pagamento)
 async function createPayment(paymentData) {
+  console.log('🔄 Criando pagamento ASAAS:', paymentData);
+
   const { customerId, planType, companyId } = paymentData;
 
   // Validar dados obrigatórios
@@ -149,9 +149,7 @@ async function createPayment(paymentData) {
       value: 39.00,
       dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       description: 'Assinatura Mensal - Ateliê Pro',
-      externalReference: companyId || 'temp-company',
-      callbackUrl: 'https://atelie-pro-gestao-criativa.vercel.app/assinatura-sucesso',
-      successUrl: 'https://atelie-pro-gestao-criativa.vercel.app/assinatura-sucesso'
+      externalReference: companyId || 'temp-company'
     };
   } else if (planType === 'yearly') {
     payload = {
@@ -160,17 +158,14 @@ async function createPayment(paymentData) {
       value: 390.00,
       dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       description: 'Assinatura Anual - Ateliê Pro',
-      externalReference: companyId || 'temp-company',
-      callbackUrl: 'https://atelie-pro-gestao-criativa.vercel.app/assinatura-sucesso',
-      successUrl: 'https://atelie-pro-gestao-criativa.vercel.app/assinatura-sucesso'
+      externalReference: companyId || 'temp-company'
     };
   } else {
     throw new Error('Tipo de plano inválido. Use: monthly ou yearly');
   }
 
-  console.log('🔄 Criando pagamento ASAAS:', payload);
+  console.log('📤 Payload para ASAAS:', payload);
   console.log('🔑 API Key presente:', process.env.VITE_ASAAS_API_KEY ? 'SIM' : 'NÃO');
-  console.log('🔑 Primeiros 10 caracteres da API Key:', process.env.VITE_ASAAS_API_KEY?.substring(0, 10) + '...');
 
   const response = await fetch('https://www.asaas.com/api/v3/payments', {
     method: 'POST',
