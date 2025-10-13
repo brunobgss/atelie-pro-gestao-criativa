@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from "react
 import { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { getTrialData, saveTrialData, createNewTrial, clearTrialData } from "@/utils/trialPersistence";
 
 interface Empresa {
   id: string;
@@ -90,132 +91,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
 
       if (error) {
-        console.warn("Erro ao buscar empresa, usando dados padrão:", error.message);
-        
-        // Verificar se já existe uma data de trial persistida no localStorage
-        const STORAGE_KEY = 'atelie-pro-trial-end-date';
-        const STORAGE_KEY_EMPRESA = 'atelie-pro-empresa-data';
-        
-        let trialEndDate: string;
-        let empresaData: any = null;
+        console.warn("Erro ao buscar empresa, usando dados persistidos:", error.message);
         
         // Tentar recuperar dados persistidos
-        const storedTrialDate = localStorage.getItem(STORAGE_KEY);
-        const storedEmpresaData = localStorage.getItem(STORAGE_KEY_EMPRESA);
+        const trialData = getTrialData();
         
-        if (storedTrialDate && storedEmpresaData) {
+        if (trialData && trialData.userId === userId) {
           // Usar dados persistidos
-          trialEndDate = storedTrialDate;
-          empresaData = JSON.parse(storedEmpresaData);
-          // Usar dados persistidos do localStorage se disponível
+          setEmpresa(trialData.empresaData);
+          console.log("Usando dados persistidos do localStorage");
         } else {
-          // Primeira vez: criar trial de 7 dias e persistir
-          const trialEnd = new Date();
-          trialEnd.setDate(trialEnd.getDate() + 7);
-          trialEndDate = trialEnd.toISOString();
-          
-          empresaData = {
-            id: "temp-id",
-            nome: "Empresa Temporária",
-            email: "temp@empresa.com",
-            telefone: "",
-            responsavel: "Usuário",
-            trial_end_date: trialEndDate
-          };
-          
-          // Persistir no localStorage
-          localStorage.setItem(STORAGE_KEY, trialEndDate);
-          localStorage.setItem(STORAGE_KEY_EMPRESA, JSON.stringify(empresaData));
-          // Criar novo trial de 7 dias e persistir
+          // Criar novo trial
+          const newTrialData = createNewTrial(userId);
+          setEmpresa(newTrialData.empresaData);
+          console.log("Criando novo trial de 7 dias");
         }
-        
-        setEmpresa(empresaData);
         return;
       }
 
       if (data?.empresas) {
         setEmpresa(data.empresas);
       } else {
-        // Usar dados temporários em caso de erro
-        const STORAGE_KEY = 'atelie-pro-trial-end-date';
-        const STORAGE_KEY_EMPRESA = 'atelie-pro-empresa-data';
-        
-        let trialEndDate: string;
-        let empresaData: any = null;
-        
         // Tentar recuperar dados persistidos
-        const storedTrialDate = localStorage.getItem(STORAGE_KEY);
-        const storedEmpresaData = localStorage.getItem(STORAGE_KEY_EMPRESA);
+        const trialData = getTrialData();
         
-        if (storedTrialDate && storedEmpresaData) {
+        if (trialData && trialData.userId === userId) {
           // Usar dados persistidos
-          trialEndDate = storedTrialDate;
-          empresaData = JSON.parse(storedEmpresaData);
+          setEmpresa(trialData.empresaData);
           console.log("Usando dados persistidos do localStorage (sem empresa)");
         } else {
-          // Primeira vez: criar trial de 7 dias e persistir
-          const trialEnd = new Date();
-          trialEnd.setDate(trialEnd.getDate() + 7);
-          trialEndDate = trialEnd.toISOString();
-          
-          empresaData = {
-            id: "temp-id",
-            nome: "Empresa Temporária",
-            email: "temp@empresa.com",
-            telefone: "",
-            responsavel: "Usuário",
-            trial_end_date: trialEndDate
-          };
-          
-          // Persistir no localStorage
-          localStorage.setItem(STORAGE_KEY, trialEndDate);
-          localStorage.setItem(STORAGE_KEY_EMPRESA, JSON.stringify(empresaData));
-          console.log("Criando novo trial de 7 dias e persistindo (sem empresa)");
+          // Criar novo trial
+          const newTrialData = createNewTrial(userId);
+          setEmpresa(newTrialData.empresaData);
+          console.log("Criando novo trial de 7 dias (sem empresa)");
         }
-        
-        setEmpresa(empresaData);
       }
     } catch (error: any) {
-      console.warn("Erro ao buscar empresa, usando dados padrão:", error.message);
-      
-      // Usar dados temporários em caso de erro
-      const STORAGE_KEY = 'atelie-pro-trial-end-date';
-      const STORAGE_KEY_EMPRESA = 'atelie-pro-empresa-data';
-      
-      let trialEndDate: string;
-      let empresaData: any = null;
+      console.warn("Erro ao buscar empresa, usando dados persistidos:", error.message);
       
       // Tentar recuperar dados persistidos
-      const storedTrialDate = localStorage.getItem(STORAGE_KEY);
-      const storedEmpresaData = localStorage.getItem(STORAGE_KEY_EMPRESA);
+      const trialData = getTrialData();
       
-      if (storedTrialDate && storedEmpresaData) {
+      if (trialData && trialData.userId === userId) {
         // Usar dados persistidos
-        trialEndDate = storedTrialDate;
-        empresaData = JSON.parse(storedEmpresaData);
-        // Usar dados persistidos do localStorage (catch)
+        setEmpresa(trialData.empresaData);
+        console.log("Usando dados persistidos do localStorage (catch)");
       } else {
-        // Primeira vez: criar trial de 7 dias e persistir
-        const trialEnd = new Date();
-        trialEnd.setDate(trialEnd.getDate() + 7);
-        trialEndDate = trialEnd.toISOString();
-        
-        empresaData = {
-          id: "temp-id",
-          nome: "Empresa Temporária",
-          email: "temp@empresa.com",
-          telefone: "",
-          responsavel: "Usuário",
-          trial_end_date: trialEndDate
-        };
-        
-        // Persistir no localStorage
-        localStorage.setItem(STORAGE_KEY, trialEndDate);
-        localStorage.setItem(STORAGE_KEY_EMPRESA, JSON.stringify(empresaData));
-        console.log("Criando novo trial de 7 dias e persistindo (catch)");
+        // Criar novo trial
+        const newTrialData = createNewTrial(userId);
+        setEmpresa(newTrialData.empresaData);
+        console.log("Criando novo trial de 7 dias (catch)");
       }
-      
-      setEmpresa(empresaData);
     } finally {
       setLoading(false);
     }
