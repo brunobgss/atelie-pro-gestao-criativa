@@ -8,7 +8,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/components/AuthProvider";
-import { asaasService } from "@/integrations/asaas/service-direct";
+import { asaasService } from "@/integrations/asaas/service-vite";
 
 interface Plan {
   id: string;
