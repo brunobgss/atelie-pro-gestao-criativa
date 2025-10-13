@@ -59,6 +59,8 @@ class ASAASService {
   }
 
   async createCustomer(customerData: ASAASCustomer) {
+    console.log('🔄 Dados recebidos para criar cliente:', customerData);
+    
     const payload = {
       name: customerData.name,
       email: customerData.email,
@@ -69,6 +71,7 @@ class ASAASService {
     if (customerData.phone) payload.phone = customerData.phone;
     if (customerData.cpfCnpj) payload.cpfCnpj = customerData.cpfCnpj;
 
+    console.log('📤 Payload final para ASAAS:', payload);
     return await this.makeRequest('customers', payload);
   }
 
@@ -76,13 +79,15 @@ class ASAASService {
     return await this.makeRequest('payments', paymentData);
   }
 
-  async createMonthlySubscription(userEmail: string, userName: string) {
+  async createMonthlySubscription(userEmail: string, userName: string, companyId?: string, cpfCnpj?: string, phone?: string, paymentMethod: string = 'PIX') {
     console.log('🔄 Criando pagamento mensal...');
     
     // Primeiro criar o cliente
     const customer = await this.createCustomer({
       name: userName,
-      email: userEmail
+      email: userEmail,
+      cpfCnpj: cpfCnpj,
+      phone: phone
     });
 
     console.log('✅ Cliente criado:', customer);
@@ -91,20 +96,23 @@ class ASAASService {
     const payment = await this.createPayment({
       customerId: customer.id,
       planType: 'monthly',
-      companyId: 'temp-company'
+      companyId: companyId || 'temp-company',
+      paymentMethod: paymentMethod
     });
 
     console.log('✅ Pagamento mensal criado:', payment);
     return { customer, payment };
   }
 
-  async createYearlySubscription(userEmail: string, userName: string) {
+  async createYearlySubscription(userEmail: string, userName: string, companyId?: string, cpfCnpj?: string, phone?: string, paymentMethod: string = 'PIX') {
     console.log('🔄 Criando pagamento anual...');
     
     // Primeiro criar o cliente
     const customer = await this.createCustomer({
       name: userName,
-      email: userEmail
+      email: userEmail,
+      cpfCnpj: cpfCnpj,
+      phone: phone
     });
 
     console.log('✅ Cliente criado:', customer);
@@ -113,7 +121,8 @@ class ASAASService {
     const payment = await this.createPayment({
       customerId: customer.id,
       planType: 'yearly',
-      companyId: 'temp-company'
+      companyId: companyId || 'temp-company',
+      paymentMethod: paymentMethod
     });
 
     console.log('✅ Pagamento anual criado:', payment);

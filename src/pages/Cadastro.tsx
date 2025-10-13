@@ -17,6 +17,7 @@ export default function Cadastro() {
     empresa: "",
     nome: "",
     telefone: "",
+    cpfCnpj: "",
   });
   const [loading, setLoading] = useState(false);
 
@@ -60,6 +61,7 @@ export default function Cadastro() {
             email: formData.email,
             telefone: formData.telefone,
             responsavel: formData.nome,
+            cpf_cnpj: formData.cpfCnpj,
           })
           .select("id")
           .single();
@@ -151,6 +153,18 @@ export default function Cadastro() {
                 />
               </div>
               <div className="space-y-2">
+                <Label htmlFor="cpfCnpj" className="text-white">CPF ou CNPJ</Label>
+                <Input
+                  id="cpfCnpj"
+                  name="cpfCnpj"
+                  value={formData.cpfCnpj}
+                  onChange={handleChange}
+                  className="bg-white/20 border-white/30 text-white placeholder:text-purple-200"
+                  placeholder="000.000.000-00 ou 00.000.000/0000-00"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="telefone" className="text-white">Telefone</Label>
                 <Input
                   id="telefone"
@@ -159,6 +173,7 @@ export default function Cadastro() {
                   onChange={handleChange}
                   className="bg-white/20 border-white/30 text-white placeholder:text-purple-200"
                   placeholder="(11) 99999-9999"
+                  required
                 />
               </div>
               <div className="space-y-2">

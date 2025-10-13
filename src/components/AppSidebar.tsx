@@ -1,6 +1,6 @@
 import { LayoutDashboard, Package, Calendar, FileText, Users, Archive, LogOut, Calculator, BookOpen, BarChart3, Crown, DollarSign, User } from "lucide-react";
 import { NavLink } from "react-router-dom";
-import logoAteliePro from "@/assets/logo-atelie-pro.svg";
+import logoAteliePro from "@/assets/logo-atelie-pro.png";
 import {
   Sidebar,
   SidebarContent,

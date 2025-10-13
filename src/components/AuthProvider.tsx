@@ -10,6 +10,7 @@ interface Empresa {
   email: string;
   telefone?: string;
   responsavel?: string;
+  cpf_cnpj?: string;
   trial_end_date?: string;
   created_at?: string;
   updated_at?: string;
@@ -82,6 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             email,
             telefone,
             responsavel,
+            cpf_cnpj,
             created_at
           )
         `)

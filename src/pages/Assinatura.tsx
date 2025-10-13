@@ -8,10 +8,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/components/AuthProvider";
-import { asaasService } from "@/integrations/asaas/service-vite";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface Plan {
   id: string;
@@ -71,20 +68,39 @@ export default function Assinatura() {
   const { user, empresa } = useAuth();
   const [selectedPlan, setSelectedPlan] = useState<string>("yearly");
   const [isLoading, setIsLoading] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [cpfCnpj, setCpfCnpj] = useState("");
-  const [phone, setPhone] = useState("");
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("PIX");
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [pendingPlanId, setPendingPlanId] = useState<string | null>(null);
 
   const handleSubscribe = async (planId: string) => {
-    setIsModalOpen(true);
+    // Verificar se tem CPF/CNPJ e telefone salvos
+    console.log('🔍 Dados da empresa:', empresa);
+    console.log('🔍 CPF/CNPJ:', empresa?.cpf_cnpj);
+    console.log('🔍 Telefone:', empresa?.telefone);
+    console.log('🔍 Tipo do CPF/CNPJ:', typeof empresa?.cpf_cnpj);
+    console.log('🔍 Tipo do Telefone:', typeof empresa?.telefone);
+    
+    if (!empresa?.cpf_cnpj || !empresa?.telefone) {
+      console.error('❌ Dados faltando:');
+      console.error('❌ CPF/CNPJ:', empresa?.cpf_cnpj);
+      console.error('❌ Telefone:', empresa?.telefone);
+      toast.error("Complete seus dados de CPF/CNPJ e telefone no cadastro primeiro!");
+      return;
+    }
+    
+    // Abrir modal para escolher forma de pagamento
+    setPendingPlanId(planId);
+    setIsPaymentModalOpen(true);
   };
 
-  const handleConfirmSubscribe = async (planId: string) => {
+  const handleConfirmPayment = async () => {
+    if (!pendingPlanId) return;
+    
     setIsLoading(true);
-    setIsModalOpen(false);
+    setIsPaymentModalOpen(false);
     
     try {
-      const userName = empresa?.nome || user?.email || "Usuário";
+      const userName = empresa?.responsavel || empresa?.nome || user?.email || "Usuário";
       const userEmail = empresa?.email || user?.email || "";
       
       if (!userEmail) {
@@ -92,13 +108,27 @@ export default function Assinatura() {
         return;
       }
 
-      // Criar assinatura no ASAAS
+      // Criar assinatura no ASAAS usando dados salvos
       let result;
       
-      if (planId === 'monthly') {
-        result = await asaasService.createMonthlySubscription(userEmail, userName);
+      if (pendingPlanId === 'monthly') {
+        result = await asaasService.createMonthlySubscription(
+          userEmail, 
+          userName, 
+          empresa?.id, 
+          empresa?.cpf_cnpj, 
+          empresa?.telefone,
+          selectedPaymentMethod
+        );
       } else {
-        result = await asaasService.createYearlySubscription(userEmail, userName);
+        result = await asaasService.createYearlySubscription(
+          userEmail, 
+          userName, 
+          empresa?.id, 
+          empresa?.cpf_cnpj, 
+          empresa?.telefone,
+          selectedPaymentMethod
+        );
       }
 
       if (result && result.payment) {
@@ -368,45 +398,87 @@ export default function Assinatura() {
         </div>
       </div>
 
-      {/* Modal de Confirmação */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="sm:max-w-md">
+      {/* Modal de Seleção de Forma de Pagamento */}
+      <Dialog open={isPaymentModalOpen} onOpenChange={setIsPaymentModalOpen}>
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Confirmar Assinatura</DialogTitle>
+            <DialogTitle className="text-center text-purple-800 text-xl">
+              Escolha a Forma de Pagamento
+            </DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="cpf-cnpj">CPF ou CNPJ</Label>
-              <Input
-                id="cpf-cnpj"
-                placeholder="Digite seu CPF ou CNPJ"
-                value={cpfCnpj}
-                onChange={(e) => setCpfCnpj(e.target.value)}
-              />
+          <div className="space-y-6 py-4">
+            <div className="grid grid-cols-1 gap-4">
+              <Button
+                variant={selectedPaymentMethod === 'PIX' ? 'default' : 'outline'}
+                onClick={() => setSelectedPaymentMethod('PIX')}
+                className={`h-20 flex flex-col items-center justify-center gap-2 p-4 ${
+                  selectedPaymentMethod === 'PIX' 
+                    ? 'bg-purple-600 hover:bg-purple-700 text-white' 
+                    : 'hover:bg-purple-50'
+                }`}
+              >
+                <div className="text-3xl">📱</div>
+                <div className="font-semibold text-base">PIX</div>
+                <div className="text-sm opacity-75">Pagamento instantâneo</div>
+              </Button>
+              
+              <Button
+                variant={selectedPaymentMethod === 'CREDIT_CARD' ? 'default' : 'outline'}
+                onClick={() => setSelectedPaymentMethod('CREDIT_CARD')}
+                className={`h-20 flex flex-col items-center justify-center gap-2 p-4 ${
+                  selectedPaymentMethod === 'CREDIT_CARD' 
+                    ? 'bg-purple-600 hover:bg-purple-700 text-white' 
+                    : 'hover:bg-purple-50'
+                }`}
+              >
+                <div className="text-3xl">💳</div>
+                <div className="font-semibold text-base">Cartão</div>
+                <div className="text-sm opacity-75">Crédito ou débito</div>
+              </Button>
+              
+              <Button
+                variant={selectedPaymentMethod === 'BOLETO' ? 'default' : 'outline'}
+                onClick={() => setSelectedPaymentMethod('BOLETO')}
+                className={`h-20 flex flex-col items-center justify-center gap-2 p-4 ${
+                  selectedPaymentMethod === 'BOLETO' 
+                    ? 'bg-purple-600 hover:bg-purple-700 text-white' 
+                    : 'hover:bg-purple-50'
+                }`}
+              >
+                <div className="text-3xl">📄</div>
+                <div className="font-semibold text-base">Boleto</div>
+                <div className="text-sm opacity-75">Bancário</div>
+              </Button>
             </div>
-            <div>
-              <Label htmlFor="phone">Telefone (opcional)</Label>
-              <Input
-                id="phone"
-                placeholder="(11) 99999-9999"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-              />
-            </div>
-            <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setIsModalOpen(false)}>
+            
+            <div className="flex gap-3 justify-end pt-6 border-t">
+              <Button 
+                variant="outline" 
+                onClick={() => setIsPaymentModalOpen(false)}
+                disabled={isLoading}
+                className="px-6"
+              >
                 Cancelar
               </Button>
               <Button 
-                onClick={() => handleConfirmSubscribe(selectedPlan)}
-                disabled={!cpfCnpj || isLoading}
+                onClick={handleConfirmPayment}
+                disabled={isLoading}
+                className="bg-purple-600 hover:bg-purple-700 px-6"
               >
-                {isLoading ? "Processando..." : "Confirmar Assinatura"}
+                {isLoading ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Processando...
+                  </div>
+                ) : (
+                  "Confirmar Pagamento"
+                )}
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
+
     </div>
   );
 }

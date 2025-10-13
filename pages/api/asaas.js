@@ -148,8 +148,8 @@ async function createPayment(paymentData) {
       dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       description: 'Assinatura Mensal - Ateliê Pro',
       externalReference: companyId || 'temp-company',
-      callbackUrl: 'https://atelie-pro-gestao-criativa.vercel.app/assinatura-sucesso',
-      successUrl: 'https://atelie-pro-gestao-criativa.vercel.app/assinatura-sucesso'
+      callbackUrl: 'https://app.ateliepro.online/assinatura-sucesso',
+      successUrl: 'https://app.ateliepro.online/assinatura-sucesso'
     };
   } else if (planType === 'yearly') {
     payload = {
@@ -159,8 +159,8 @@ async function createPayment(paymentData) {
       dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       description: 'Assinatura Anual - Ateliê Pro',
       externalReference: companyId || 'temp-company',
-      callbackUrl: 'https://atelie-pro-gestao-criativa.vercel.app/assinatura-sucesso',
-      successUrl: 'https://atelie-pro-gestao-criativa.vercel.app/assinatura-sucesso'
+      callbackUrl: 'https://app.ateliepro.online/assinatura-sucesso',
+      successUrl: 'https://app.ateliepro.online/assinatura-sucesso'
     };
   } else {
     throw new Error('Tipo de plano inválido. Use: monthly ou yearly');

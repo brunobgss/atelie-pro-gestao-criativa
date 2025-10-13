@@ -132,7 +132,7 @@ async function createCustomer(customerData) {
 async function createPayment(paymentData) {
   console.log('🔄 Criando pagamento ASAAS:', paymentData);
 
-  const { customerId, planType, companyId } = paymentData;
+  const { customerId, planType, companyId, paymentMethod = 'PIX' } = paymentData;
 
   // Validar dados obrigatórios
   if (!customerId || !planType) {
@@ -145,7 +145,7 @@ async function createPayment(paymentData) {
   if (planType === 'monthly') {
     payload = {
       customer: customerId,
-      billingType: 'PIX',
+      billingType: paymentMethod,
       value: 39.00,
       dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       description: 'Assinatura Mensal - Ateliê Pro',
@@ -154,7 +154,7 @@ async function createPayment(paymentData) {
   } else if (planType === 'yearly') {
     payload = {
       customer: customerId,
-      billingType: 'PIX',
+      billingType: paymentMethod,
       value: 390.00,
       dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       description: 'Assinatura Anual - Ateliê Pro',
