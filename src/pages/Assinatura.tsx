@@ -8,7 +8,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/components/AuthProvider";
-import { createSubscriptionCheckout } from "@/integrations/asaas/service";
+import { asaasService } from "@/integrations/asaas/service-direct";
 
 interface Plan {
   id: string;
@@ -81,25 +81,26 @@ export default function Assinatura() {
         return;
       }
 
-      // Criar checkout no ASAAS
-      const result = await createSubscriptionCheckout(
-        planId as 'monthly' | 'yearly',
-        userEmail,
-        userName
-      );
-
-      if (result.success) {
-        toast.success("Redirecionando para o checkout...");
-        
-        // Redirecionar para a URL do checkout ASAAS
-        if (result.data && result.data.invoiceUrl) {
-          window.location.href = result.data.invoiceUrl;
-        } else {
-          toast.error("URL de checkout não encontrada. Tente novamente.");
-        }
-        
+      // Criar assinatura no ASAAS
+      let result;
+      
+      if (planId === 'monthly') {
+        result = await asaasService.createMonthlySubscription(userEmail, userName);
       } else {
-        toast.error(`Erro ao processar assinatura: ${result.error}`);
+        result = await asaasService.createYearlySubscription(userEmail, userName);
+      }
+
+      if (result && result.subscription) {
+        toast.success("Assinatura criada com sucesso!");
+        
+        // Mostrar informações da assinatura
+        console.log('✅ Assinatura criada:', result);
+        toast.success(`Assinatura ${planId === 'monthly' ? 'Mensal' : 'Anual'} criada! Verifique seu email para o PIX.`);
+        
+        // Aqui você pode redirecionar ou mostrar mais informações
+        // Por enquanto, apenas mostra sucesso
+      } else {
+        toast.error("Erro ao criar assinatura");
       }
       
     } catch (error) {
