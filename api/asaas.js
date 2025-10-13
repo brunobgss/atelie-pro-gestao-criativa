@@ -10,7 +10,11 @@ export default async function handler(req, res) {
   }
 
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Método não permitido' });
+    return res.status(200).json({ 
+      message: 'API ASAAS funcionando! Use POST para criar clientes/assinaturas.',
+      method: req.method,
+      timestamp: new Date().toISOString()
+    });
   }
 
   try {

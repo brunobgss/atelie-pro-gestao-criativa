@@ -25,15 +25,15 @@ export function Layout() {
   }
 
   return (
-    <SidebarProvider defaultOpen={true} open={true}>
+    <SidebarProvider defaultOpen={false}>
       <TrialProtectedRoute>
         <div className="min-h-screen flex w-full bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100">
           <AppSidebar />
           <main className="flex-1 overflow-auto">
-            <div className="p-3 md:p-6">
+            <div className="p-2 sm:p-3 md:p-6">
               <div className="mx-auto max-w-[1400px]">
-                <div className="rounded-xl border border-gray-200/50 bg-white/95 backdrop-blur-sm shadow-sm">
-                  <div className="rounded-2xl md:rounded-3xl">
+                <div className="rounded-lg sm:rounded-xl border border-gray-200/50 bg-white/95 backdrop-blur-sm shadow-sm">
+                  <div className="rounded-lg sm:rounded-2xl md:rounded-3xl">
                     <Outlet />
                   </div>
                 </div>
