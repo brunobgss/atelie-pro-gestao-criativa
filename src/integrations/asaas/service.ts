@@ -39,20 +39,15 @@ if (!ASAAS_API_KEY) {
 }
 
 class ASAASService {
-  private async makeRequest(endpoint: string, method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET', data?: any) {
-    console.log(`🔄 ASAAS Request: ${method} ${endpoint}`, data);
+  private async makeRequest(action: string, data: any) {
+    console.log(`🔄 ASAAS Request: ${action}`, data);
 
-    // Usar nossa API intermediária para evitar problemas de CORS
-    const apiEndpoint = endpoint === '/customers' ? '/api/asaas/customers' : 
-                       endpoint === '/subscriptions' ? '/api/asaas/subscriptions' : 
-                       endpoint;
-
-    const response = await fetch(apiEndpoint, {
-      method,
+    const response = await fetch('/api/asaas', {
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: data ? JSON.stringify(data) : undefined,
+      body: JSON.stringify({ action, data }),
     });
 
     const responseData = await response.json();
@@ -62,15 +57,15 @@ class ASAASService {
       throw new Error(`ASAAS API Error: ${response.status} ${response.statusText} - ${responseData.error || 'Erro desconhecido'}`);
     }
 
-    console.log(`✅ ASAAS Response: ${method} ${endpoint}`, responseData);
-    return responseData;
+    console.log(`✅ ASAAS Response: ${action}`, responseData);
+    return responseData.data;
   }
 
   // Criar cliente no ASAAS
   async createCustomer(customer: ASAASCustomer) {
     try {
-      const response = await this.makeRequest('/customers', 'POST', customer);
-      return { success: true, data: response };
+      const response = await this.makeRequest('createCustomer', customer);
+      return { success: true, customer: response };
     } catch (error) {
       console.error('Erro ao criar cliente ASAAS:', error);
       return { success: false, error: error.message };
@@ -80,7 +75,7 @@ class ASAASService {
   // Criar assinatura recorrente
   async createSubscription(subscription: ASAASSubscription) {
     try {
-      const response = await this.makeRequest('/subscriptions', 'POST', subscription);
+      const response = await this.makeRequest('createSubscription', subscription);
       return { success: true, data: response };
     } catch (error) {
       console.error('Erro ao criar assinatura ASAAS:', error);
@@ -152,7 +147,7 @@ class ASAASService {
       companyId: companyId
     };
 
-    return await this.makeRequest('/subscriptions', 'POST', subscriptionData);
+    return await this.makeRequest('createSubscription', subscriptionData);
   }
 
   // Gerar URL de checkout para plano anual
@@ -175,7 +170,7 @@ class ASAASService {
       companyId: companyId
     };
 
-    return await this.makeRequest('/subscriptions', 'POST', subscriptionData);
+    return await this.makeRequest('createSubscription', subscriptionData);
   }
 }
 
