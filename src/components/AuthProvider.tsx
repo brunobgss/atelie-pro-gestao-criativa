@@ -68,9 +68,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchEmpresa = async (userId: string) => {
     try {
-      // Timeout reduzido para 5 segundos para melhor performance
+      // Timeout aumentado para 15 segundos para melhor conectividade
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout')), 5000)
+        setTimeout(() => reject(new Error('Timeout')), 15000)
       );
 
       const fetchPromise = supabase
@@ -98,15 +98,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Tentar recuperar dados persistidos
         const trialData = getTrialData();
         
-        if (trialData && trialData.userId === userId) {
-          // Usar dados persistidos
+        if (trialData && trialData.userId === userId && trialData.empresaData.nome !== "Empresa Temporária") {
+          // Usar dados persistidos apenas se não for temporário
           setEmpresa(trialData.empresaData);
           console.log("Usando dados persistidos do localStorage");
         } else {
-          // Criar novo trial
-          const newTrialData = createNewTrial(userId);
-          setEmpresa(newTrialData.empresaData);
-          console.log("Criando novo trial de 7 dias");
+          // Não criar dados temporários, aguardar Supabase
+          console.log("Aguardando dados reais do Supabase...");
+          setEmpresa(null);
         }
         return;
       }
