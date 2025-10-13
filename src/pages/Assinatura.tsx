@@ -9,6 +9,9 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/components/AuthProvider";
 import { asaasService } from "@/integrations/asaas/service-vite";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface Plan {
   id: string;
@@ -68,9 +71,17 @@ export default function Assinatura() {
   const { user, empresa } = useAuth();
   const [selectedPlan, setSelectedPlan] = useState<string>("yearly");
   const [isLoading, setIsLoading] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [cpfCnpj, setCpfCnpj] = useState("");
+  const [phone, setPhone] = useState("");
 
   const handleSubscribe = async (planId: string) => {
+    setIsModalOpen(true);
+  };
+
+  const handleConfirmSubscribe = async (planId: string) => {
     setIsLoading(true);
+    setIsModalOpen(false);
     
     try {
       const userName = empresa?.nome || user?.email || "Usuário";
@@ -356,6 +367,46 @@ export default function Assinatura() {
           </Card>
         </div>
       </div>
+
+      {/* Modal de Confirmação */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirmar Assinatura</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="cpf-cnpj">CPF ou CNPJ</Label>
+              <Input
+                id="cpf-cnpj"
+                placeholder="Digite seu CPF ou CNPJ"
+                value={cpfCnpj}
+                onChange={(e) => setCpfCnpj(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="phone">Telefone (opcional)</Label>
+              <Input
+                id="phone"
+                placeholder="(11) 99999-9999"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => setIsModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button 
+                onClick={() => handleConfirmSubscribe(selectedPlan)}
+                disabled={!cpfCnpj || isLoading}
+              >
+                {isLoading ? "Processando..." : "Confirmar Assinatura"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

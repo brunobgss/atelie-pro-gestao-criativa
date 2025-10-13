@@ -89,14 +89,9 @@ class ASAASService {
 
     // Depois criar o pagamento mensal
     const payment = await this.createPayment({
-      customer: customer.id,
-      billingType: 'PIX',
-      value: 39.00,
-      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      description: 'Assinatura Mensal - Ateliê Pro',
-      externalReference: 'temp-company',
-      callbackUrl: 'https://atelie-pro-gestao-criativa.vercel.app/assinatura-sucesso',
-      successUrl: 'https://atelie-pro-gestao-criativa.vercel.app/assinatura-sucesso'
+      customerId: customer.id,
+      planType: 'monthly',
+      companyId: 'temp-company'
     });
 
     console.log('✅ Pagamento mensal criado:', payment);
@@ -116,14 +111,9 @@ class ASAASService {
 
     // Depois criar o pagamento anual
     const payment = await this.createPayment({
-      customer: customer.id,
-      billingType: 'PIX',
-      value: 390.00,
-      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      description: 'Assinatura Anual - Ateliê Pro',
-      externalReference: 'temp-company',
-      callbackUrl: 'https://atelie-pro-gestao-criativa.vercel.app/assinatura-sucesso',
-      successUrl: 'https://atelie-pro-gestao-criativa.vercel.app/assinatura-sucesso'
+      customerId: customer.id,
+      planType: 'yearly',
+      companyId: 'temp-company'
     });
 
     console.log('✅ Pagamento anual criado:', payment);
