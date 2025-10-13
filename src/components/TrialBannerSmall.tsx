@@ -22,40 +22,10 @@ export function TrialBannerSmall({ onClose }: TrialBannerProps) {
   const { empresa } = useAuth();
 
   useEffect(() => {
+    // Sempre usar dados do Supabase quando disponíveis
     if (!empresa?.trial_end_date) {
-      // Usar localStorage para manter uma data fixa de trial
-      const STORAGE_KEY = 'atelie-pro-trial-end-date';
-      let trialEnd: Date;
-      
-      const storedDate = localStorage.getItem(STORAGE_KEY);
-      if (storedDate) {
-        trialEnd = new Date(storedDate);
-      } else {
-        // Primeira vez: criar data de 7 dias a partir de agora
-        trialEnd = new Date();
-        trialEnd.setDate(trialEnd.getDate() + 7);
-        localStorage.setItem(STORAGE_KEY, trialEnd.toISOString());
-      }
-      
-      const updateTimer = () => {
-        const now = new Date();
-        const difference = trialEnd.getTime() - now.getTime();
-
-        if (difference > 0) {
-          const days = Math.floor(difference / (1000 * 60 * 60 * 24));
-          const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-          const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
-          const seconds = Math.floor((difference % (1000 * 60)) / 1000);
-
-          setTimeLeft({ days, hours, minutes, seconds });
-        } else {
-          setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-        }
-      };
-
-      updateTimer();
-      const interval = setInterval(updateTimer, 1000);
-      return () => clearInterval(interval);
+      console.log('⚠️ Trial end date não encontrado, aguardando dados do Supabase...');
+      return;
     }
 
     const trialEnd = new Date(empresa.trial_end_date);
