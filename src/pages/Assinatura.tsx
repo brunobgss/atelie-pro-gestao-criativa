@@ -90,17 +90,24 @@ export default function Assinatura() {
         result = await asaasService.createYearlySubscription(userEmail, userName);
       }
 
-      if (result && result.subscription) {
-        toast.success("Assinatura criada com sucesso!");
+      if (result && result.payment) {
+        toast.success("Pagamento criado com sucesso!");
         
-        // Mostrar informações da assinatura
-        console.log('✅ Assinatura criada:', result);
-        toast.success(`Assinatura ${planId === 'monthly' ? 'Mensal' : 'Anual'} criada! Verifique seu email para o PIX.`);
+        // Mostrar informações do pagamento
+        console.log('✅ Pagamento criado:', result);
+        
+        // Redirecionar para o link de pagamento do ASAAS
+        if (result.payment.invoiceUrl) {
+          window.open(result.payment.invoiceUrl, '_blank');
+          toast.success(`Pagamento ${planId === 'monthly' ? 'Mensal' : 'Anual'} criado! Abra o link para pagar via PIX.`);
+        } else {
+          toast.success(`Pagamento ${planId === 'monthly' ? 'Mensal' : 'Anual'} criado! Verifique seu email para o PIX.`);
+        }
         
         // Aqui você pode redirecionar ou mostrar mais informações
         // Por enquanto, apenas mostra sucesso
       } else {
-        toast.error("Erro ao criar assinatura");
+        toast.error("Erro ao criar pagamento");
       }
       
     } catch (error) {

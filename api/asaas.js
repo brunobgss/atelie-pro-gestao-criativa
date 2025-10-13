@@ -1,4 +1,4 @@
-// pages/api/asaas.js - API ASAAS simplificada para links de pagamento
+// api/asaas.js - API ASAAS para Vercel
 export default async function handler(req, res) {
   console.log('🚀 ASAAS API chamada:', req.method, req.url);
   

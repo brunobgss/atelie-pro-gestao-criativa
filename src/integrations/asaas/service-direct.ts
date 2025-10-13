@@ -31,20 +31,16 @@ class ASAASService {
   private async makeRequest(endpoint: string, data: any) {
     console.log(`🔄 ASAAS Request: ${endpoint}`, data);
 
-    // Usar proxy público para evitar CORS
-    const proxyUrl = 'https://api.allorigins.win/raw?url=';
-    const asaasUrl = encodeURIComponent(`${ASAAS_API_URL}/${endpoint}`);
-    const fullUrl = `${proxyUrl}${asaasUrl}`;
-
-    console.log(`🌐 Usando proxy: ${fullUrl}`);
-
-    const response = await fetch(fullUrl, {
+    // Usar nossa API intermediária local
+    const response = await fetch('/api/asaas', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'access_token': ASAAS_API_KEY,
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify({ 
+        action: endpoint === 'customers' ? 'createCustomer' : 'createPayment',
+        data: data 
+      }),
     });
 
     if (!response.ok) {
@@ -55,7 +51,12 @@ class ASAASService {
 
     const result = await response.json();
     console.log(`✅ ASAAS Response: ${endpoint}`, result);
-    return result;
+    
+    if (!result.success) {
+      throw new Error(result.error || 'Erro desconhecido');
+    }
+    
+    return result.data;
   }
 
   async createCustomer(customerData: ASAASCustomer) {
@@ -72,12 +73,12 @@ class ASAASService {
     return await this.makeRequest('customers', payload);
   }
 
-  async createSubscription(subscriptionData: ASAASSubscription) {
-    return await this.makeRequest('subscriptions', subscriptionData);
+  async createPayment(paymentData: ASAASSubscription) {
+    return await this.makeRequest('payments', paymentData);
   }
 
   async createMonthlySubscription(userEmail: string, userName: string) {
-    console.log('🔄 Criando assinatura mensal...');
+    console.log('🔄 Criando pagamento mensal...');
     
     // Primeiro criar o cliente
     const customer = await this.createCustomer({
@@ -87,23 +88,22 @@ class ASAASService {
 
     console.log('✅ Cliente criado:', customer);
 
-    // Depois criar a assinatura mensal
-    const subscription = await this.createSubscription({
+    // Depois criar o pagamento mensal
+    const payment = await this.createPayment({
       customer: customer.id,
       billingType: 'PIX',
       value: 39.00,
-      nextDueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      cycle: 'MONTHLY',
+      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       description: 'Assinatura Mensal - Ateliê Pro',
       externalReference: 'temp-company'
     });
 
-    console.log('✅ Assinatura mensal criada:', subscription);
-    return { customer, subscription };
+    console.log('✅ Pagamento mensal criado:', payment);
+    return { customer, payment };
   }
 
   async createYearlySubscription(userEmail: string, userName: string) {
-    console.log('🔄 Criando assinatura anual...');
+    console.log('🔄 Criando pagamento anual...');
     
     // Primeiro criar o cliente
     const customer = await this.createCustomer({
@@ -113,19 +113,18 @@ class ASAASService {
 
     console.log('✅ Cliente criado:', customer);
 
-    // Depois criar a assinatura anual
-    const subscription = await this.createSubscription({
+    // Depois criar o pagamento anual
+    const payment = await this.createPayment({
       customer: customer.id,
       billingType: 'PIX',
       value: 390.00,
-      nextDueDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      cycle: 'YEARLY',
+      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       description: 'Assinatura Anual - Ateliê Pro',
       externalReference: 'temp-company'
     });
 
-    console.log('✅ Assinatura anual criada:', subscription);
-    return { customer, subscription };
+    console.log('✅ Pagamento anual criado:', payment);
+    return { customer, payment };
   }
 }
 
