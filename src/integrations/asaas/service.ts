@@ -40,17 +40,17 @@ if (!ASAAS_API_KEY) {
 
 class ASAASService {
   private async makeRequest(endpoint: string, method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET', data?: any) {
-    if (!ASAAS_API_KEY) {
-      throw new Error('ASAAS_API_KEY não configurada. Configure no arquivo .env.local');
-    }
-
     console.log(`🔄 ASAAS Request: ${method} ${endpoint}`, data);
 
-    const response = await fetch(`${ASAAS_API_URL}${endpoint}`, {
+    // Usar nossa API intermediária para evitar problemas de CORS
+    const apiEndpoint = endpoint === '/customers' ? '/api/asaas/customers' : 
+                       endpoint === '/subscriptions' ? '/api/asaas/subscriptions' : 
+                       endpoint;
+
+    const response = await fetch(apiEndpoint, {
       method,
       headers: {
         'Content-Type': 'application/json',
-        'access_token': ASAAS_API_KEY,
       },
       body: data ? JSON.stringify(data) : undefined,
     });
@@ -59,7 +59,7 @@ class ASAASService {
 
     if (!response.ok) {
       console.error(`❌ ASAAS API Error: ${response.status} ${response.statusText}`, responseData);
-      throw new Error(`ASAAS API Error: ${response.status} ${response.statusText} - ${responseData.message || 'Erro desconhecido'}`);
+      throw new Error(`ASAAS API Error: ${response.status} ${response.statusText} - ${responseData.error || 'Erro desconhecido'}`);
     }
 
     console.log(`✅ ASAAS Response: ${method} ${endpoint}`, responseData);
@@ -133,22 +133,10 @@ class ASAASService {
   }
 
   // Gerar URL de checkout para plano mensal
-  async createMonthlySubscription(userEmail: string, userName: string) {
+  async createMonthlySubscription(userEmail: string, userName: string, companyId?: string) {
     const customerData = {
       name: userName,
       email: userEmail,
-    };
-
-    const subscriptionData = {
-      customer: '', // Será preenchido após criar o cliente
-      billingType: 'CREDIT_CARD' as const,
-      value: 39.00,
-      nextDueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 dias
-      description: 'Ateliê Pro - Assinatura Mensal',
-      cycle: 'MONTHLY' as const,
-      externalReference: `monthly-${Date.now()}`,
-      callbackUrl: `${window.location.origin}/api/webhooks/asaas`,
-      successUrl: `${window.location.origin}/assinatura/sucesso`,
     };
 
     // Criar cliente primeiro
@@ -157,28 +145,21 @@ class ASAASService {
       return customerResult;
     }
 
-    // Criar assinatura
-    subscriptionData.customer = customerResult.data.id;
-    return await this.createSubscription(subscriptionData);
+    // Criar assinatura usando nossa API intermediária
+    const subscriptionData = {
+      customerId: customerResult.customer.id,
+      planType: 'monthly',
+      companyId: companyId
+    };
+
+    return await this.makeRequest('/subscriptions', 'POST', subscriptionData);
   }
 
   // Gerar URL de checkout para plano anual
-  async createYearlySubscription(userEmail: string, userName: string) {
+  async createYearlySubscription(userEmail: string, userName: string, companyId?: string) {
     const customerData = {
       name: userName,
       email: userEmail,
-    };
-
-    const subscriptionData = {
-      customer: '', // Será preenchido após criar o cliente
-      billingType: 'CREDIT_CARD' as const,
-      value: 390.00,
-      nextDueDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 1 ano
-      description: 'Ateliê Pro - Assinatura Anual (2 meses grátis)',
-      cycle: 'YEARLY' as const,
-      externalReference: `yearly-${Date.now()}`,
-      callbackUrl: `${window.location.origin}/api/webhooks/asaas`,
-      successUrl: `${window.location.origin}/assinatura/sucesso`,
     };
 
     // Criar cliente primeiro
@@ -187,9 +168,14 @@ class ASAASService {
       return customerResult;
     }
 
-    // Criar assinatura
-    subscriptionData.customer = customerResult.data.id;
-    return await this.createSubscription(subscriptionData);
+    // Criar assinatura usando nossa API intermediária
+    const subscriptionData = {
+      customerId: customerResult.customer.id,
+      planType: 'yearly',
+      companyId: companyId
+    };
+
+    return await this.makeRequest('/subscriptions', 'POST', subscriptionData);
   }
 }
 
