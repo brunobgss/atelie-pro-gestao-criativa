@@ -51,6 +51,8 @@ export async function saveProduct(productData: {
   profitMargin: number;
 }): Promise<{ ok: boolean; id?: string; error?: string }> {
   try {
+    console.log("🔍 Tentando salvar produto:", productData);
+    
     const { data, error } = await supabase
       .from("atelie_products")
       .insert({
@@ -65,9 +67,15 @@ export async function saveProduct(productData: {
       .select("id")
       .single();
     
-    if (error) throw error;
+    if (error) {
+      console.error("❌ Erro ao salvar produto:", error);
+      throw error;
+    }
+    
+    console.log("✅ Produto salvo com sucesso:", data);
     return { ok: true, id: data?.id };
   } catch (e: any) {
+    console.error("❌ Erro na função saveProduct:", e);
     return { ok: false, error: e?.message ?? "Erro ao salvar produto" };
   }
 }

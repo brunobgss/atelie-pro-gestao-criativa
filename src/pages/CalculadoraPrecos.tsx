@@ -180,6 +180,8 @@ _Orçamento gerado pela Calculadora Profissional_
 
   const saveAsProduct = async () => {
     try {
+      console.log("🔍 Iniciando salvamento do produto...");
+      
       const productData = {
         name: productType === "personalizado" ? "Produto Personalizado" : productTemplates[productType]?.name || "Bordado",
         type: productType,
@@ -189,9 +191,14 @@ _Orçamento gerado pela Calculadora Profissional_
         profitMargin,
       };
       
+      console.log("📦 Dados do produto:", productData);
+      
       const result = await saveProduct(productData);
       
+      console.log("📋 Resultado do salvamento:", result);
+      
       if (!result.ok) {
+        console.error("❌ Falha ao salvar produto:", result.error);
         toast.error(result.error || "Erro ao salvar produto");
         return;
       }
@@ -201,8 +208,10 @@ _Orçamento gerado pela Calculadora Profissional_
       savedProducts.push({ ...productData, id: result.id, createdAt: new Date().toISOString() });
       localStorage.setItem('savedProducts', JSON.stringify(savedProducts));
       
+      console.log("✅ Produto salvo com sucesso!");
       toast.success("Produto salvo no catálogo!");
     } catch (error) {
+      console.error("❌ Erro inesperado ao salvar produto:", error);
       toast.error("Erro ao salvar produto");
     }
   };
