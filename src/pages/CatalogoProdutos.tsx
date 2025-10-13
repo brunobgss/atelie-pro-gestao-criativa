@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Package, Plus, Edit, Trash2, Copy, Search, Filter } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { toast } from "sonner";
+import { getProducts } from "@/integrations/supabase/inventory";
 
 interface Product {
   id: string;
@@ -25,6 +26,7 @@ interface Product {
 
 export default function CatalogoProdutos() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -39,6 +41,38 @@ export default function CatalogoProdutos() {
   });
 
   const categories = ["all", "Uniforme", "Personalizado", "Bordado", "Estampado"];
+
+  // Buscar produtos do Supabase
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        console.log("🔍 Buscando produtos do catálogo...");
+        const productsData = await getProducts();
+        
+        // Converter dados do Supabase para o formato da interface
+        const convertedProducts: Product[] = productsData.map(product => ({
+          id: product.id,
+          name: product.name,
+          category: product.type,
+          description: `Produto ${product.type} - R$ ${product.unit_price.toFixed(2)}`,
+          basePrice: product.unit_price,
+          estimatedTime: product.work_hours,
+          materials: Array.isArray(product.materials) ? product.materials : [],
+          createdAt: product.created_at
+        }));
+        
+        console.log("✅ Produtos carregados:", convertedProducts.length);
+        setProducts(convertedProducts);
+      } catch (error) {
+        console.error("❌ Erro ao buscar produtos:", error);
+        toast.error("Erro ao carregar produtos");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
 
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||

@@ -80,4 +80,26 @@ export async function saveProduct(productData: {
   }
 }
 
+export async function getProducts(): Promise<ProductRow[]> {
+  try {
+    console.log("🔍 Buscando produtos do catálogo...");
+    
+    const { data, error } = await supabase
+      .from("atelie_products")
+      .select("*")
+      .order("created_at", { ascending: false });
+    
+    if (error) {
+      console.error("❌ Erro ao buscar produtos:", error);
+      throw error;
+    }
+    
+    console.log("✅ Produtos encontrados:", data?.length || 0);
+    return (data ?? []) as ProductRow[];
+  } catch (e: any) {
+    console.error("❌ Erro na função getProducts:", e);
+    return [];
+  }
+}
+
 
