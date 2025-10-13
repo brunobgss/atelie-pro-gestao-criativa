@@ -2,7 +2,7 @@
 export default async function handler(req, res) {
   // Configurar CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   // Responder a requisições OPTIONS (preflight)
@@ -10,9 +10,17 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  // Verificar se é POST
+  // Aceitar GET para teste
+  if (req.method === 'GET') {
+    return res.status(200).json({ 
+      message: 'API ASAAS funcionando via Next.js!',
+      method: req.method,
+      timestamp: new Date().toISOString()
+    });
+  }
+
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return res.status(405).json({ error: 'Método não permitido' });
   }
 
   try {
