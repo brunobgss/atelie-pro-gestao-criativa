@@ -7,17 +7,9 @@
       "config": {
         "distDir": "dist"
       }
-    },
-    {
-      "src": "pages/api/**/*.js",
-      "use": "@vercel/node"
     }
   ],
   "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/pages/api/$1"
-    },
     {
       "src": "/assets/(.*)",
       "dest": "/assets/$1"
