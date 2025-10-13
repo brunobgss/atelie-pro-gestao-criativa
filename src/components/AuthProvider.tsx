@@ -149,23 +149,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     try {
-      // Limpar dados locais primeiro
+      // Limpar dados locais IMEDIATAMENTE
       setUser(null);
       setEmpresa(null);
       clearTrialData();
       
-      // Tentar logout no Supabase com timeout
-      const logoutPromise = supabase.auth.signOut();
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Logout timeout')), 5000)
-      );
+      // Tentar logout no Supabase (sem aguardar)
+      supabase.auth.signOut().catch(() => {
+        // Ignorar erros de conectividade
+        console.log("Logout no Supabase falhou, mas dados locais foram limpos");
+      });
       
-      await Promise.race([logoutPromise, timeoutPromise]);
       toast.success("Logout realizado com sucesso");
+      
+      // Redirecionar para login após 1 segundo
+      setTimeout(() => {
+        window.location.href = '/login';
+      }, 1000);
+      
     } catch (error: any) {
-      console.error("Erro ao fazer logout:", error);
+      console.error("Erro inesperado no logout:", error);
       // Mesmo com erro, dados já foram limpos
-      toast.success("Logout realizado (dados locais limpos)");
+      toast.success("Logout realizado");
+      window.location.href = '/login';
     }
   };
 
