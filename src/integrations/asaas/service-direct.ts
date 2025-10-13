@@ -31,7 +31,14 @@ class ASAASService {
   private async makeRequest(endpoint: string, data: any) {
     console.log(`🔄 ASAAS Request: ${endpoint}`, data);
 
-    const response = await fetch(`${ASAAS_API_URL}/${endpoint}`, {
+    // Usar proxy público para evitar CORS
+    const proxyUrl = 'https://api.allorigins.win/raw?url=';
+    const asaasUrl = encodeURIComponent(`${ASAAS_API_URL}/${endpoint}`);
+    const fullUrl = `${proxyUrl}${asaasUrl}`;
+
+    console.log(`🌐 Usando proxy: ${fullUrl}`);
+
+    const response = await fetch(fullUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
