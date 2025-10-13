@@ -1,24 +1,47 @@
+import { useState } from "react";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
-import { Outlet } from "react-router-dom";
+import { Outlet, Navigate } from "react-router-dom";
+import { useAuth } from "./AuthProvider";
+import { TrialProtectedRoute } from "./TrialProtectedRoute";
+import { TrialBanner } from "./TrialBanner";
 
 export function Layout() {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-purple-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-purple-600 mx-auto mb-4"></div>
+          <p className="text-purple-600 font-medium">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
   return (
     <SidebarProvider defaultOpen={true} open={true}>
-      <div className="min-h-screen flex w-full bg-[radial-gradient(1200px_600px_at_10%_-10%,hsl(var(--primary)/0.08),transparent),radial-gradient(1000px_500px_at_110%_10%,hsl(var(--secondary)/0.10),transparent)]">
-        <AppSidebar />
-        <main className="flex-1 overflow-auto">
-          <div className="p-3 md:p-6">
-            <div className="mx-auto max-w-[1400px]">
-              <div className="rounded-2xl md:rounded-3xl border border-white/20 bg-white/70 backdrop-blur-xl shadow-[var(--shadow-elegant)] dark:bg-card/70">
-                <div className="rounded-2xl md:rounded-3xl">
-                  <Outlet />
+      <TrialProtectedRoute>
+        <div className="min-h-screen flex w-full bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100">
+          <AppSidebar />
+          <main className="flex-1 overflow-auto">
+            <div className="p-3 md:p-6">
+              <div className="mx-auto max-w-[1400px]">
+                <div className="rounded-xl border border-gray-200/50 bg-white/95 backdrop-blur-sm shadow-sm">
+                  <div className="rounded-2xl md:rounded-3xl">
+                    <Outlet />
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </main>
-      </div>
+          </main>
+        </div>
+      </TrialProtectedRoute>
     </SidebarProvider>
   );
 }

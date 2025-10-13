@@ -1,73 +1,112 @@
-# Welcome to your Lovable project
+# Ateliê Pro - Sistema de Gestão para Ateliês
 
-## Project info
+Sistema completo de gestão para ateliês de costura, bordado e confecção, desenvolvido com React, TypeScript e Supabase.
 
-**URL**: https://lovable.dev/projects/49bb0e91-9694-4c38-9ad9-67d86f53a445
+## 🚀 Funcionalidades
 
-## How can I edit this code?
+### 📋 Gestão de Pedidos
+- Criação e edição de pedidos
+- Controle de status (Aguardando aprovação, Em produção, Pronto, Entregue, Cancelado)
+- Controle de pagamentos (Pendente, Parcial, Pago)
+- Geração de ordens de produção em PDF
 
-There are several ways of editing your application.
+### 💰 Orçamentos
+- Criação de orçamentos detalhados
+- Lista de itens com quantidades e valores
+- Geração de PDFs para impressão
+- Compartilhamento público de orçamentos
+- Envio via WhatsApp
 
-**Use Lovable**
+### 💳 Controle Financeiro
+- Registro de receitas e pagamentos
+- Controle de valores pagos por pedido
+- Relatórios financeiros
+- Lembretes de pagamento via WhatsApp
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/49bb0e91-9694-4c38-9ad9-67d86f53a445) and start prompting.
+### 📅 Agenda
+- Visualização de entregas por data
+- Lembretes automáticos via WhatsApp
+- Controle de prazos
 
-Changes made via Lovable will be committed automatically to this repo.
+### 📦 Estoque
+- Controle de inventário
+- Alertas de estoque baixo
+- Movimentações de entrada e saída
 
-**Use your preferred IDE**
+### 👥 Clientes
+- Cadastro completo de clientes
+- Histórico de pedidos
+- Contatos e informações
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### 🛍️ Catálogo de Produtos
+- Cadastro de produtos e serviços
+- Preços e descrições
+- Categorização
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+### 📊 Dashboard Inteligente
+- Centro de alertas inteligentes
+- Estatísticas em tempo real
+- Pedidos atrasados
+- Pagamentos pendentes
+- Estoque crítico
 
-Follow these steps:
+## 🛠️ Tecnologias
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+- **Frontend**: React 18, TypeScript, Vite
+- **UI**: Tailwind CSS, Radix UI, Lucide Icons
+- **Backend**: Supabase (PostgreSQL, Auth, Storage)
+- **Estado**: TanStack Query (React Query)
+- **Roteamento**: React Router DOM
+- **Notificações**: Sonner (Toast)
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+## 🚀 Instalação
 
-# Step 3: Install the necessary dependencies.
-npm i
+1. Clone o repositório:
+```bash
+git clone <seu-repositorio>
+cd atelie-pro-gestao-criativa
+```
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+2. Instale as dependências:
+```bash
+npm install
+```
+
+3. Configure as variáveis de ambiente:
+```bash
+# Crie um arquivo .env.local com suas credenciais do Supabase
+VITE_SUPABASE_URL=sua_url_do_supabase
+VITE_SUPABASE_ANON_KEY=sua_chave_anonima_do_supabase
+```
+
+4. Execute o projeto:
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## 📱 Sistema Multi-Loja
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+O Ateliê Pro suporta múltiplas empresas/lojas com:
+- Isolamento completo de dados por empresa
+- Controle de acesso por usuário
+- Trial gratuito de 7 dias por empresa
+- Sistema de assinatura premium
 
-**Use GitHub Codespaces**
+## 🔐 Autenticação
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+- Login/Cadastro seguro via Supabase Auth
+- Controle de sessão automático
+- Proteção de rotas
+- Sistema de recuperação de senha
 
-## What technologies are used for this project?
+## 📄 Licença
 
-This project is built with:
+Este projeto é proprietário e destinado ao uso comercial.
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## 👨‍💻 Desenvolvido por
 
-## How can I deploy this project?
+Sistema desenvolvido especialmente para ateliês de costura e confecção, com foco na experiência do usuário e funcionalidades essenciais para o negócio.
 
-Simply open [Lovable](https://lovable.dev/projects/49bb0e91-9694-4c38-9ad9-67d86f53a445) and click on Share -> Publish.
+---
 
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+**Ateliê Pro** - Transformando a gestão do seu ateliê! 🧵✨

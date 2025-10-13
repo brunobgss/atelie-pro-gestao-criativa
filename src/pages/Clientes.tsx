@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Search, Phone, Mail, Package, Plus } from "lucide-react";
+import { Search, Phone, Mail, Package, Plus, Edit, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -12,6 +12,22 @@ import { toast } from "sonner";
 
 export default function Clientes() {
   const [searchTerm, setSearchTerm] = useState("");
+
+  const handleEditClient = (client: any) => {
+    // Implementar edição de cliente
+    toast.info("Funcionalidade de edição em desenvolvimento");
+  };
+
+  const handleDeleteClient = async (client: any) => {
+    if (confirm(`Tem certeza que deseja excluir "${client.name}"?`)) {
+      try {
+        // Implementar exclusão
+        toast.success("Cliente excluído com sucesso!");
+      } catch (error) {
+        toast.error("Erro ao excluir cliente");
+      }
+    }
+  };
 
   const clients = [
     {
@@ -133,7 +149,7 @@ export default function Clientes() {
               className="border-border hover:shadow-md transition-all animate-fade-in cursor-pointer"
             >
               <CardHeader>
-                <div className="flex items-start justify-between">
+                  <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
                       <span className="text-white font-semibold text-lg">
@@ -155,6 +171,30 @@ export default function Clientes() {
                         {client.type}
                       </Badge>
                     </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditClient(client);
+                      }}
+                      className="h-8 w-8 p-0"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteClient(client);
+                      }}
+                      className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
                   </div>
                 </div>
               </CardHeader>

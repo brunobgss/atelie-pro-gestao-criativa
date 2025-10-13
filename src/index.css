@@ -8,98 +8,98 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* Ateliê Pro - Design System Clean & Modern */
+    /* Ateliê Pro - Design System Roxo-Magenta Vibrante */
     
-    /* Cores principais baseadas na logo */
-    --background: 0 0% 98%; /* Branco Clean */
-    --foreground: 200 40% 15%; /* Azul Petróleo Escuro */
+    /* Cores elegantes e profissionais - Tema Sofisticado */
+    --background: 0 0% 100%; /* Branco Puro */
+    --foreground: 240 10% 15%; /* Cinza Escuro Elegante */
 
     --card: 0 0% 100%;
-    --card-foreground: 200 40% 15%;
+    --card-foreground: 240 10% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 200 40% 15%;
+    --popover-foreground: 240 10% 15%;
 
-    --primary: 198 65% 35%; /* Azul Petróleo da Logo */
+    --primary: 240 15% 20%; /* Cinza Escuro Sofisticado */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 165 65% 50%; /* Verde Turquesa da Logo */
-    --secondary-foreground: 0 0% 100%;
+    --secondary: 240 5% 95%; /* Cinza Muito Claro */
+    --secondary-foreground: 240 10% 15%;
 
-    --muted: 210 20% 96%; /* Cinza Muito Claro */
-    --muted-foreground: 200 15% 50%;
+    --muted: 240 5% 96%; /* Cinza Claro Neutro */
+    --muted-foreground: 240 5% 45%;
 
-    --accent: 25 85% 55%; /* Laranja Tech da Logo */
+    --accent: 270 100% 25%; /* Roxo Elegante */
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 210 20% 90%;
-    --input: 210 20% 90%;
-    --ring: 198 65% 35%;
+    --border: 300 20% 90%;
+    --input: 300 20% 90%;
+    --ring: 300 100% 25%;
 
     --radius: 0.5rem;
 
-    /* Sidebar clara */
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 200 40% 15%;
-    --sidebar-primary: 165 65% 50%;
+    /* Sidebar elegante e profissional */
+    --sidebar-background: 0 0% 100%; /* Branco Limpo */
+    --sidebar-foreground: 240 10% 15%; /* Cinza Escuro */
+    --sidebar-primary: 240 15% 20%; /* Cinza Escuro Sofisticado */
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 210 20% 96%;
-    --sidebar-accent-foreground: 200 40% 15%;
-    --sidebar-border: 210 20% 90%;
-    --sidebar-ring: 165 65% 50%;
+    --sidebar-accent: 240 5% 95%; /* Cinza Muito Claro */
+    --sidebar-accent-foreground: 240 10% 15%;
+    --sidebar-border: 240 5% 90%; /* Cinza Claro */
+    --sidebar-ring: 270 100% 25%; /* Roxo Elegante */
 
-    /* Gradientes baseados na logo */
-    --gradient-primary: linear-gradient(135deg, hsl(198 65% 25%), hsl(165 75% 45%));
-    --gradient-secondary: linear-gradient(135deg, hsl(165 75% 45%), hsl(165 75% 55%));
-    --gradient-accent: linear-gradient(135deg, hsl(25 85% 55%), hsl(25 85% 65%));
+    /* Gradientes elegantes e sofisticados */
+    --gradient-primary: linear-gradient(135deg, hsl(240 15% 20%), hsl(240 10% 25%));
+    --gradient-secondary: linear-gradient(135deg, hsl(240 5% 95%), hsl(240 3% 98%));
+    --gradient-accent: linear-gradient(135deg, hsl(270 100% 25%), hsl(270 80% 35%));
     
-    /* Sombras sofisticadas */
+    /* Sombras elegantes e profissionais */
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
     --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
     --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-    --shadow-elegant: 0 20px 25px -5px rgb(36 60 72 / 0.15), 0 8px 10px -6px rgb(36 60 72 / 0.1);
+    --shadow-elegant: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
   }
 
   .dark {
-    --background: 200 40% 8%;
-    --foreground: 0 0% 100%;
+    --background: 300 100% 5%; /* Roxo Muito Escuro */
+    --foreground: 300 20% 95%; /* Roxo Muito Claro */
 
-    --card: 200 40% 12%;
-    --card-foreground: 0 0% 100%;
+    --card: 300 100% 8%; /* Roxo Escuro */
+    --card-foreground: 300 20% 95%;
 
-    --popover: 200 40% 12%;
-    --popover-foreground: 0 0% 100%;
+    --popover: 300 100% 8%;
+    --popover-foreground: 300 20% 95%;
 
-    --primary: 165 75% 45%;
+    --primary: 320 100% 50%; /* Magenta Vibrante */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 198 65% 30%;
+    --secondary: 300 100% 25%; /* Roxo Profundo */
     --secondary-foreground: 0 0% 100%;
 
-    --muted: 200 40% 18%;
-    --muted-foreground: 210 20% 70%;
+    --muted: 300 100% 12%; /* Roxo Médio-Escuro */
+    --muted-foreground: 300 20% 70%;
 
-    --accent: 25 85% 55%;
+    --accent: 340 100% 60%; /* Rosa Vibrante */
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 200 40% 18%;
-    --input: 200 40% 18%;
-    --ring: 165 75% 45%;
+    --border: 300 100% 15%; /* Roxo Médio */
+    --input: 300 100% 15%;
+    --ring: 320 100% 50%; /* Magenta Vibrante */
 
-    --sidebar-background: 198 65% 20%;
-    --sidebar-foreground: 0 0% 100%;
-    --sidebar-primary: 165 75% 45%;
+    --sidebar-background: 300 100% 8%; /* Roxo Escuro */
+    --sidebar-foreground: 300 20% 95%;
+    --sidebar-primary: 320 100% 50%; /* Magenta Vibrante */
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 198 65% 25%;
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 198 65% 15%;
-    --sidebar-ring: 165 75% 45%;
+    --sidebar-accent: 300 100% 12%; /* Roxo Médio-Escuro */
+    --sidebar-accent-foreground: 300 20% 95%;
+    --sidebar-border: 300 100% 15%; /* Roxo Médio */
+    --sidebar-ring: 320 100% 50%; /* Magenta Vibrante */
   }
 }
 
@@ -146,6 +146,560 @@ All colors MUST be HSL.
 
 @layer utilities {
   .text-gradient {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-secondary;
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary via-secondary to-accent;
   }
+  
+  .text-gradient-purple {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-purple-600 via-purple-500 to-pink-500;
+  }
+  
+  .bg-gradient-purple {
+    @apply bg-gradient-to-r from-purple-600 via-purple-500 to-pink-500;
+  }
+}
+
+/* Animações sofisticadas adicionais */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+
+@keyframes pulse-soft {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(59, 130, 246, 0.6);
+  }
+}
+
+@keyframes bounce {
+  0%, 20%, 50%, 80%, 100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-10px);
+  }
+  60% {
+    transform: translateY(-5px);
+  }
+}
+
+.animate-slide-in {
+  animation: slideIn 0.6s ease-out;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.4s ease-out;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2s ease-in-out infinite;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.8s ease-out;
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+.animate-glow {
+  animation: glow 2s ease-in-out infinite;
+}
+
+.animate-bounce {
+  animation: bounce 1s ease-in-out;
+}
+
+/* Efeitos de hover sofisticados */
+.card-hover {
+  @apply transition-all duration-300 ease-out;
+  @apply hover:shadow-xl hover:-translate-y-1;
+}
+
+.button-hover {
+  @apply transition-all duration-200 ease-out;
+  @apply hover:scale-105 hover:shadow-lg;
+}
+
+.input-focus {
+  @apply transition-all duration-200 ease-out;
+  @apply focus:ring-2 focus:ring-purple-500 focus:border-transparent;
+}
+
+/* Glassmorphism */
+.glass {
+  background: rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+/* Sombras sofisticadas */
+.shadow-soft {
+  box-shadow: 0 2px 15px -3px rgba(0, 0, 0, 0.07), 0 10px 20px -2px rgba(0, 0, 0, 0.04);
+}
+
+.shadow-medium {
+  box-shadow: 0 4px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.shadow-strong {
+  box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.15), 0 4px 25px -5px rgba(0, 0, 0, 0.08);
+}
+
+/* ========================================
+   ESTILOS PROFISSIONAIS PARA IMPRESSÃO
+   ======================================== */
+
+/* Estilos gerais para impressão */
+@media print {
+  * {
+    -webkit-print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    color: black !important;
+    font-size: 12pt !important;
+    line-height: 1.4 !important;
+  }
+  
+  .no-print {
+    display: none !important;
+  }
+  
+  .print-only {
+    display: block !important;
+  }
+  
+  /* Layout de impressão */
+  .print-page {
+    width: 210mm !important;
+    min-height: 297mm !important;
+    margin: 0 auto !important;
+    padding: 15mm !important;
+    box-sizing: border-box !important;
+    page-break-after: always !important;
+    background: white !important;
+    color: black !important;
+  }
+  
+  .print-page:last-child {
+    page-break-after: auto !important;
+  }
+  
+  /* Cabeçalho de impressão */
+  .print-header {
+    text-align: center !important;
+    margin-bottom: 30px !important;
+    border-bottom: 3px solid #2563eb !important;
+    padding-bottom: 20px !important;
+  }
+  
+  .print-header h1 {
+    font-size: 28px !important;
+    color: #1e40af !important;
+    margin-bottom: 10px !important;
+    font-weight: bold !important;
+  }
+  
+  .print-header .company-info {
+    font-size: 14px !important;
+    color: #6b7280 !important;
+    margin-top: 10px !important;
+  }
+  
+  /* Seções de impressão */
+  .print-section {
+    margin-bottom: 25px !important;
+    page-break-inside: avoid !important;
+  }
+  
+  .print-section h2 {
+    font-size: 18px !important;
+    color: #374151 !important;
+    margin-bottom: 15px !important;
+    border-bottom: 2px solid #e5e7eb !important;
+    padding-bottom: 8px !important;
+  }
+  
+  .print-section h3 {
+    font-size: 16px !important;
+    color: #4b5563 !important;
+    margin-bottom: 10px !important;
+    margin-top: 15px !important;
+  }
+  
+  /* Grid de informações */
+  .print-grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) !important;
+    gap: 15px !important;
+    margin-bottom: 20px !important;
+  }
+  
+  .print-item {
+    background: #f9fafb !important;
+    padding: 12px !important;
+    border-radius: 6px !important;
+    border-left: 4px solid #2563eb !important;
+  }
+  
+  .print-item .label {
+    font-weight: bold !important;
+    color: #374151 !important;
+    font-size: 12px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    margin-bottom: 4px !important;
+  }
+  
+  .print-item .value {
+    color: #1f2937 !important;
+    font-size: 14px !important;
+  }
+  
+  /* Tabelas de impressão */
+  .print-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    margin: 20px 0 !important;
+    background: white !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+  }
+  
+  .print-table th {
+    background: #f3f4f6 !important;
+    color: #374151 !important;
+    font-weight: bold !important;
+    padding: 12px !important;
+    text-align: left !important;
+    border: 1px solid #d1d5db !important;
+    font-size: 13px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+  }
+  
+  .print-table td {
+    padding: 12px !important;
+    border: 1px solid #d1d5db !important;
+    font-size: 14px !important;
+    color: #1f2937 !important;
+  }
+  
+  .print-table tr:nth-child(even) {
+    background: #f9fafb !important;
+  }
+  
+  .print-total {
+    background: #1e40af !important;
+    color: white !important;
+    font-weight: bold !important;
+    font-size: 16px !important;
+  }
+  
+  .print-total td {
+    color: white !important;
+    border-color: #1e40af !important;
+  }
+  
+  /* Instruções e observações */
+  .print-instructions {
+    background: #fef3c7 !important;
+    border: 1px solid #f59e0b !important;
+    border-radius: 6px !important;
+    padding: 15px !important;
+    margin: 20px 0 !important;
+  }
+  
+  .print-instructions h4 {
+    color: #92400e !important;
+    margin-bottom: 10px !important;
+    font-size: 14px !important;
+  }
+  
+  .print-instructions ul {
+    margin-left: 20px !important;
+    color: #92400e !important;
+  }
+  
+  .print-instructions li {
+    margin-bottom: 5px !important;
+    font-size: 13px !important;
+  }
+  
+  /* Status badges */
+  .print-status {
+    display: inline-block !important;
+    padding: 4px 12px !important;
+    border-radius: 20px !important;
+    font-size: 12px !important;
+    font-weight: bold !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+  }
+  
+  .status-pending {
+    background: #fef3c7 !important;
+    color: #92400e !important;
+    border: 1px solid #f59e0b !important;
+  }
+  
+  .status-production {
+    background: #dbeafe !important;
+    color: #1e40af !important;
+    border: 1px solid #3b82f6 !important;
+  }
+  
+  .status-ready {
+    background: #d1fae5 !important;
+    color: #065f46 !important;
+    border: 1px solid #10b981 !important;
+  }
+  
+  .status-waiting {
+    background: #f3e8ff !important;
+    color: #7c3aed !important;
+    border: 1px solid #8b5cf6 !important;
+  }
+  
+  /* Rodapé de impressão */
+  .print-footer {
+    margin-top: 40px !important;
+    text-align: center !important;
+    font-size: 12px !important;
+    color: #6b7280 !important;
+    border-top: 1px solid #e5e7eb !important;
+    padding-top: 20px !important;
+  }
+  
+  /* Quebras de página */
+  .page-break {
+    page-break-before: always !important;
+  }
+  
+  .no-page-break {
+    page-break-inside: avoid !important;
+  }
+  
+  /* Ocultar elementos da interface */
+  .sidebar,
+  .header,
+  .navigation,
+  .buttons,
+  .print-actions {
+    display: none !important;
+  }
+}
+
+/* Estilos para preview de impressão */
+.print-preview {
+  background: white !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 8px !important;
+  padding: 20px !important;
+  margin: 20px 0 !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+}
+
+.print-preview .print-header {
+  text-align: center !important;
+  margin-bottom: 30px !important;
+  border-bottom: 3px solid #2563eb !important;
+  padding-bottom: 20px !important;
+}
+
+.print-preview .print-section {
+  margin-bottom: 25px !important;
+}
+
+.print-preview .print-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) !important;
+  gap: 15px !important;
+  margin-bottom: 20px !important;
+}
+
+.print-preview .print-item {
+  background: #f9fafb !important;
+  padding: 12px !important;
+  border-radius: 6px !important;
+  border-left: 4px solid #2563eb !important;
+}
+
+.print-preview .print-table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  margin: 20px 0 !important;
+  background: white !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+}
+
+.print-preview .print-table th {
+  background: #f3f4f6 !important;
+  color: #374151 !important;
+  font-weight: bold !important;
+  padding: 12px !important;
+  text-align: left !important;
+  border: 1px solid #d1d5db !important;
+  font-size: 13px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+}
+
+.print-preview .print-table td {
+  padding: 12px !important;
+  border: 1px solid #d1d5db !important;
+  font-size: 14px !important;
+  color: #1f2937 !important;
+}
+
+.print-preview .print-table tr:nth-child(even) {
+  background: #f9fafb !important;
+}
+
+.print-preview .print-total {
+  background: #1e40af !important;
+  color: white !important;
+  font-weight: bold !important;
+  font-size: 16px !important;
+}
+
+.print-preview .print-total td {
+  color: white !important;
+  border-color: #1e40af !important;
+}
+
+.print-preview .print-instructions {
+  background: #fef3c7 !important;
+  border: 1px solid #f59e0b !important;
+  border-radius: 6px !important;
+  padding: 15px !important;
+  margin: 20px 0 !important;
+}
+
+.print-preview .print-instructions h4 {
+  color: #92400e !important;
+  margin-bottom: 10px !important;
+  font-size: 14px !important;
+}
+
+.print-preview .print-instructions ul {
+  margin-left: 20px !important;
+  color: #92400e !important;
+}
+
+.print-preview .print-instructions li {
+  margin-bottom: 5px !important;
+  font-size: 13px !important;
+}
+
+.print-preview .print-status {
+  display: inline-block !important;
+  padding: 4px 12px !important;
+  border-radius: 20px !important;
+  font-size: 12px !important;
+  font-weight: bold !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+}
+
+.print-preview .status-pending {
+  background: #fef3c7 !important;
+  color: #92400e !important;
+  border: 1px solid #f59e0b !important;
+}
+
+.print-preview .status-production {
+  background: #dbeafe !important;
+  color: #1e40af !important;
+  border: 1px solid #3b82f6 !important;
+}
+
+.print-preview .status-ready {
+  background: #d1fae5 !important;
+  color: #065f46 !important;
+  border: 1px solid #10b981 !important;
+}
+
+.print-preview .status-waiting {
+  background: #f3e8ff !important;
+  color: #7c3aed !important;
+  border: 1px solid #8b5cf6 !important;
+}
+
+.print-preview .print-footer {
+  margin-top: 40px !important;
+  text-align: center !important;
+  font-size: 12px !important;
+  color: #6b7280 !important;
+  border-top: 1px solid #e5e7eb !important;
+  padding-top: 20px !important;
 }

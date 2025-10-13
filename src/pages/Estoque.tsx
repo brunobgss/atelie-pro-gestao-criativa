@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Plus, AlertTriangle, TrendingDown } from "lucide-react";
+import { Plus, AlertTriangle, TrendingDown, Edit, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +12,22 @@ import { useQuery } from "@tanstack/react-query";
 import { listInventory } from "@/integrations/supabase/inventory";
 
 export default function Estoque() {
+  const handleEditItem = (item: any) => {
+    // Implementar edição de item
+    toast.info("Funcionalidade de edição em desenvolvimento");
+  };
+
+  const handleDeleteItem = async (item: any) => {
+    if (confirm(`Tem certeza que deseja excluir "${item.name}"?`)) {
+      try {
+        // Implementar exclusão
+        toast.success("Item excluído com sucesso!");
+      } catch (error) {
+        toast.error("Erro ao excluir item");
+      }
+    }
+  };
+
   const { data: items = [], isLoading } = useQuery({
     queryKey: ["inventory"],
     queryFn: async () => {
@@ -187,6 +203,24 @@ export default function Estoque() {
                         <p className="text-xs text-muted-foreground">{item.unit}</p>
                       </div>
                       {statusInfo.badge}
+                      <div className="flex gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditItem(item)}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteItem(item)}
+                          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </CardContent>

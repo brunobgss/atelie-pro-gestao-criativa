@@ -9,23 +9,28 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useState } from "react";
 import { createQuote, generateQuoteCode } from "@/integrations/supabase/quotes";
+import { useAuth } from "@/components/AuthProvider";
 
 export default function NovoOrcamento() {
   const navigate = useNavigate();
+  const { empresa } = useAuth();
   const [items, setItems] = useState([{ description: "", quantity: 1, value: 0 }]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const clientInput = (document.getElementById("client") as HTMLInputElement)?.value;
+    const phoneInput = (document.getElementById("phone") as HTMLInputElement)?.value;
     const dateInput = (document.getElementById("date") as HTMLInputElement)?.value || new Date().toISOString().split('T')[0];
+    const deliveryDateInput = (document.getElementById("deliveryDate") as HTMLInputElement)?.value;
     const observations = (document.getElementById("observations") as HTMLTextAreaElement)?.value || undefined;
     const code = generateQuoteCode();
 
     const result = await createQuote({
       code,
       customer_name: clientInput,
+      customer_phone: phoneInput,
       date: dateInput,
-      observations,
+      observations: (observations || '') + (deliveryDateInput ? `\nData de entrega estimada: ${new Date(deliveryDateInput).toLocaleDateString('pt-BR')}` : ''),
       items,
     });
 
@@ -56,7 +61,7 @@ export default function NovoOrcamento() {
   const handleWhatsApp = () => {
     const clientInput = (document.getElementById("client") as HTMLInputElement)?.value || "cliente";
     const message = encodeURIComponent(
-      `Olá ${clientInput}! Segue o seu orçamento no Ateliê Pro. Total: R$ ${total.toFixed(2)}.`
+      `Olá ${clientInput}! Segue o seu orçamento no ${empresa?.nome || 'Ateliê'}. Total: R$ ${total.toFixed(2)}.`
     );
     window.open(`https://wa.me/?text=${message}`, "_blank");
   };
@@ -101,11 +106,31 @@ export default function NovoOrcamento() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="date">Data</Label>
+                  <Label htmlFor="phone">Telefone</Label>
+                  <Input
+                    id="phone"
+                    placeholder="(11) 99999-9999"
+                    className="border-input"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="date">Data do Orçamento</Label>
                   <Input
                     id="date"
                     type="date"
                     defaultValue={new Date().toISOString().split('T')[0]}
+                    className="border-input"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="deliveryDate">Data de Entrega Estimada</Label>
+                  <Input
+                    id="deliveryDate"
+                    type="date"
                     className="border-input"
                   />
                 </div>
@@ -156,19 +181,24 @@ export default function NovoOrcamento() {
                       />
                     </div>
                     <div className="col-span-6 md:col-span-3">
-                      <Input
-                        type="number"
-                        placeholder="Valor"
-                        step="0.01"
-                        min="0"
-                        value={item.value}
-                        onChange={(e) => {
-                          const newItems = [...items];
-                          newItems[index].value = Number(e.target.value);
-                          setItems(newItems);
-                        }}
-                        className="border-input"
-                      />
+                      <div className="space-y-1">
+                        <Input
+                          type="number"
+                          placeholder="Valor unitário"
+                          step="0.01"
+                          min="0"
+                          value={item.value}
+                          onChange={(e) => {
+                            const newItems = [...items];
+                            newItems[index].value = Number(e.target.value);
+                            setItems(newItems);
+                          }}
+                          className="border-input"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Valor por unidade (ex: 25.50)
+                        </p>
+                      </div>
                     </div>
                     {items.length > 1 && (
                       <div className="col-span-12 md:col-span-1 flex items-center justify-center">

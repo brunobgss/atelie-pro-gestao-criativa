@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Layout } from "./components/Layout";
+import { AuthProvider } from "./components/AuthProvider";
 import Dashboard from "./pages/Dashboard";
 import Pedidos from "./pages/Pedidos";
 import NovoPedido from "./pages/NovoPedido";
@@ -12,9 +13,22 @@ import Orcamentos from "./pages/Orcamentos";
 import NovoOrcamento from "./pages/NovoOrcamento";
 import Clientes from "./pages/Clientes";
 import Estoque from "./pages/Estoque";
-import NotFound from "./pages/NotFound";
+import CalculadoraPrecos from "./pages/CalculadoraPrecos";
+import CatalogoProdutos from "./pages/CatalogoProdutos";
+import Relatorios from "./pages/Relatorios";
+import Assinatura from "./pages/Assinatura";
+import AssinaturaSucesso from "./pages/AssinaturaSucesso";
+import OrdemProducao from "./pages/OrdemProducao";
+import ControleFinanceiro from "./pages/ControleFinanceiro";
 import PedidoDetalhe from "./pages/PedidoDetalhe";
 import OrcamentoPublico from "./pages/OrcamentoPublico";
+import OrcamentoImpressao from "./pages/OrcamentoImpressao";
+import EditarOrcamento from "./pages/EditarOrcamento";
+import EditarPedido from "./pages/EditarPedido";
+import MinhaConta from "./pages/MinhaConta";
+import Login from "./pages/Login";
+import Cadastro from "./pages/Cadastro";
+import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
@@ -24,21 +38,36 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route element={<Layout />}>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/pedidos" element={<Pedidos />} />
-            <Route path="/pedidos/:id" element={<PedidoDetalhe />} />
-            <Route path="/pedidos/novo" element={<NovoPedido />} />
-            <Route path="/agenda" element={<Agenda />} />
-            <Route path="/orcamentos" element={<Orcamentos />} />
-            <Route path="/orcamentos/novo" element={<NovoOrcamento />} />
-            <Route path="/clientes" element={<Clientes />} />
-            <Route path="/estoque" element={<Estoque />} />
-          </Route>
-          <Route path="/orcamento/:id" element={<OrcamentoPublico />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AuthProvider>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/cadastro" element={<Cadastro />} />
+            <Route path="/orcamento/:id" element={<OrcamentoPublico />} />
+            <Route path="/assinatura/sucesso" element={<AssinaturaSucesso />} />
+            <Route element={<Layout />}>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/pedidos" element={<Pedidos />} />
+              <Route path="/pedidos/:id" element={<PedidoDetalhe />} />
+              <Route path="/pedidos/:id/producao" element={<OrdemProducao />} />
+              <Route path="/pedidos/novo" element={<NovoPedido />} />
+              <Route path="/pedidos/editar/:id" element={<EditarPedido />} />
+              <Route path="/agenda" element={<Agenda />} />
+              <Route path="/orcamentos" element={<Orcamentos />} />
+              <Route path="/orcamentos/novo" element={<NovoOrcamento />} />
+              <Route path="/orcamentos/editar/:id" element={<EditarOrcamento />} />
+              <Route path="/orcamentos/imprimir/:id" element={<OrcamentoImpressao />} />
+              <Route path="/calculadora" element={<CalculadoraPrecos />} />
+              <Route path="/catalogo" element={<CatalogoProdutos />} />
+              <Route path="/relatorios" element={<Relatorios />} />
+              <Route path="/assinatura" element={<Assinatura />} />
+              <Route path="/minha-conta" element={<MinhaConta />} />
+              <Route path="/financeiro" element={<ControleFinanceiro />} />
+              <Route path="/clientes" element={<Clientes />} />
+              <Route path="/estoque" element={<Estoque />} />
+            </Route>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

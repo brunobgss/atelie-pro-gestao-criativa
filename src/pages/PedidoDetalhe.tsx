@@ -1,12 +1,18 @@
-import { useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { ArrowLeft, Calendar, CheckCircle2, Clock, Package, Upload, User } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import { getOrderByCode } from "@/integrations/supabase/orders";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ArrowLeft, Calendar, CheckCircle2, Clock, Package, Upload, User, Play, Pause, CheckCircle, Truck, Printer, Edit, CreditCard } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { getOrderByCode, updateOrderStatus } from "@/integrations/supabase/orders";
+import { getReceitaByOrderCode } from "@/integrations/supabase/receitas";
+import { toast } from "sonner";
 
 type OrderItem = {
   id: string;
@@ -16,52 +22,10 @@ type OrderItem = {
   value: number;
   paid: number;
   delivery: string; // ISO
-  status: "Aguardando aprovação" | "Em produção" | "Pronto" | "Aguardando retirada";
+  status: "Aguardando aprovação" | "Em produção" | "Pronto" | "Aguardando retirada" | "Entregue";
   file?: string;
 };
 
-const MOCK_ORDERS: OrderItem[] = [
-  {
-    id: "PED-001",
-    client: "Maria Silva",
-    type: "Bordado Computadorizado",
-    description: "Logo empresa em 50 camisetas",
-    value: 850,
-    paid: 425,
-    delivery: "2025-10-12",
-    status: "Em produção",
-  },
-  {
-    id: "PED-002",
-    client: "João Santos",
-    type: "Uniforme Escolar",
-    description: "15 uniformes tam. P-M-G",
-    value: 1200,
-    paid: 1200,
-    delivery: "2025-10-10",
-    status: "Pronto",
-  },
-  {
-    id: "PED-003",
-    client: "Ana Costa",
-    type: "Personalizado",
-    description: "Toalhinhas com bordado nome",
-    value: 320,
-    paid: 160,
-    delivery: "2025-10-15",
-    status: "Aguardando aprovação",
-  },
-  {
-    id: "PED-004",
-    client: "Pedro Oliveira",
-    type: "Camiseta Estampada",
-    description: "30 camisetas estampa personalizada",
-    value: 600,
-    paid: 300,
-    delivery: "2025-10-13",
-    status: "Em produção",
-  },
-];
 
 function getStatusStepIndex(status: OrderItem["status"]) {
   const steps: OrderItem["status"][] = [
@@ -69,6 +33,7 @@ function getStatusStepIndex(status: OrderItem["status"]) {
     "Em produção",
     "Pronto",
     "Aguardando retirada",
+    "Entregue",
   ];
   return steps.indexOf(status);
 }
@@ -76,15 +41,123 @@ function getStatusStepIndex(status: OrderItem["status"]) {
 export default function PedidoDetalhe() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
+  const [isPaidDialogOpen, setIsPaidDialogOpen] = useState(false);
+  const [newStatus, setNewStatus] = useState("");
+  const [newPaidValue, setNewPaidValue] = useState("");
+  const [forceUpdate, setForceUpdate] = useState(0); // Para forçar re-render
+  const [localStatus, setLocalStatus] = useState<string | null>(null); // Estado local do status
 
   const code = id as string;
-  const { data: orderDb } = useQuery({
+
+  const handleUpdateStatus = async () => {
+    if (!newStatus) {
+      toast.error("Selecione um status");
+      return;
+    }
+
+    try {
+      // Atualizando status do pedido
+      
+      // Atualizar estado local imediatamente para feedback visual
+      setLocalStatus(newStatus);
+      
+      const result = await updateOrderStatus(code, newStatus);
+      if (result.ok) {
+        toast.success("Status atualizado com sucesso!");
+        setIsStatusDialogOpen(false);
+        setNewStatus(""); // Limpar o campo
+        
+          // Status atualizado no banco, mantendo estado local
+        
+        // Manter o estado local atualizado
+        setLocalStatus(newStatus);
+        
+        // Invalidar cache para sincronização futura
+        await queryClient.invalidateQueries({ queryKey: ["order", code] });
+        await queryClient.invalidateQueries({ queryKey: ["orders"] });
+        
+      } else {
+        console.error("Erro ao atualizar status:", result.error);
+        toast.error(result.error || "Erro ao atualizar status");
+        
+        // Reverter estado local em caso de erro
+        setLocalStatus(null);
+      }
+    } catch (error) {
+      console.error("Erro ao atualizar status:", error);
+      toast.error("Erro ao atualizar status");
+      
+      // Reverter estado local em caso de erro
+      setLocalStatus(null);
+    }
+  };
+
+  const handleUpdatePaid = async () => {
+    const value = parseFloat(newPaidValue);
+    if (isNaN(value) || value < 0) {
+      toast.error("Digite um valor válido");
+      return;
+    }
+
+    try {
+      // Atualizando valor pago do pedido
+      const result = await updateOrderStatus(code, undefined, value);
+      if (result.ok) {
+        toast.success("Valor pago atualizado com sucesso!");
+        setIsPaidDialogOpen(false);
+        setNewPaidValue(""); // Limpar o campo
+        
+        // Se temos dados atualizados, usar eles diretamente
+        if (result.data) {
+          // Usando dados atualizados
+          // Atualizar o cache do React Query com os dados retornados
+          queryClient.setQueryData(["order", code], result.data);
+          
+          // Forçar re-render imediato
+          await queryClient.invalidateQueries({ queryKey: ["order", code] });
+          await queryClient.invalidateQueries({ queryKey: ["orders"] });
+          
+          // Refetch para garantir consistência
+          refetch();
+        } else {
+          console.warn("Nenhum dado retornado - forçando refetch");
+          // Se não temos dados, forçar refetch completo
+          await queryClient.invalidateQueries({ queryKey: ["order", code] });
+          await queryClient.invalidateQueries({ queryKey: ["orders"] });
+          refetch();
+        }
+      } else {
+        console.error("Erro ao atualizar valor pago:", result.error);
+        toast.error(result.error || "Erro ao atualizar valor pago");
+      }
+    } catch (error) {
+      console.error("Erro ao atualizar valor pago:", error);
+      toast.error("Erro ao atualizar valor pago");
+    }
+  };
+
+  const { data: orderDb, isLoading, error, refetch } = useQuery({
     queryKey: ["order", code],
     queryFn: () => getOrderByCode(code),
     enabled: Boolean(code),
+    refetchOnWindowFocus: false,
+    staleTime: 0, // Sempre buscar dados frescos
   });
+
+  // Query para buscar status de pagamento
+  const { data: receitaData, isLoading: isLoadingPayment } = useQuery({
+    queryKey: ["receita", code],
+    queryFn: () => getReceitaByOrderCode(code),
+    enabled: Boolean(code),
+    refetchOnWindowFocus: false,
+    staleTime: 0, // Sempre buscar dados frescos
+  });
+  
   const order = useMemo(() => {
     if (orderDb) {
+      console.log("Dados do pedido recebidos:", orderDb, "forceUpdate:", forceUpdate);
       return {
         id: orderDb.code,
         client: orderDb.customer_name,
@@ -97,14 +170,33 @@ export default function PedidoDetalhe() {
         file: orderDb.file_url ?? undefined,
       } as OrderItem;
     }
-    return MOCK_ORDERS.find((o) => o.id === id);
-  }, [orderDb, id]);
+    return null;
+  }, [orderDb, id, forceUpdate]);
 
-  const steps: { key: OrderItem["status"]; label: string }[] = [
-    { key: "Aguardando aprovação", label: "Aguardando aprovação" },
-    { key: "Em produção", label: "Em produção" },
-    { key: "Pronto", label: "Pronto" },
-    { key: "Aguardando retirada", label: "Aguardando retirada" },
+  // Função para determinar o status de pagamento
+  const getPaymentStatus = () => {
+    if (!order) return { status: "unknown", label: "Desconhecido", color: "bg-gray-100 text-gray-600" };
+    
+    const totalValue = order.value;
+    const paidValue = order.paid;
+    
+    if (paidValue === 0) {
+      return { status: "pending", label: "Pendente", color: "bg-yellow-100 text-yellow-800" };
+    } else if (paidValue >= totalValue) {
+      return { status: "paid", label: "Pago", color: "bg-green-100 text-green-800" };
+    } else {
+      return { status: "partial", label: "Parcial", color: "bg-blue-100 text-blue-800" };
+    }
+  };
+
+  const paymentStatus = getPaymentStatus();
+
+  const steps: { key: OrderItem["status"]; label: string; icon: any; description: string }[] = [
+    { key: "Aguardando aprovação", label: "Aguardando Aprovação", icon: Clock, description: "Pedido recebido, aguardando confirmação do cliente" },
+    { key: "Em produção", label: "Em Produção", icon: Play, description: "Trabalho iniciado, produção em andamento" },
+    { key: "Pronto", label: "Pronto", icon: CheckCircle, description: "Produto finalizado, pronto para entrega" },
+    { key: "Aguardando retirada", label: "Aguardando Retirada", icon: Truck, description: "Produto pronto, aguardando retirada pelo cliente" },
+    { key: "Entregue", label: "Entregue", icon: CheckCircle2, description: "Produto entregue ao cliente, pedido finalizado" },
   ];
 
   if (!order) {
@@ -184,14 +276,58 @@ export default function PedidoDetalhe() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>
                   <p className="text-xs text-muted-foreground">Tipo</p>
                   <p className="text-sm font-medium text-foreground">{order.type}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Valor / Pago</p>
-                  <p className="text-sm font-medium text-foreground">R$ {order.value} / R$ {order.paid}</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-medium text-foreground">R$ {order.value} / R$ {order.paid}</p>
+                    <Dialog open={isPaidDialogOpen} onOpenChange={setIsPaidDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                          <Edit className="w-3 h-3" />
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Editar Valor Pago</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div>
+                            <Label htmlFor="paid">Valor Pago (R$)</Label>
+                            <Input
+                              id="paid"
+                              type="number"
+                              step="0.01"
+                              placeholder="0,00"
+                              value={newPaidValue}
+                              onChange={(e) => setNewPaidValue(e.target.value)}
+                            />
+                          </div>
+                          <div className="flex gap-2">
+                            <Button onClick={handleUpdatePaid} className="flex-1">
+                              Atualizar
+                            </Button>
+                            <Button variant="outline" onClick={() => setIsPaidDialogOpen(false)}>
+                              Cancelar
+                            </Button>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Status de Pagamento</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <CreditCard className="w-4 h-4 text-muted-foreground" />
+                    <Badge className={`${paymentStatus.color} border-0`}>
+                      {paymentStatus.label}
+                    </Badge>
+                  </div>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Status</p>
@@ -224,36 +360,117 @@ export default function PedidoDetalhe() {
             </CardContent>
           </Card>
 
-          <Card className="border-border">
+          <Card className="border-gray-200/50 shadow-sm">
             <CardHeader>
-              <CardTitle className="text-foreground">Timeline do Pedido</CardTitle>
+              <CardTitle className="text-gray-900 flex items-center gap-2">
+                <Clock className="w-5 h-5 text-purple-600" />
+                Timeline de Produção
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <ol className="relative border-l border-border ml-3 space-y-6">
+              <div className="space-y-6">
                 {steps.map((step, index) => {
                   const isDone = index <= currentStep;
+                  const isCurrent = index === currentStep;
+                  const IconComponent = step.icon;
+                  
                   return (
-                    <li key={step.key} className="ml-4">
-                      <div className="absolute -left-3 w-6 h-6 rounded-full flex items-center justify-center bg-card border border-border">
-                        {isDone ? (
-                          <CheckCircle2 className="w-4 h-4 text-secondary" />
-                        ) : (
-                          <Clock className="w-4 h-4 text-muted-foreground" />
+                    <div key={step.key} className="flex items-start gap-4">
+                      <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center border-2 ${
+                        isDone 
+                          ? 'bg-green-100 border-green-500 text-green-600' 
+                          : isCurrent
+                          ? 'bg-blue-100 border-blue-500 text-blue-600'
+                          : 'bg-gray-100 border-gray-300 text-gray-400'
+                      }`}>
+                        <IconComponent className="w-5 h-5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className={`font-medium ${
+                          isDone ? 'text-green-700' : isCurrent ? 'text-blue-700' : 'text-gray-500'
+                        }`}>
+                          {step.label}
+                        </div>
+                        <div className={`text-sm ${
+                          isDone ? 'text-green-600' : isCurrent ? 'text-blue-600' : 'text-gray-400'
+                        }`}>
+                          {step.description}
+                        </div>
+                        {isCurrent && (
+                          <div className="mt-2">
+                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                              Status Atual
+                            </Badge>
+                          </div>
                         )}
                       </div>
-                      <p className={`text-sm ${isDone ? "text-foreground" : "text-muted-foreground"}`}>
-                        {step.label}
-                      </p>
-                    </li>
+                    </div>
                   );
                 })}
-              </ol>
+              </div>
             </CardContent>
           </Card>
         </div>
+
+        {/* Ações */}
+        <Card className="bg-white border border-gray-200/50 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-gray-900 flex items-center gap-2">
+              <Printer className="w-5 h-5 text-purple-600" />
+              Ações
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-3">
+              <Button
+                onClick={() => navigate(`/pedidos/${order.id}/producao`)}
+                className="flex-1"
+              >
+                <Printer className="w-4 h-4 mr-2" />
+                Gerar Ordem de Produção
+              </Button>
+              <Dialog open={isStatusDialogOpen} onOpenChange={setIsStatusDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline">
+                    <Upload className="w-4 h-4 mr-2" />
+                    Atualizar Status
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Atualizar Status do Pedido</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="status">Novo Status</Label>
+                      <Select value={newStatus} onValueChange={setNewStatus}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione o status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Aguardando aprovação">Aguardando aprovação</SelectItem>
+                          <SelectItem value="Em produção">Em produção</SelectItem>
+                          <SelectItem value="Pronto">Pronto</SelectItem>
+                          <SelectItem value="Aguardando retirada">Aguardando retirada</SelectItem>
+                          <SelectItem value="Entregue">Entregue</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button onClick={handleUpdateStatus} className="flex-1">
+                        Atualizar
+                      </Button>
+                      <Button variant="outline" onClick={() => setIsStatusDialogOpen(false)}>
+                        Cancelar
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
 }
-
-

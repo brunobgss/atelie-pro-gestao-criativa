@@ -1,120 +1,333 @@
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Calendar, Package, AlertCircle } from "lucide-react";
+import { Calendar, Package, AlertCircle, Clock, CheckCircle, Bell, MessageCircle } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { listOrders } from "@/integrations/supabase/orders";
+import { useAuth } from "@/components/AuthProvider";
+import { toast } from "sonner";
+
+interface DeliveryEvent {
+  id: string;
+  date: string;
+  client: string;
+  type: string;
+  status: string;
+  orderCode: string;
+  daysUntilDelivery: number;
+  isOverdue: boolean;
+  isUrgent: boolean;
+}
 
 export default function Agenda() {
-  const events = [
-    { date: "2025-10-10", client: "João Santos", type: "Uniforme", status: "Pronto" },
-    { date: "2025-10-12", client: "Maria Silva", type: "Bordado", status: "Em produção" },
-    { date: "2025-10-13", client: "Pedro Oliveira", type: "Camiseta", status: "Em produção" },
-    { date: "2025-10-15", client: "Ana Costa", type: "Personalizado", status: "Aguardando" },
-    { date: "2025-10-08", client: "Carlos Lima", type: "Uniforme", status: "Atrasado" },
-  ];
+  const [currentDate] = useState(new Date());
+  const [notifications, setNotifications] = useState<string[]>([]);
+  const { empresa } = useAuth();
 
-  const getStatusColor = (status: string) => {
+  const { data: orders = [] } = useQuery({
+    queryKey: ["orders"],
+    queryFn: listOrders,
+  });
+
+  // Processar pedidos para eventos de entrega
+  const deliveryEvents: DeliveryEvent[] = orders
+    .filter(order => order.delivery_date)
+    .map(order => {
+      const deliveryDate = new Date(order.delivery_date!);
+      const today = new Date();
+      const diffTime = deliveryDate.getTime() - today.getTime();
+      const daysUntilDelivery = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      return {
+        id: order.id,
+        date: order.delivery_date!,
+        client: order.customer_name,
+        type: order.type,
+        status: order.status,
+        orderCode: order.code,
+        daysUntilDelivery,
+        isOverdue: daysUntilDelivery < 0,
+        isUrgent: daysUntilDelivery <= 2 && daysUntilDelivery >= 0,
+      };
+    });
+
+  // Gerar notificações automáticas (sem duplicatas)
+  useEffect(() => {
+    const newNotifications: string[] = [];
+    const processedOrders = new Set<string>(); // Para evitar duplicatas
+    
+    deliveryEvents.forEach(event => {
+      const notificationKey = `${event.orderCode}-${event.isOverdue ? 'overdue' : 'urgent'}`;
+      
+      if (!processedOrders.has(notificationKey)) {
+        processedOrders.add(notificationKey);
+        
+        if (event.isOverdue) {
+          newNotifications.push(`🚨 URGENTE: Pedido ${event.orderCode} (${event.client}) está atrasado!`);
+        } else if (event.isUrgent) {
+          newNotifications.push(`⚠️ ATENÇÃO: Pedido ${event.orderCode} (${event.client}) vence em ${event.daysUntilDelivery} dias`);
+        }
+      }
+    });
+
+    // Só atualizar se realmente mudou
+    if (JSON.stringify(newNotifications) !== JSON.stringify(notifications)) {
+      setNotifications(newNotifications);
+    }
+  }, [deliveryEvents, notifications]);
+
+  const getStatusColor = (status: string, isOverdue: boolean, isUrgent: boolean) => {
+    if (isOverdue) {
+      return "bg-red-100 text-red-700 border-red-300";
+    }
+    if (isUrgent) {
+      return "bg-orange-100 text-orange-700 border-orange-300";
+    }
+    
     switch (status) {
       case "Pronto":
-        return "bg-accent/20 text-accent border-accent/30";
+        return "bg-green-100 text-green-700 border-green-300";
       case "Em produção":
-        return "bg-secondary/20 text-secondary border-secondary/30";
-      case "Atrasado":
-        return "bg-destructive/20 text-destructive border-destructive/30";
+        return "bg-blue-100 text-blue-700 border-blue-300";
+      case "Aguardando aprovação":
+        return "bg-gray-100 text-gray-700 border-gray-300";
       default:
-        return "bg-muted text-muted-foreground border-muted-foreground/30";
+        return "bg-gray-100 text-gray-700 border-gray-300";
     }
   };
 
-  const sortedEvents = [...events].sort(
+  const getDaysUntilDeliveryText = (days: number, isOverdue: boolean) => {
+    if (isOverdue) {
+      return `${Math.abs(days)} dias atrasado`;
+    }
+    if (days === 0) {
+      return "Hoje";
+    }
+    if (days === 1) {
+      return "Amanhã";
+    }
+    return `${days} dias`;
+  };
+
+  const sortedEvents = [...deliveryEvents].sort(
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
   );
 
+  const sendWhatsAppReminder = (event: DeliveryEvent) => {
+    const message = `Olá ${event.client}!
+
+Lembramos que seu pedido ${event.orderCode} tem entrega prevista para ${new Date(event.date).toLocaleDateString('pt-BR')}.
+
+*DETALHES:*
+• Tipo: ${event.type}
+• Status: ${event.status}
+• Dias restantes: ${event.daysUntilDelivery > 0 ? event.daysUntilDelivery : 'Atrasado'}
+
+Em caso de dúvidas, entre em contato conosco!
+
+_${empresa?.nome || 'Ateliê'}_`;
+
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank');
+    toast.success("Mensagem do WhatsApp preparada!");
+  };
+
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="flex items-center gap-4 p-4">
-          <SidebarTrigger />
-          <div>
-            <h1 className="text-2xl font-semibold text-foreground">Agenda de Produção</h1>
-            <p className="text-sm text-muted-foreground">Calendário de entregas e produção</p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100">
+      {/* Header */}
+      <div className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 sticky top-0 z-10 shadow-sm">
+        <div className="p-6 flex justify-between items-center">
+          <div className="flex items-center gap-4">
+            <SidebarTrigger className="text-gray-700 hover:bg-gray-100" />
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                <Calendar className="w-6 h-6 text-purple-600" />
+                Agenda de Entregas
+              </h1>
+              <p className="text-gray-600 text-sm mt-0.5">Calendário de produção com lembretes automáticos</p>
+            </div>
           </div>
         </div>
-      </header>
+      </div>
 
-      <div className="p-6 space-y-6">
-        {/* Alerts */}
-        <Card className="border-destructive/50 bg-destructive/5 animate-fade-in">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <AlertCircle className="w-5 h-5 text-destructive" />
-              <div>
-                <p className="font-medium text-destructive">1 pedido atrasado</p>
-                <p className="text-sm text-muted-foreground">Verifique os pedidos pendentes</p>
+      <div className="p-8 space-y-6">
+        {/* Notificações Automáticas */}
+        {notifications.length > 0 && (
+          <Card className="border-red-200 bg-red-50 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-red-800 flex items-center gap-2">
+                <Bell className="w-5 h-5" />
+                Lembretes Automáticos ({notifications.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {notifications.map((notification, index) => (
+                  <div key={index} className="flex items-center gap-2 p-2 bg-white rounded border border-red-200">
+                    <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                    <span className="text-red-800 text-sm">{notification}</span>
+                  </div>
+                ))}
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
-        {/* Calendar Timeline */}
-        <Card className="border-border animate-fade-in">
+        {/* Resumo do Dia */}
+        <div className="grid gap-6 md:grid-cols-3">
+          <Card className="bg-white border border-gray-200/50 shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Entregas Hoje</p>
+                  <p className="text-2xl font-bold text-blue-600">
+                    {deliveryEvents.filter(e => e.daysUntilDelivery === 0).length}
+                  </p>
+                </div>
+                <Calendar className="w-8 h-8 text-blue-500" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white border border-gray-200/50 shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Próximos 3 Dias</p>
+                  <p className="text-2xl font-bold text-orange-600">
+                    {deliveryEvents.filter(e => e.daysUntilDelivery > 0 && e.daysUntilDelivery <= 3).length}
+                  </p>
+                </div>
+                <Clock className="w-8 h-8 text-orange-500" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white border border-gray-200/50 shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Atrasados</p>
+                  <p className="text-2xl font-bold text-red-600">
+                    {deliveryEvents.filter(e => e.isOverdue).length}
+                  </p>
+                </div>
+                <AlertCircle className="w-8 h-8 text-red-500" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Lista de Entregas */}
+        <Card className="bg-white border border-gray-200/50 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-foreground flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-primary" />
-              Próximas Entregas
+            <CardTitle className="text-gray-900 flex items-center gap-2">
+              <Package className="w-5 h-5 text-purple-600" />
+              Cronograma de Entregas
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {sortedEvents.map((event, index) => {
-                const eventDate = new Date(event.date);
-                const today = new Date();
-                const isToday = eventDate.toDateString() === today.toDateString();
-                const isPast = eventDate < today;
-
-                return (
+            {sortedEvents.length === 0 ? (
+              <div className="text-center py-8">
+                <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Nenhuma entrega agendada</h3>
+                <p className="text-gray-600">Crie pedidos para ver o cronograma de entregas</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {sortedEvents.map((event) => (
                   <div
-                    key={index}
-                    className={`flex items-center gap-4 p-4 rounded-lg border transition-colors ${
-                      isToday
-                        ? "border-accent bg-accent/5"
-                        : isPast
-                        ? "border-destructive/30 bg-destructive/5"
-                        : "border-border bg-card hover:bg-muted/30"
+                    key={event.id}
+                    className={`p-4 rounded-lg border ${
+                      event.isOverdue 
+                        ? 'bg-red-50 border-red-200' 
+                        : event.isUrgent 
+                        ? 'bg-orange-50 border-orange-200' 
+                        : 'bg-gray-50 border-gray-200'
                     }`}
                   >
-                    <div className="flex-shrink-0">
-                      <div
-                        className={`w-16 h-16 rounded-lg flex flex-col items-center justify-center ${
-                          isToday
-                            ? "bg-accent text-accent-foreground"
-                            : isPast
-                            ? "bg-destructive/20 text-destructive"
-                            : "bg-primary/10 text-primary"
-                        }`}
-                      >
-                        <span className="text-xs font-medium">
-                          {eventDate.toLocaleDateString('pt-BR', { month: 'short' }).toUpperCase()}
-                        </span>
-                        <span className="text-2xl font-bold">
-                          {eventDate.getDate()}
-                        </span>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                          event.isOverdue 
+                            ? 'bg-red-100 text-red-600' 
+                            : event.isUrgent 
+                            ? 'bg-orange-100 text-orange-600' 
+                            : 'bg-blue-100 text-blue-600'
+                        }`}>
+                          <Calendar className="w-6 h-6" />
+                        </div>
+                        
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold text-gray-900">{event.client}</h3>
+                            <Badge variant="outline" className={getStatusColor(event.status, event.isOverdue, event.isUrgent)}>
+                              {event.status}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-gray-600">{event.type} - {event.orderCode}</p>
+                          <p className="text-xs text-gray-500">
+                            Entrega: {new Date(event.date).toLocaleDateString('pt-BR')} 
+                            ({getDaysUntilDeliveryText(event.daysUntilDelivery, event.isOverdue)})
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => sendWhatsAppReminder(event)}
+                          className="text-green-600 border-green-200 hover:bg-green-50"
+                        >
+                          <MessageCircle className="w-4 h-4 mr-1" />
+                          WhatsApp
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.open(`/pedidos/${event.orderCode}`, '_blank')}
+                        >
+                          Ver Pedido
+                        </Button>
                       </div>
                     </div>
-
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Package className="w-4 h-4 text-muted-foreground" />
-                        <h3 className="font-medium text-foreground">{event.client}</h3>
-                      </div>
-                      <p className="text-sm text-muted-foreground">{event.type}</p>
-                    </div>
-
-                    <Badge variant="outline" className={getStatusColor(event.status)}>
-                      {event.status}
-                    </Badge>
                   </div>
-                );
-              })}
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Calendário Visual */}
+        <Card className="bg-white border border-gray-200/50 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-gray-900 flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-purple-600" />
+              Visão do Mês
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-8">
+              <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Calendário Visual</h3>
+              <p className="text-gray-600 mb-4">Visualização em calendário será implementada em breve</p>
+              <div className="flex justify-center gap-2">
+                <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                  🔴 Atrasados
+                </Badge>
+                <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
+                  🟠 Urgentes
+                </Badge>
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                  🔵 Em Produção
+                </Badge>
+                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                  🟢 Prontos
+                </Badge>
+              </div>
             </div>
           </CardContent>
         </Card>

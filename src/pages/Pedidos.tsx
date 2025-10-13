@@ -4,14 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Plus, Search, Filter, Package, Calendar, User } from "lucide-react";
+import { Plus, Search, Filter, Package, Calendar, User, Copy, Edit, X } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { listOrders } from "@/integrations/supabase/orders";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { listOrders, updateOrderStatus } from "@/integrations/supabase/orders";
+import { toast } from "sonner";
 
 export default function Pedidos() {
   const [searchTerm, setSearchTerm] = useState("");
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const { data: orders = [] } = useQuery({
     queryKey: ["orders"],
@@ -38,8 +40,55 @@ export default function Pedidos() {
         return "bg-secondary/20 text-secondary border-secondary/30";
       case "Aguardando aprovação":
         return "bg-muted text-muted-foreground border-muted-foreground/30";
+      case "Cancelado":
+        return "bg-destructive/20 text-destructive border-destructive/30";
       default:
         return "bg-muted text-muted-foreground border-muted-foreground/30";
+    }
+  };
+
+  const duplicateOrder = (order: any) => {
+    // Armazenar dados do pedido para duplicação
+    const orderData = {
+      client: order.client,
+      type: order.type,
+      description: order.description,
+      value: order.value,
+      // Não duplicar sinal pago e data de entrega
+      paid: 0,
+      delivery: "",
+    };
+    
+    // Armazenar no localStorage para usar no NovoPedido
+    localStorage.setItem('duplicateOrder', JSON.stringify(orderData));
+    
+    // Redirecionar para NovoPedido
+    navigate('/pedidos/novo');
+    
+    toast.success("Dados do pedido copiados! Preencha as informações atualizadas.");
+  };
+
+  const handleCancelOrder = async (orderId: string) => {
+    if (confirm("Tem certeza que deseja cancelar este pedido?")) {
+      try {
+        console.log("Cancelando pedido:", orderId);
+        
+        const result = await updateOrderStatus(orderId, "Cancelado");
+        
+        if (result.ok) {
+          toast.success("Pedido cancelado com sucesso!");
+          
+          // Invalidar e recarregar os dados
+          await queryClient.invalidateQueries({ queryKey: ["orders"] });
+          await queryClient.invalidateQueries({ queryKey: ["order", orderId] });
+        } else {
+          console.error("Erro ao cancelar pedido:", result.error);
+          toast.error(result.error || "Erro ao cancelar pedido");
+        }
+      } catch (error) {
+        console.error("Erro ao cancelar pedido:", error);
+        toast.error("Erro ao cancelar pedido");
+      }
     }
   };
 
@@ -141,6 +190,46 @@ export default function Pedidos() {
                         </p>
                       </div>
                     </div>
+                  </div>
+
+                  {/* Botões de Ação */}
+                  <div className="flex gap-2 pt-3 border-t border-border">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        duplicateOrder(order);
+                      }}
+                      className="flex-1"
+                    >
+                      <Copy className="w-4 h-4 mr-2" />
+                      Duplicar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/pedidos/editar/${order.id}`);
+                      }}
+                      className="flex-1"
+                    >
+                      <Edit className="w-4 h-4 mr-2" />
+                      Editar
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCancelOrder(order.id);
+                      }}
+                      className="flex-1"
+                    >
+                      <X className="w-4 h-4 mr-2" />
+                      Cancelar
+                    </Button>
                   </div>
                 </div>
               </CardContent>

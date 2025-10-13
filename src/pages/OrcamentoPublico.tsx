@@ -14,18 +14,6 @@ type Quote = {
   observations?: string;
 };
 
-const MOCK_QUOTES: Quote[] = [
-  {
-    id: "ORC-001",
-    client: "Roberto Alves",
-    date: "2025-10-08",
-    items: [
-      { description: "Camiseta bordada - modelo A", quantity: 50, value: 20 },
-      { description: "Camiseta bordada - modelo B", quantity: 50, value: 30 },
-    ],
-    observations: "Valores válidos por 7 dias.",
-  },
-];
 
 export default function OrcamentoPublico() {
   const { id } = useParams();
@@ -43,11 +31,11 @@ export default function OrcamentoPublico() {
         id: data.quote.code,
         client: data.quote.customer_name,
         date: data.quote.date,
-        items: (data.items ?? []).map((it) => ({ description: it.description, quantity: it.quantity, value: it.value })),
+        items: (data.items ?? []).map((it) => ({ description: it.description, quantity: it.quantity, value: it.unit_value || 0 })),
         observations: data.quote.observations ?? undefined,
       } as Quote;
     }
-    return MOCK_QUOTES.find((q) => q.id === id) ?? null;
+    return null;
   }, [data, id]);
 
   const total = quote?.items.reduce((sum, item) => sum + item.quantity * item.value, 0) ?? 0;
@@ -120,6 +108,12 @@ export default function OrcamentoPublico() {
         </Card>
 
         <div className="flex gap-3 no-print">
+          <button
+            onClick={() => navigate("/orcamentos")}
+            className="px-4 py-2 rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
+          >
+            ← Voltar aos Orçamentos
+          </button>
           <button
             onClick={() => window.print()}
             className="px-4 py-2 rounded bg-black text-white"

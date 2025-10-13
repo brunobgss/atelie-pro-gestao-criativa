@@ -1,0 +1,21 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Fundo branco com borda roxa -->
+  <rect width="32" height="32" rx="6" fill="white" stroke="#5A2D82" stroke-width="1.5"/>
+  
+  <!-- Monograma AP -->
+  <g transform="translate(16, 16)">
+    <defs>
+      <linearGradient id="apGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%" style="stop-color:#5A2D82;stop-opacity:1" />
+        <stop offset="50%" style="stop-color:#8A3AB8;stop-opacity:1" />
+        <stop offset="100%" style="stop-color:#E94E8F;stop-opacity:1" />
+      </linearGradient>
+    </defs>
+    
+    <!-- Letra A -->
+    <path d="M-6 6 L0 -6 L6 6 M-3 2 L3 2" stroke="url(#apGradient)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+    
+    <!-- Letra P -->
+    <path d="M8 -6 L8 6 M8 -6 L12 -6 L12 -2 L8 -2" stroke="url(#apGradient)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  </g>
+</svg>

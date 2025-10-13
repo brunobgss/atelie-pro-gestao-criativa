@@ -1,0 +1,7 @@
+<!-- PLACEHOLDER PARA FAVICON PNG -->
+<!-- Substitua este arquivo pelo favicon PNG original -->
+<!-- Dimensões recomendadas: 32x32px ou múltiplos (64x64, 128x128) -->
+<!-- Formato: PNG com fundo transparente -->
+<!-- Nome do arquivo: favicon.png -->
+
+
