@@ -1,5 +1,7 @@
-// pages/api/asaas.js
+// pages/api/asaas.js - Estrutura Next.js padrão
 export default async function handler(req, res) {
+  console.log('🚀 ASAAS API chamada:', req.method, req.url);
+  
   // Configurar CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
@@ -7,64 +9,83 @@ export default async function handler(req, res) {
 
   // Responder a requisições OPTIONS (preflight)
   if (req.method === 'OPTIONS') {
+    console.log('✅ OPTIONS request - CORS preflight');
     return res.status(200).end();
   }
 
   // Aceitar GET para teste
   if (req.method === 'GET') {
+    console.log('✅ GET request - teste da API');
     return res.status(200).json({ 
       message: 'API ASAAS funcionando via Next.js!',
       method: req.method,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development'
     });
   }
 
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Método não permitido' });
-  }
+  // Aceitar POST
+  if (req.method === 'POST') {
+    console.log('✅ POST request recebido');
+    
+    try {
+      const { action, data } = req.body;
+      console.log('📝 Action:', action);
+      console.log('📝 Data:', data);
 
-  try {
-    const { action, data } = req.body;
+      // Verificar se a API Key está configurada
+      if (!process.env.VITE_ASAAS_API_KEY) {
+        console.error('❌ API Key não configurada');
+        return res.status(500).json({ 
+          error: 'ASAAS_API_KEY não configurada no Vercel',
+          success: false
+        });
+      }
 
-    // Verificar se a API Key está configurada
-    if (!process.env.VITE_ASAAS_API_KEY) {
+      console.log('🔑 API Key configurada:', process.env.VITE_ASAAS_API_KEY ? 'SIM' : 'NÃO');
+      console.log('🔑 Primeiros 10 caracteres:', process.env.VITE_ASAAS_API_KEY?.substring(0, 10) + '...');
+
+      let result;
+
+      switch (action) {
+        case 'createCustomer':
+          result = await createCustomer(data);
+          break;
+        case 'createSubscription':
+          result = await createSubscription(data);
+          break;
+        default:
+          console.error('❌ Ação não reconhecida:', action);
+          return res.status(400).json({ 
+            error: 'Ação não reconhecida. Use: createCustomer ou createSubscription',
+            success: false
+          });
+      }
+
+      console.log('✅ Resultado:', result);
+      return res.status(200).json({
+        success: true,
+        action,
+        data: result
+      });
+
+    } catch (error) {
+      console.error('❌ Erro na API:', error);
       return res.status(500).json({ 
-        error: 'ASAAS_API_KEY não configurada no Vercel' 
+        success: false,
+        error: 'Erro interno do servidor',
+        message: error.message 
       });
     }
-
-    console.log(`🔄 ASAAS Action: ${action}`, data);
-
-    let result;
-
-    switch (action) {
-      case 'createCustomer':
-        result = await createCustomer(data);
-        break;
-      case 'createSubscription':
-        result = await createSubscription(data);
-        break;
-      default:
-        return res.status(400).json({ 
-          error: 'Ação não reconhecida. Use: createCustomer ou createSubscription' 
-        });
-    }
-
-    console.log(`✅ ASAAS Success: ${action}`, result);
-    res.status(200).json({
-      success: true,
-      action,
-      data: result
-    });
-
-  } catch (error) {
-    console.error('❌ ASAAS Error:', error);
-    res.status(500).json({ 
-      success: false,
-      error: 'Erro interno do servidor',
-      message: error.message 
-    });
   }
+
+  // Método não permitido
+  console.error('❌ Método não permitido:', req.method);
+  return res.status(405).json({ 
+    error: 'Método não permitido',
+    success: false,
+    allowedMethods: ['GET', 'POST', 'OPTIONS']
+  });
 }
 
 // Função para criar cliente no ASAAS
@@ -86,9 +107,8 @@ async function createCustomer(customerData) {
   if (phone) payload.phone = phone;
   if (cpfCnpj) payload.cpfCnpj = cpfCnpj;
 
-  console.log('🔑 API Key configurada:', process.env.VITE_ASAAS_API_KEY ? 'SIM' : 'NÃO');
-  console.log('🔑 Primeiros 10 caracteres da API Key:', process.env.VITE_ASAAS_API_KEY?.substring(0, 10) + '...');
-  
+  console.log('🔄 Criando cliente ASAAS:', payload);
+
   const response = await fetch('https://www.asaas.com/api/v3/customers', {
     method: 'POST',
     headers: {
@@ -101,10 +121,11 @@ async function createCustomer(customerData) {
   const data = await response.json();
 
   if (!response.ok) {
-    console.error('Erro ASAAS createCustomer:', data);
+    console.error('❌ Erro ASAAS createCustomer:', data);
     throw new Error(`ASAAS Error: ${data.message || 'Erro ao criar cliente'}`);
   }
 
+  console.log('✅ Cliente criado com sucesso:', data);
   return data;
 }
 
@@ -144,9 +165,8 @@ async function createSubscription(subscriptionData) {
     throw new Error('Tipo de plano inválido. Use: monthly ou yearly');
   }
 
-  console.log('🔑 API Key configurada (subscription):', process.env.VITE_ASAAS_API_KEY ? 'SIM' : 'NÃO');
-  console.log('🔑 Primeiros 10 caracteres da API Key (subscription):', process.env.VITE_ASAAS_API_KEY?.substring(0, 10) + '...');
-  
+  console.log('🔄 Criando assinatura ASAAS:', payload);
+
   const response = await fetch('https://www.asaas.com/api/v3/subscriptions', {
     method: 'POST',
     headers: {
@@ -159,9 +179,10 @@ async function createSubscription(subscriptionData) {
   const data = await response.json();
 
   if (!response.ok) {
-    console.error('Erro ASAAS createSubscription:', data);
+    console.error('❌ Erro ASAAS createSubscription:', data);
     throw new Error(`ASAAS Error: ${data.message || 'Erro ao criar assinatura'}`);
   }
 
+  console.log('✅ Assinatura criada com sucesso:', data);
   return data;
 }
