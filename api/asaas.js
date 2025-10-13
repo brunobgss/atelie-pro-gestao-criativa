@@ -1,6 +1,3 @@
-// api/asaas.js
-// API única para todas as operações do ASAAS
-
 export default async function handler(req, res) {
   // Configurar CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -12,9 +9,8 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  // Verificar se é POST
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return res.status(405).json({ error: 'Método não permitido' });
   }
 
   try {

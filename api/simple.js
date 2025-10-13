@@ -1,7 +1,6 @@
-// api/simple.js
 export default function handler(req, res) {
   res.status(200).json({ 
-    message: 'API simples funcionando na raiz!',
+    message: "API funcionando via Vercel + Vite!",
     method: req.method,
     timestamp: new Date().toISOString()
   });
