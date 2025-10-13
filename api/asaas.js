@@ -1,4 +1,4 @@
-// api/asaas.js - API ASAAS simples para Vercel
+// api/asaas.js - API ASAAS para Vercel
 export default async function handler(req, res) {
   console.log('🚀 ASAAS API chamada:', req.method, req.url);
   
