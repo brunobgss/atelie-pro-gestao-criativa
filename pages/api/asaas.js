@@ -86,6 +86,9 @@ async function createCustomer(customerData) {
   if (phone) payload.phone = phone;
   if (cpfCnpj) payload.cpfCnpj = cpfCnpj;
 
+  console.log('🔑 API Key configurada:', process.env.VITE_ASAAS_API_KEY ? 'SIM' : 'NÃO');
+  console.log('🔑 Primeiros 10 caracteres da API Key:', process.env.VITE_ASAAS_API_KEY?.substring(0, 10) + '...');
+  
   const response = await fetch('https://www.asaas.com/api/v3/customers', {
     method: 'POST',
     headers: {
@@ -141,6 +144,9 @@ async function createSubscription(subscriptionData) {
     throw new Error('Tipo de plano inválido. Use: monthly ou yearly');
   }
 
+  console.log('🔑 API Key configurada (subscription):', process.env.VITE_ASAAS_API_KEY ? 'SIM' : 'NÃO');
+  console.log('🔑 Primeiros 10 caracteres da API Key (subscription):', process.env.VITE_ASAAS_API_KEY?.substring(0, 10) + '...');
+  
   const response = await fetch('https://www.asaas.com/api/v3/subscriptions', {
     method: 'POST',
     headers: {
