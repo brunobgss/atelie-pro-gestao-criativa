@@ -50,22 +50,45 @@ export default function CatalogoProdutos() {
         const productsData = await getProducts();
         
         // Converter dados do Supabase para o formato da interface
-        const convertedProducts: Product[] = productsData.map(product => ({
-          id: product.id,
-          name: product.name,
-          category: product.type,
-          description: `Produto ${product.type} - R$ ${product.unit_price.toFixed(2)}`,
-          basePrice: product.unit_price,
-          estimatedTime: product.work_hours,
-          materials: Array.isArray(product.materials) ? product.materials : [],
-          createdAt: product.created_at
-        }));
+        const convertedProducts: Product[] = productsData.map(product => {
+          try {
+            return {
+              id: product.id,
+              name: product.name || 'Produto sem nome',
+              category: product.type || 'outros',
+              description: `Produto ${product.type || 'indefinido'} - R$ ${(product.unit_price || 0).toFixed(2)}`,
+              basePrice: product.unit_price || 0,
+              estimatedTime: product.work_hours || 0,
+              materials: Array.isArray(product.materials) 
+                ? product.materials.map((mat: any) => {
+                    if (typeof mat === 'string') return mat;
+                    if (typeof mat === 'object' && mat.name) return mat.name;
+                    return 'Material';
+                  })
+                : [],
+              createdAt: product.created_at || new Date().toISOString()
+            };
+          } catch (conversionError) {
+            console.error("❌ Erro ao converter produto:", product, conversionError);
+            return {
+              id: product.id,
+              name: 'Produto com erro',
+              category: 'outros',
+              description: 'Erro ao carregar produto',
+              basePrice: 0,
+              estimatedTime: 0,
+              materials: [],
+              createdAt: new Date().toISOString()
+            };
+          }
+        });
         
         console.log("✅ Produtos carregados:", convertedProducts.length);
         setProducts(convertedProducts);
       } catch (error) {
         console.error("❌ Erro ao buscar produtos:", error);
         toast.error("Erro ao carregar produtos");
+        setProducts([]);
       } finally {
         setLoading(false);
       }
