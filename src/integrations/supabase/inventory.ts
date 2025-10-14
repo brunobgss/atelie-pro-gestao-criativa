@@ -64,14 +64,32 @@ export async function updateInventoryItem(id: string, input: { name?: string; qu
     
     console.log("📝 Dados para atualização:", updateData);
     
-    // Atualizar diretamente sem verificação prévia (mais eficiente)
+    // Primeiro, listar todos os itens para debug
+    console.log("🔍 DEBUG: Listando todos os itens do estoque...");
+    const { data: allItems, error: listError } = await supabase
+      .from("inventory_items")
+      .select("id, name");
+    
+    if (listError) {
+      console.error("❌ Erro ao listar itens:", listError);
+    } else {
+      console.log("📋 Todos os itens encontrados:", allItems);
+      console.log("🔍 Procurando ID:", normalizedId);
+      const foundItem = allItems?.find(item => item.id === normalizedId);
+      console.log("🎯 Item encontrado na lista:", foundItem);
+    }
+    
+    // Atualizar diretamente
     console.log("🔄 Executando atualização direta...");
+    console.log("🔍 Query: UPDATE inventory_items SET", updateData, "WHERE id =", normalizedId);
     
     const { data, error } = await supabase
       .from("inventory_items")
       .update(updateData)
       .eq("id", normalizedId)
       .select("*");
+    
+    console.log("📊 Resultado da query:", { data, error });
     
     if (error) {
       console.error("❌ Erro do Supabase:", error);
@@ -82,6 +100,7 @@ export async function updateInventoryItem(id: string, input: { name?: string; qu
       console.error("❌ Nenhum item encontrado para atualizar");
       console.error("❌ ID usado na query:", normalizedId);
       console.error("❌ Dados enviados:", updateData);
+      console.error("❌ Resultado da query:", { data, error });
       return { ok: false, error: "Item não encontrado para atualização" };
     }
     
