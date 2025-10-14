@@ -1,4 +1,4 @@
-import { createContext, useContext, ReactNode } from 'react';
+import { createContext, useContext, ReactNode, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
 interface SyncContextType {
@@ -12,6 +12,19 @@ const SyncContext = createContext<SyncContextType | undefined>(undefined);
 
 export function SyncProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
+
+  // Refresh automático a cada 30 segundos para garantir dados atualizados
+  useEffect(() => {
+    const interval = setInterval(() => {
+      console.log('🔄 Refresh automático dos dados...');
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['quotes'] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+    }, 30000); // 30 segundos
+
+    return () => clearInterval(interval);
+  }, [queryClient]);
 
   const invalidateAll = () => {
     console.log('🔄 Invalidando todos os caches...');

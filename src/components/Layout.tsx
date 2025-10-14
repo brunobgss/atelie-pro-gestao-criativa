@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/AppSidebar";
+import { MobileSidebarTrigger } from "@/components/MobileSidebarTrigger";
 import { Outlet, Navigate } from "react-router-dom";
 import { useAuth } from "./AuthProvider";
 import { TrialProtectedRoute } from "./TrialProtectedRoute";
@@ -50,6 +51,11 @@ export function Layout() {
           )}
           
           <main className="flex-1 overflow-auto">
+            {/* Botão mobile para fechar menu */}
+            <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-sm border-b border-gray-200/50 p-2 md:hidden">
+              <MobileSidebarTrigger />
+            </div>
+            
             <div className="p-2 sm:p-3 md:p-6">
               <div className="mx-auto max-w-[1400px]">
                 <div className="rounded-lg sm:rounded-xl border border-gray-200/50 bg-white/95 backdrop-blur-sm shadow-sm">

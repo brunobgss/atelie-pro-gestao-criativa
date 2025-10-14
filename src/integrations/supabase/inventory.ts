@@ -34,6 +34,14 @@ export async function listInventory(): Promise<InventoryRow[]> {
 export async function updateInventoryItem(id: string, input: { name?: string; quantity?: number; unit?: string; min_quantity?: number }): Promise<{ ok: boolean; data?: InventoryRow; error?: string }> {
   try {
     console.log("🔄 Atualizando item do estoque:", { id, input });
+    console.log("🔍 Tipo do ID:", typeof id);
+    console.log("🔍 ID recebido:", id);
+    
+    // Verificar se o ID é válido
+    if (!id || id.trim() === '') {
+      console.error("❌ ID inválido ou vazio");
+      return { ok: false, error: "ID inválido" };
+    }
     
     // Preparar dados de forma mais segura
     const updateData: Record<string, unknown> = {};
@@ -43,6 +51,20 @@ export async function updateInventoryItem(id: string, input: { name?: string; qu
     if (input.min_quantity !== undefined) updateData.min_quantity = Number(input.min_quantity);
     
     console.log("📝 Dados para atualização:", updateData);
+    
+    // Primeiro, verificar se o item existe
+    const { data: existingItem, error: checkError } = await supabase
+      .from("inventory_items")
+      .select("id, name")
+      .eq("id", id)
+      .single();
+    
+    if (checkError) {
+      console.error("❌ Erro ao verificar item existente:", checkError);
+      return { ok: false, error: "Item não encontrado no banco de dados" };
+    }
+    
+    console.log("✅ Item encontrado no banco:", existingItem);
     
     const { data, error } = await supabase
       .from("inventory_items")

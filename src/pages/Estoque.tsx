@@ -53,6 +53,8 @@ export default function Estoque() {
     }
     
     console.log("Salvando edição do item:", editingItem.id, editForm);
+    console.log("Tipo do ID:", typeof editingItem.id);
+    console.log("ID como string:", String(editingItem.id));
     
     try {
       const result = await updateInventoryItem(String(editingItem.id), {
