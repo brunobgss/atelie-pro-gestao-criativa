@@ -13,6 +13,24 @@ import Login from "./pages/Login";
 import Cadastro from "./pages/Cadastro";
 import OrcamentoPublico from "./pages/OrcamentoPublico";
 
+// Páginas protegidas
+import Dashboard from "./pages/Dashboard";
+import Pedidos from "./pages/Pedidos";
+import NovoPedido from "./pages/NovoPedido";
+import PedidoDetalhe from "./pages/PedidoDetalhe";
+import Orcamentos from "./pages/Orcamentos";
+import NovoOrcamento from "./pages/NovoOrcamento";
+import OrcamentoImpressao from "./pages/OrcamentoImpressao";
+import Clientes from "./pages/Clientes";
+import Estoque from "./pages/Estoque";
+import CatalogoProdutos from "./pages/CatalogoProdutos";
+import CalculadoraPrecos from "./pages/CalculadoraPrecos";
+import Relatorios from "./pages/Relatorios";
+import ControleFinanceiro from "./pages/ControleFinanceiro";
+import Assinatura from "./pages/Assinatura";
+import MinhaConta from "./pages/MinhaConta";
+import Agenda from "./pages/Agenda";
+
 // QueryClient fora do componente para evitar re-criação
 // Cache buster: 2024-12-19 - Corrigindo Dashboard not defined
 const queryClient = new QueryClient({
