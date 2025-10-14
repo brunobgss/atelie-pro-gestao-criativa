@@ -55,6 +55,8 @@ function App() {
                 <Route path="/login" element={<Login />} />
                 <Route path="/cadastro" element={<Cadastro />} />
                 <Route path="/orcamento/:id" element={<OrcamentoPublico />} />
+                
+                {/* Rota de impressão - deve vir ANTES das rotas protegidas */}
                 <Route path="/orcamentos/:id/impressao" element={<OrcamentoImpressaoTeste />} />
                 
                 {/* Rotas protegidas com Layout */}
