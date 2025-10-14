@@ -257,7 +257,7 @@ export async function approveQuote(quoteCode: string): Promise<{ ok: boolean; er
     
     // Criar pedido
     console.log("Criando pedido...");
-    const { data: order, error: orderError } = await supabase
+    let { data: order, error: orderError } = await supabase
       .from("atelie_orders")
       .insert({
         code: orderCode,
