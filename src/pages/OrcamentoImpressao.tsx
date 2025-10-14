@@ -7,9 +7,13 @@ import PrintLayout from "@/components/PrintLayout";
 import { useAuth } from "@/components/AuthProvider";
 
 export default function OrcamentoImpressao() {
+  console.log("🚀 OrcamentoImpressao component executando!");
+  
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { empresa } = useAuth();
+  
+  console.log("📋 Parâmetros recebidos:", { id, empresa: empresa?.nome });
 
   const { data: quoteData, isLoading, error } = useQuery({
     queryKey: ["quotePrint", id],
