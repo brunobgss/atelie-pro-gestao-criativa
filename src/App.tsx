@@ -17,6 +17,7 @@ import OrcamentoPublico from "./pages/OrcamentoPublico";
 import Dashboard from "./pages/Dashboard";
 import Pedidos from "./pages/Pedidos";
 import NovoPedido from "./pages/NovoPedido";
+import EditarPedido from "./pages/EditarPedido";
 import PedidoDetalhe from "./pages/PedidoDetalhe";
 import Orcamentos from "./pages/Orcamentos";
 import NovoOrcamento from "./pages/NovoOrcamento";
