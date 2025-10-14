@@ -14,6 +14,7 @@ import Cadastro from "./pages/Cadastro";
 import OrcamentoPublico from "./pages/OrcamentoPublico";
 
 // QueryClient fora do componente para evitar re-criação
+// Cache buster: 2024-12-19 - Corrigindo Dashboard not defined
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
