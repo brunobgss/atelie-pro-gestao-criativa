@@ -287,9 +287,9 @@ ${empresa?.nome || 'Ateliê'}`;
                   <div className="space-y-1">
                     <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
                       <FileText className="w-5 h-5 text-secondary" />
-                      {quote.id}
+                      {quote.client}
                     </CardTitle>
-                    <p className="text-sm text-muted-foreground">{quote.client}</p>
+                    <p className="text-sm text-muted-foreground font-mono">{quote.id}</p>
                   </div>
                   <Badge variant="outline" className={getStatusColor(quote.status)}>
                     {translateStatus(quote.status)}
