@@ -219,11 +219,12 @@ export async function updatePaymentStatus(
       newPaidValue = order.paid > 0 ? order.paid : order.value / 2;
     }
 
-    // Atualizar o pedido com o novo valor pago
+    // Atualizar o pedido com o novo valor pago e status
     const { error: updateError } = await supabase
       .from("atelie_orders")
       .update({ 
         paid: newPaidValue,
+        status: status, // ADICIONAR O STATUS!
         updated_at: new Date().toISOString()
       })
       .eq("code", orderCode);
