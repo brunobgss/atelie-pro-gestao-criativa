@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Search, Phone, Mail, Package, Plus, Edit, Trash2 } from "lucide-react";
+import { Search, Phone, Mail, Package, Plus, Edit, Trash2, FileText, ShoppingCart, ExternalLink } from "lucide-react";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -15,9 +15,11 @@ import { useSync } from "@/contexts/SyncContext";
 import { useSyncOperations } from "@/hooks/useSyncOperations";
 import { validateName, validatePhone, validateEmail, validateForm } from "@/utils/validators";
 import { errorHandler } from "@/utils/errorHandler";
+import { useNavigate } from "react-router-dom";
 
 export default function Clientes() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { invalidateRelated } = useSync();
   const { syncAfterCreate, syncAfterUpdate, syncAfterDelete, syncWithToast } = useSyncOperations();
   const [searchTerm, setSearchTerm] = useState("");
@@ -194,34 +196,73 @@ export default function Clientes() {
     }
   ];
 
-  // Buscar clientes reais do banco de dados
+  // Buscar clientes reais do banco de dados com histórico
   const { data: realClients = [], isLoading, refetch } = useQuery({
     queryKey: ["customers"],
     queryFn: async () => {
       try {
         console.log("🔍 Buscando clientes do banco de dados...");
-        const { data, error } = await supabase
+        const { data: customers, error: customersError } = await supabase
           .from("customers")
           .select("*")
           .order("name", { ascending: true });
         
-        if (error) {
-          console.warn("Erro ao buscar clientes do banco, usando dados de demonstração:", error.message);
+        if (customersError) {
+          console.warn("Erro ao buscar clientes do banco, usando dados de demonstração:", customersError.message);
           return [];
         }
         
-        if (!data || data.length === 0) {
+        if (!customers || customers.length === 0) {
           console.log("Nenhum cliente encontrado no banco, usando dados de demonstração");
           return [];
         }
         
-        console.log(`✅ ${data.length} clientes encontrados no banco`);
-        return data.map(client => ({
-          ...client,
-          orders: Math.floor(Math.random() * 10) + 1,
-          lastOrder: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-          type: Math.random() > 0.5 ? "VIP" : "Regular"
-        }));
+        console.log(`✅ ${customers.length} clientes encontrados no banco`);
+        
+        // Buscar histórico real de pedidos e orçamentos para cada cliente
+        const clientsWithHistory = await Promise.all(
+          customers.map(async (client) => {
+            // Buscar pedidos do cliente
+            const { data: orders } = await supabase
+              .from("atelie_orders")
+              .select("code, value, paid, status, delivery_date, created_at")
+              .eq("customer_name", client.name)
+              .order("created_at", { ascending: false });
+            
+            // Buscar orçamentos do cliente
+            const { data: quotes } = await supabase
+              .from("atelie_quotes")
+              .select("code, total_value, status, date, created_at")
+              .eq("customer_name", client.name)
+              .order("created_at", { ascending: false });
+            
+            // Calcular estatísticas reais
+            const totalOrders = orders?.length || 0;
+            const totalQuotes = quotes?.length || 0;
+            const lastOrderDate = orders?.[0]?.created_at ? 
+              new Date(orders[0].created_at).toISOString().split('T')[0] : null;
+            const lastQuoteDate = quotes?.[0]?.created_at ? 
+              new Date(quotes[0].created_at).toISOString().split('T')[0] : null;
+            
+            // Determinar tipo de cliente baseado no histórico
+            const totalValue = orders?.reduce((sum, order) => sum + (order.value || 0), 0) || 0;
+            const type = totalValue > 1000 ? "VIP" : "Regular";
+            
+            return {
+              ...client,
+              orders: totalOrders,
+              quotes: totalQuotes,
+              lastOrder: lastOrderDate,
+              lastQuote: lastQuoteDate,
+              totalValue: totalValue,
+              type: type,
+              ordersList: orders || [],
+              quotesList: quotes || []
+            };
+          })
+        );
+        
+        return clientsWithHistory;
       } catch (error) {
         console.warn("Erro ao buscar clientes, usando dados de demonstração:", error);
         return [];
@@ -432,16 +473,76 @@ export default function Clientes() {
                     <span className="text-foreground">{client.email}</span>
                   </div>
 
-                  <div className="flex items-center justify-between pt-3 border-t border-border">
+                  {/* Histórico Real de Pedidos e Orçamentos */}
+                  <div className="pt-3 border-t border-border space-y-2">
+                    <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Package className="w-4 h-4 text-muted-foreground" />
+                        <ShoppingCart className="w-4 h-4 text-muted-foreground" />
                       <span className="text-sm text-muted-foreground">
                         {client.orders} pedidos
                       </span>
                     </div>
-                    <span className="text-xs text-muted-foreground">
-                      Último: {new Date(client.lastOrder).toLocaleDateString('pt-BR')}
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">
+                          {client.quotes} orçamentos
                     </span>
+                      </div>
+                    </div>
+                    
+                    {client.totalValue > 0 && (
+                      <div className="text-xs text-muted-foreground">
+                        Total gasto: R$ {client.totalValue.toFixed(2)}
+                      </div>
+                    )}
+                    
+                    {(client.lastOrder || client.lastQuote) && (
+                      <div className="text-xs text-muted-foreground">
+                        Última atividade: {
+                          client.lastOrder && client.lastQuote ? 
+                            (new Date(client.lastOrder) > new Date(client.lastQuote) ? 
+                              `Pedido em ${new Date(client.lastOrder).toLocaleDateString('pt-BR')}` :
+                              `Orçamento em ${new Date(client.lastQuote).toLocaleDateString('pt-BR')}`) :
+                            client.lastOrder ? 
+                              `Pedido em ${new Date(client.lastOrder).toLocaleDateString('pt-BR')}` :
+                              `Orçamento em ${new Date(client.lastQuote).toLocaleDateString('pt-BR')}`
+                        }
+                      </div>
+                    )}
+                    
+                    {/* Links para ver histórico */}
+                    <div className="flex gap-2 pt-2">
+                      {client.orders > 0 && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate('/pedidos');
+                          }}
+                          className="h-7 text-xs"
+                        >
+                          <ShoppingCart className="w-3 h-3 mr-1" />
+                          Ver Pedidos
+                          <ExternalLink className="w-3 h-3 ml-1" />
+                        </Button>
+                      )}
+                      {client.quotes > 0 && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate('/orcamentos');
+                          }}
+                          className="h-7 text-xs"
+                        >
+                          <FileText className="w-3 h-3 mr-1" />
+                          Ver Orçamentos
+                          <ExternalLink className="w-3 h-3 ml-1" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </CardContent>

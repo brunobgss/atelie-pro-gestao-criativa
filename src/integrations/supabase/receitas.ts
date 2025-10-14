@@ -220,15 +220,11 @@ export async function updatePaymentStatus(
       newPaidValue = order.paid > 0 ? order.paid : order.value / 2;
     }
     
-    // Mapear status de pagamento para status de pedido usando constantes
-    const newStatus = mapPaymentToOrderStatus(status);
-
-    // Atualizar o pedido com o novo valor pago e status
+    // Atualizar APENAS o valor pago, NÃO alterar status de produção
     const { error: updateError } = await supabase
       .from("atelie_orders")
       .update({ 
         paid: newPaidValue,
-        status: newStatus, // USAR STATUS CORRETO DO BANCO!
         updated_at: new Date().toISOString()
       })
       .eq("code", orderCode);

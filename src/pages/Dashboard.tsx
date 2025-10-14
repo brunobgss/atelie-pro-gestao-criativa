@@ -13,10 +13,20 @@ import { listReceitas } from "@/integrations/supabase/receitas";
 import { listInventory } from "@/integrations/supabase/inventory";
 import { useAuth } from "@/components/AuthProvider";
 import { toast } from "sonner";
+import { startStockAlerts, checkStockNow } from "@/utils/stockAlerts";
+import React from "react";
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { empresa } = useAuth();
+  
+  // Iniciar sistema de alertas de estoque
+  React.useEffect(() => {
+    startStockAlerts();
+    return () => {
+      // Cleanup será feito pelo próprio sistema
+    };
+  }, []);
   
   // Buscar dados reais das APIs
   const { data: orders = [] } = useQuery({
