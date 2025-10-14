@@ -9,6 +9,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listOrders, updateOrderStatus } from "@/integrations/supabase/orders";
 import { toast } from "sonner";
+import { getOrderStatusColor } from "@/utils/statusConstants";
 
 export default function Pedidos() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -33,18 +34,7 @@ export default function Pedidos() {
   });
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case "Pronto":
-        return "bg-accent/20 text-accent border-accent/30";
-      case "Em produção":
-        return "bg-secondary/20 text-secondary border-secondary/30";
-      case "Aguardando aprovação":
-        return "bg-muted text-muted-foreground border-muted-foreground/30";
-      case "Cancelado":
-        return "bg-destructive/20 text-destructive border-destructive/30";
-      default:
-        return "bg-muted text-muted-foreground border-muted-foreground/30";
-    }
+    return getOrderStatusColor(status);
   };
 
   const duplicateOrder = (order: unknown) => {

@@ -1,5 +1,6 @@
 import { supabase } from "./client";
 import { getCurrentEmpresaId } from "./auth-utils";
+import { mapPaymentToOrderStatus } from "@/utils/statusConstants";
 import { checkDatabaseHealth } from "./config";
 
 export interface ReceitaRow {
@@ -209,19 +210,18 @@ export async function updatePaymentStatus(
 
     // Calcular novo valor pago baseado no status
     let newPaidValue = order.paid;
-    let newStatus = order.status; // Manter status atual do pedido
     
     if (status === 'pago') {
       newPaidValue = order.value; // Pago = valor total
-      newStatus = 'Entregue'; // Status de pedido entregue
     } else if (status === 'pendente') {
       newPaidValue = 0; // Pendente = nada pago
-      newStatus = 'Aguardando aprovação'; // Status de pedido aguardando
     } else if (status === 'parcial') {
       // Manter valor atual ou metade se for 0
       newPaidValue = order.paid > 0 ? order.paid : order.value / 2;
-      newStatus = 'Em produção'; // Status de pedido em produção
     }
+    
+    // Mapear status de pagamento para status de pedido usando constantes
+    const newStatus = mapPaymentToOrderStatus(status);
 
     // Atualizar o pedido com o novo valor pago e status
     const { error: updateError } = await supabase

@@ -21,7 +21,6 @@ import PedidoDetalhe from "./pages/PedidoDetalhe";
 import Orcamentos from "./pages/Orcamentos";
 import NovoOrcamento from "./pages/NovoOrcamento";
 import OrcamentoImpressao from "./pages/OrcamentoImpressao";
-import OrcamentoImpressaoTeste from "./pages/OrcamentoImpressaoTeste";
 import Clientes from "./pages/Clientes";
 import Estoque from "./pages/Estoque";
 import CatalogoProdutos from "./pages/CatalogoProdutos";
@@ -55,8 +54,7 @@ function App() {
                 <Route path="/login" element={<Login />} />
                 <Route path="/cadastro" element={<Cadastro />} />
                 <Route path="/orcamento/:id" element={<OrcamentoPublico />} />
-                <Route path="/teste-impressao" element={<div style={{padding: "20px", backgroundColor: "red", color: "white"}}><h1>TESTE SIMPLES</h1><p>Se você vê isso, as rotas funcionam!</p></div>} />
-                <Route path="/orcamentos/:id/impressao" element={<div style={{padding: "20px", backgroundColor: "blue", color: "white"}}><h1>IMPRESSÃO FUNCIONANDO</h1><p>Rota de impressão ativa!</p></div>} />
+                <Route path="/orcamentos/:id/impressao" element={<OrcamentoImpressao />} />
                 
                 {/* Rotas protegidas com Layout */}
                 <Route path="/" element={<Layout />}>

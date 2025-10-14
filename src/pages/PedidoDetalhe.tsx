@@ -14,6 +14,7 @@ import { getOrderByCode, updateOrderStatus } from "@/integrations/supabase/order
 import { getReceitaByOrderCode } from "@/integrations/supabase/receitas";
 import { useSync } from "@/contexts/SyncContext";
 import { toast } from "sonner";
+import { ORDER_STATUS_OPTIONS } from "@/utils/statusConstants";
 
 type OrderItem = {
   id: string;
@@ -515,12 +516,11 @@ export default function PedidoDetalhe() {
                           <SelectValue placeholder="Selecione o status" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Aguardando aprovação">Aguardando aprovação</SelectItem>
-                          <SelectItem value="Em produção">Em produção</SelectItem>
-                          <SelectItem value="Finalizando">Finalizando</SelectItem>
-                          <SelectItem value="Pronto">Pronto</SelectItem>
-                          <SelectItem value="Aguardando retirada">Aguardando retirada</SelectItem>
-                          <SelectItem value="Entregue">Entregue</SelectItem>
+                          {ORDER_STATUS_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>

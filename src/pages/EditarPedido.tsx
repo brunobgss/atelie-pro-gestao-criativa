@@ -13,6 +13,7 @@ import { getOrderByCode, updateOrder } from "@/integrations/supabase/orders";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSync } from "@/contexts/SyncContext";
 import { useSyncOperations } from "@/hooks/useSyncOperations";
+import { ORDER_STATUS_OPTIONS } from "@/utils/statusConstants";
 
 export default function EditarPedido() {
   const { id } = useParams<{ id: string }>();
@@ -247,11 +248,11 @@ export default function EditarPedido() {
                     <SelectValue placeholder="Selecione o status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Aguardando aprovação">Aguardando aprovação</SelectItem>
-                    <SelectItem value="Em produção">Em produção</SelectItem>
-                    <SelectItem value="Finalizando">Finalizando</SelectItem>
-                    <SelectItem value="Pronto para Entrega">Pronto para Entrega</SelectItem>
-                    <SelectItem value="Concluído">Concluído</SelectItem>
+                    {ORDER_STATUS_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

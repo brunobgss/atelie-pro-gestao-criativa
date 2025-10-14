@@ -12,6 +12,7 @@ import { listOrders } from "@/integrations/supabase/orders";
 import { listReceitas, updatePaymentStatus } from "@/integrations/supabase/receitas";
 import { useAuth } from "@/components/AuthProvider";
 import { toast } from "sonner";
+import { PAYMENT_STATUS_OPTIONS, getPaymentStatusColor } from "@/utils/statusConstants";
 
 interface PaymentStatus {
   id: string;
@@ -377,15 +378,11 @@ _${empresa?.nome || 'Ateliê'}_`;
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="pendente" className="text-red-600">
-                                ⏳ Pendente
-                              </SelectItem>
-                              <SelectItem value="parcial" className="text-yellow-600">
-                                ⚡ Parcial
-                              </SelectItem>
-                              <SelectItem value="pago" className="text-green-600">
-                                ✓ Pago
-                              </SelectItem>
+                              {PAYMENT_STATUS_OPTIONS.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
                             </SelectContent>
                           </Select>
                         </div>
