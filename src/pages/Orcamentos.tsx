@@ -46,8 +46,9 @@ export default function Orcamentos() {
           }
           
           return {
-            id: r.code || r.id || `ORC-${Date.now()}-${index}`,
-            code: r.code || r.id || `ORC-${Date.now()}-${index}`,
+            id: r.code || `ORC-${Date.now()}-${index}`, // Usar código como ID principal
+            internalId: r.id, // Manter ID interno para referência
+            code: r.code || `ORC-${Date.now()}-${index}`,
             client: r.customer_name || "Cliente não informado",
             description: r.observations || "Sem descrição",
             value: value,

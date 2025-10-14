@@ -35,11 +35,22 @@ export async function listOrders(): Promise<OrderRow[]> {
       .select("id, code, customer_name, customer_phone, type, description, value, paid, delivery_date, status, file_url")
       .order("created_at", { ascending: false })
       .limit(100);
+    
+    console.log("Pedidos encontrados no banco:", data?.length, "pedidos");
+    if (data && data.length > 0) {
+      console.log("Primeiro pedido:", { id: data[0].id, code: data[0].code });
+    }
     if (error) throw error;
     return (data ?? []) as OrderRow[];
   } catch {
     return [];
   }
+}
+
+// Função para detectar se é UUID ou código
+function isUUID(str: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
 }
 
 export async function getOrderByCode(code: string): Promise<OrderRow | null> {
@@ -64,10 +75,14 @@ export async function getOrderByCode(code: string): Promise<OrderRow | null> {
       setTimeout(() => reject(new Error('Timeout')), 10000)
     );
 
+    // Detectar se é UUID ou código e buscar adequadamente
+    const isUuid = isUUID(code.trim());
+    console.log("Tipo de identificador:", isUuid ? "UUID" : "Código");
+    
     const fetchPromise = supabase
       .from("atelie_orders")
       .select("*")
-      .eq("code", code.trim())
+      .eq(isUuid ? "id" : "code", code.trim())
       .maybeSingle();
 
     const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
@@ -105,6 +120,7 @@ export async function createOrder(input: {
 }): Promise<{ ok: boolean; id?: string; error?: string }> {
   try {
     const code = input.code ?? generateOrderCode();
+    console.log("Código do pedido gerado:", code);
     
     // Obter empresa_id do usuário logado
     const empresa_id = await getCurrentEmpresaId();

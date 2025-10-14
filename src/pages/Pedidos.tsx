@@ -21,7 +21,8 @@ export default function Pedidos() {
     queryFn: async () => {
       const rows = await listOrders();
       return rows.map((r) => ({
-        id: r.code,
+        id: r.code, // Usar código do pedido como ID
+        internalId: r.id, // Manter ID interno para referência
         client: r.customer_name,
         type: r.type,
         description: r.description ?? "",

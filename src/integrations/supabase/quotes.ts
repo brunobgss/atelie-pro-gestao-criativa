@@ -37,6 +37,9 @@ export async function listQuotes(): Promise<QuoteRow[]> {
     
     console.log("Orçamentos encontrados:", data?.length || 0);
     console.log("Dados brutos dos orçamentos:", data);
+    if (data && data.length > 0) {
+      console.log("Primeiro orçamento:", { id: data[0].id, code: data[0].code });
+    }
     return data ?? [];
   } catch (error) {
     console.error("Erro ao buscar orçamentos:", error);
@@ -68,6 +71,12 @@ export async function listQuotes(): Promise<QuoteRow[]> {
 }
 
 
+// Função para detectar se é UUID ou código
+function isUUID(str: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+}
+
 export async function getQuoteByCode(code: string): Promise<{ quote: QuoteRow | null; items: QuoteItemRow[] }> {
   try {
     console.log("Buscando orçamento por código:", code);
@@ -85,10 +94,14 @@ export async function getQuoteByCode(code: string): Promise<{ quote: QuoteRow | 
       setTimeout(() => reject(new Error('Timeout')), 10000)
     );
 
+    // Detectar se é UUID ou código e buscar adequadamente
+    const isUuid = isUUID(code.trim());
+    console.log("Tipo de identificador para orçamento:", isUuid ? "UUID" : "Código");
+    
     const fetchPromise = supabase
       .from("atelie_quotes")
       .select("id, code, customer_name, customer_phone, date, observations, total_value, status")
-      .eq("code", code)
+      .eq(isUuid ? "id" : "code", code.trim())
       .maybeSingle();
 
     const { data: quote, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
@@ -182,7 +195,9 @@ export function generateQuoteCode(): string {
   const m = String(now.getMonth() + 1).padStart(2, "0");
   const d = String(now.getDate()).padStart(2, "0");
   const r = Math.floor(Math.random() * 900 + 100); // 3 dígitos
-  return `ORC-${y}${m}${d}-${r}`;
+  const code = `ORC-${y}${m}${d}-${r}`;
+  console.log("Código de orçamento gerado:", code);
+  return code;
 }
 
 export async function deleteQuote(quoteCode: string): Promise<{ ok: boolean; error?: string }> {
