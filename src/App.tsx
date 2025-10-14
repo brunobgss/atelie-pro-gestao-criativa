@@ -55,6 +55,7 @@ function App() {
                 <Route path="/login" element={<Login />} />
                 <Route path="/cadastro" element={<Cadastro />} />
                 <Route path="/orcamento/:id" element={<OrcamentoPublico />} />
+                <Route path="/orcamentos/:id/impressao" element={<OrcamentoImpressaoTeste />} />
                 
                 {/* Rotas protegidas com Layout */}
                 <Route path="/" element={<Layout />}>
@@ -64,7 +65,6 @@ function App() {
                   <Route path="pedidos/:id" element={<PedidoDetalhe />} />
                   <Route path="orcamentos" element={<Orcamentos />} />
                   <Route path="orcamentos/novo" element={<NovoOrcamento />} />
-                  <Route path="orcamentos/:id/impressao" element={<OrcamentoImpressaoTeste />} />
                   <Route path="clientes" element={<Clientes />} />
                   <Route path="estoque" element={<Estoque />} />
                   <Route path="catalogo" element={<CatalogoProdutos />} />
