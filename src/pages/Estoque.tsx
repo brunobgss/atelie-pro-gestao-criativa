@@ -130,10 +130,12 @@ export default function Estoque() {
     queryFn: async () => {
       const rows = await listInventory();
       return rows.map((r) => ({
+        id: r.id, // ADICIONAR ID PARA EDIÇÃO
         name: r.name,
         quantity: Number(r.quantity || 0),
         unit: r.unit,
         min: Number(r.min_quantity || 0),
+        min_quantity: Number(r.min_quantity || 0), // ADICIONAR min_quantity PARA COMPATIBILIDADE
         status: r.status,
       }));
     },
