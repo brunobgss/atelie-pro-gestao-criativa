@@ -30,21 +30,32 @@ export default function Estoque() {
   });
 
   const handleEditItem = (item: unknown) => {
+    console.log("Editando item:", item);
+    if (!item || !item.id) {
+      toast.error("Item inválido para edição");
+      return;
+    }
+    
     setEditingItem(item);
     setEditForm({
-      name: item.name || "",
-      quantity: item.quantity?.toString() || "",
-      unit: item.unit || "",
-      minQuantity: item.min_quantity?.toString() || ""
+      name: String(item.name || ""),
+      quantity: String(item.quantity || ""),
+      unit: String(item.unit || ""),
+      minQuantity: String(item.min_quantity || "")
     });
     setIsEditDialogOpen(true);
   };
 
   const handleSaveEdit = async () => {
-    if (!editingItem) return;
+    if (!editingItem || !editingItem.id) {
+      toast.error("Item inválido para edição");
+      return;
+    }
+    
+    console.log("Salvando edição do item:", editingItem.id, editForm);
     
     try {
-      const result = await updateInventoryItem(editingItem.id, {
+      const result = await updateInventoryItem(String(editingItem.id), {
         name: editForm.name,
         quantity: parseFloat(editForm.quantity) || 0,
         unit: editForm.unit,

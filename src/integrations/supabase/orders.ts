@@ -46,6 +46,11 @@ export async function getOrderByCode(code: string): Promise<OrderRow | null> {
   try {
     console.log("Buscando pedido por código:", code);
     
+    if (!code || code.trim() === '') {
+      console.error("Código do pedido inválido:", code);
+      return null;
+    }
+    
     // Verificar se o banco está funcionando
     const isDbWorking = await checkDatabaseHealth();
     
@@ -54,22 +59,27 @@ export async function getOrderByCode(code: string): Promise<OrderRow | null> {
       return null;
     }
 
-    // Timeout de 3 segundos
+    // Timeout de 10 segundos
     const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Timeout')), 3000)
+      setTimeout(() => reject(new Error('Timeout')), 10000)
     );
 
     const fetchPromise = supabase
       .from("atelie_orders")
       .select("*")
-      .eq("code", code)
-      .single();
+      .eq("code", code.trim())
+      .maybeSingle();
 
     const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
     
     if (error) {
       console.error("Erro ao buscar pedido:", error);
-      throw error;
+      return null;
+    }
+    
+    if (!data) {
+      console.log("Pedido não encontrado:", code);
+      return null;
     }
     
     console.log("Pedido encontrado:", data);

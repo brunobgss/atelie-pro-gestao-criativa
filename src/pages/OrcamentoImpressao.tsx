@@ -17,11 +17,15 @@ export default function OrcamentoImpressao() {
 
   const { data: quoteData, isLoading, error } = useQuery({
     queryKey: ["quotePrint", id],
-    queryFn: () => {
+    queryFn: async () => {
       console.log("Iniciando busca de orçamento para impressão:", id);
-      return getQuoteByCode(id!);
+      const result = await getQuoteByCode(id!);
+      console.log("Resultado da busca:", result);
+      return result;
     },
     enabled: !!id,
+    retry: 3,
+    staleTime: 0
   });
 
   console.log("Estado da impressão:", { id, isLoading, error, quoteData });

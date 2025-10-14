@@ -30,6 +30,7 @@ import ControleFinanceiro from "./pages/ControleFinanceiro";
 import Assinatura from "./pages/Assinatura";
 import MinhaConta from "./pages/MinhaConta";
 import Agenda from "./pages/Agenda";
+import OrdemProducao from "./pages/OrdemProducao";
 
 // QueryClient fora do componente para evitar re-criação
 // Cache buster: 2024-12-19 - Corrigindo Dashboard not defined
@@ -61,6 +62,8 @@ function App() {
                   <Route index element={<Dashboard />} />
                   <Route path="pedidos" element={<Pedidos />} />
                   <Route path="pedidos/novo" element={<NovoPedido />} />
+                  <Route path="pedidos/editar/:id" element={<EditarPedido />} />
+                  <Route path="pedidos/:id/producao" element={<OrdemProducao />} />
                   <Route path="pedidos/:id" element={<PedidoDetalhe />} />
                   <Route path="orcamentos" element={<Orcamentos />} />
                   <Route path="orcamentos/novo" element={<NovoOrcamento />} />
