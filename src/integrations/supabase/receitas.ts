@@ -209,14 +209,18 @@ export async function updatePaymentStatus(
 
     // Calcular novo valor pago baseado no status
     let newPaidValue = order.paid;
+    let newStatus = order.status; // Manter status atual do pedido
     
     if (status === 'pago') {
       newPaidValue = order.value; // Pago = valor total
+      newStatus = 'Entregue'; // Status de pedido entregue
     } else if (status === 'pendente') {
       newPaidValue = 0; // Pendente = nada pago
+      newStatus = 'Aguardando aprovação'; // Status de pedido aguardando
     } else if (status === 'parcial') {
       // Manter valor atual ou metade se for 0
       newPaidValue = order.paid > 0 ? order.paid : order.value / 2;
+      newStatus = 'Em produção'; // Status de pedido em produção
     }
 
     // Atualizar o pedido com o novo valor pago e status
@@ -224,7 +228,7 @@ export async function updatePaymentStatus(
       .from("atelie_orders")
       .update({ 
         paid: newPaidValue,
-        status: status, // ADICIONAR O STATUS!
+        status: newStatus, // USAR STATUS CORRETO DO BANCO!
         updated_at: new Date().toISOString()
       })
       .eq("code", orderCode);
