@@ -12,11 +12,16 @@ export function MobileSidebarTrigger() {
     return null;
   }
 
+  const handleToggle = () => {
+    console.log("🔄 Toggle mobile menu:", { open, newState: !open });
+    setOpen(!open);
+  };
+
   return (
     <Button
       variant="ghost"
       size="sm"
-      onClick={() => setOpen(!open)}
+      onClick={handleToggle}
       className="text-gray-700 hover:bg-gray-100 transition-all duration-200 p-2"
     >
       {open ? (

@@ -36,7 +36,17 @@ export default function Estoque() {
       return;
     }
     
-    setEditingItem(item);
+    // FORÇAR ID COMO STRING E PRESERVAR EXATAMENTE
+    const itemWithSafeId = {
+      ...item,
+      id: String(item.id).trim() // Garantir que é string e sem espaços
+    };
+    
+    console.log("ID original:", item.id);
+    console.log("ID como string:", String(item.id));
+    console.log("ID safe:", itemWithSafeId.id);
+    
+    setEditingItem(itemWithSafeId);
     setEditForm({
       name: String(item.name || ""),
       quantity: String(item.quantity || ""),
@@ -52,12 +62,24 @@ export default function Estoque() {
       return;
     }
     
-    console.log("Salvando edição do item:", editingItem.id, editForm);
-    console.log("Tipo do ID:", typeof editingItem.id);
-    console.log("ID como string:", String(editingItem.id));
+    // PRESERVAR ID EXATAMENTE COMO ESTÁ
+    const safeId = String(editingItem.id).trim();
+    
+    console.log("Salvando edição do item:", safeId, editForm);
+    console.log("Tipo do ID:", typeof safeId);
+    console.log("ID final:", safeId);
+    console.log("ID length:", safeId.length);
+    
+    // Verificar se o ID tem o formato correto de UUID
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(safeId)) {
+      console.error("❌ ID não é um UUID válido:", safeId);
+      toast.error("ID inválido para edição");
+      return;
+    }
     
     try {
-      const result = await updateInventoryItem(String(editingItem.id), {
+      const result = await updateInventoryItem(safeId, {
         name: editForm.name,
         quantity: parseFloat(editForm.quantity) || 0,
         unit: editForm.unit,

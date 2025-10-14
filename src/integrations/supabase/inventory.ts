@@ -33,14 +33,26 @@ export async function listInventory(): Promise<InventoryRow[]> {
 
 export async function updateInventoryItem(id: string, input: { name?: string; quantity?: number; unit?: string; min_quantity?: number }): Promise<{ ok: boolean; data?: InventoryRow; error?: string }> {
   try {
-    console.log("🔄 Atualizando item do estoque:", { id, input });
-    console.log("🔍 Tipo do ID:", typeof id);
-    console.log("🔍 ID recebido:", id);
+    // NORMALIZAR ID - REMOVER ESPAÇOS E GARANTIR FORMATO
+    const normalizedId = String(id).trim();
+    
+    console.log("🔄 Atualizando item do estoque:", { id: normalizedId, input });
+    console.log("🔍 Tipo do ID:", typeof normalizedId);
+    console.log("🔍 ID original:", id);
+    console.log("🔍 ID normalizado:", normalizedId);
+    console.log("🔍 IDs são iguais:", id === normalizedId);
     
     // Verificar se o ID é válido
-    if (!id || id.trim() === '') {
+    if (!normalizedId || normalizedId === '') {
       console.error("❌ ID inválido ou vazio");
       return { ok: false, error: "ID inválido" };
+    }
+    
+    // Verificar formato UUID
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(normalizedId)) {
+      console.error("❌ ID não é um UUID válido:", normalizedId);
+      return { ok: false, error: "ID não é um UUID válido" };
     }
     
     // Preparar dados de forma mais segura
@@ -56,7 +68,7 @@ export async function updateInventoryItem(id: string, input: { name?: string; qu
     const { data: existingItem, error: checkError } = await supabase
       .from("inventory_items")
       .select("id, name")
-      .eq("id", id)
+      .eq("id", normalizedId)
       .single();
     
     if (checkError) {
@@ -69,7 +81,7 @@ export async function updateInventoryItem(id: string, input: { name?: string; qu
     const { data, error } = await supabase
       .from("inventory_items")
       .update(updateData)
-      .eq("id", id)
+      .eq("id", normalizedId)
       .select("*");
     
     if (error) {

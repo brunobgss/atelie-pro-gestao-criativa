@@ -15,6 +15,7 @@ export function Layout() {
 
   // Atualizar estado do sidebar quando mudar de mobile para desktop
   useEffect(() => {
+    console.log("📱 Layout - isMobile:", isMobile, "sidebarOpen:", sidebarOpen);
     setSidebarOpen(!isMobile);
   }, [isMobile]);
 
@@ -36,7 +37,10 @@ export function Layout() {
   return (
     <SidebarProvider 
       defaultOpen={sidebarOpen}
-      onOpenChange={setSidebarOpen}
+      onOpenChange={(open) => {
+        console.log("🔄 SidebarProvider onOpenChange:", open);
+        setSidebarOpen(open);
+      }}
     >
       <TrialProtectedRoute>
         <div className="min-h-screen flex w-full bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100 relative">
