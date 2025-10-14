@@ -64,19 +64,8 @@ export async function updateInventoryItem(id: string, input: { name?: string; qu
     
     console.log("📝 Dados para atualização:", updateData);
     
-    // Primeiro, verificar se o item existe
-    const { data: existingItem, error: checkError } = await supabase
-      .from("inventory_items")
-      .select("id, name")
-      .eq("id", normalizedId)
-      .single();
-    
-    if (checkError) {
-      console.error("❌ Erro ao verificar item existente:", checkError);
-      return { ok: false, error: "Item não encontrado no banco de dados" };
-    }
-    
-    console.log("✅ Item encontrado no banco:", existingItem);
+    // Atualizar diretamente sem verificação prévia (mais eficiente)
+    console.log("🔄 Executando atualização direta...");
     
     const { data, error } = await supabase
       .from("inventory_items")
@@ -86,12 +75,14 @@ export async function updateInventoryItem(id: string, input: { name?: string; qu
     
     if (error) {
       console.error("❌ Erro do Supabase:", error);
-      throw error;
+      return { ok: false, error: `Erro do banco: ${error.message}` };
     }
     
     if (!data || data.length === 0) {
       console.error("❌ Nenhum item encontrado para atualizar");
-      return { ok: false, error: "Item não encontrado" };
+      console.error("❌ ID usado na query:", normalizedId);
+      console.error("❌ Dados enviados:", updateData);
+      return { ok: false, error: "Item não encontrado para atualização" };
     }
     
     console.log("✅ Item atualizado com sucesso:", data[0]);

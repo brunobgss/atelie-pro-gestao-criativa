@@ -35,7 +35,7 @@ export function AppSidebar() {
 
   return (
     <Sidebar 
-      collapsible="icon" 
+      collapsible="none" 
       className="bg-card border-r border-border md:relative fixed md:translate-x-0 z-50"
       side="left"
     >
