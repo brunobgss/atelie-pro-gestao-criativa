@@ -3,29 +3,15 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { AuthProvider } from "./components/AuthProvider";
 import { SyncProvider } from "./contexts/SyncContext";
+import { Layout } from "./components/Layout";
 
-// Páginas
-import Dashboard from "./pages/Dashboard";
-import Pedidos from "./pages/Pedidos";
-import NovoPedido from "./pages/NovoPedido";
-import PedidoDetalhe from "./pages/PedidoDetalhe";
-import Orcamentos from "./pages/Orcamentos";
-import NovoOrcamento from "./pages/NovoOrcamento";
-import OrcamentoImpressao from "./pages/OrcamentoImpressao";
-import OrcamentoPublico from "./pages/OrcamentoPublico";
-import Clientes from "./pages/Clientes";
-import Estoque from "./pages/Estoque";
-import CatalogoProdutos from "./pages/CatalogoProdutos";
-import CalculadoraPrecos from "./pages/CalculadoraPrecos";
-import Relatorios from "./pages/Relatorios";
-import ControleFinanceiro from "./pages/ControleFinanceiro";
-import Assinatura from "./pages/Assinatura";
-import MinhaConta from "./pages/MinhaConta";
-import Agenda from "./pages/Agenda";
+// Páginas públicas
 import Login from "./pages/Login";
 import Cadastro from "./pages/Cadastro";
+import OrcamentoPublico from "./pages/OrcamentoPublico";
 
 // QueryClient fora do componente para evitar re-criação
 const queryClient = new QueryClient({
@@ -50,23 +36,25 @@ function App() {
                 <Route path="/cadastro" element={<Cadastro />} />
                 <Route path="/orcamento/:id" element={<OrcamentoPublico />} />
                 
-                {/* Rotas protegidas */}
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/pedidos" element={<Pedidos />} />
-                <Route path="/pedidos/novo" element={<NovoPedido />} />
-                <Route path="/pedidos/:id" element={<PedidoDetalhe />} />
-                <Route path="/orcamentos" element={<Orcamentos />} />
-                <Route path="/orcamentos/novo" element={<NovoOrcamento />} />
-                <Route path="/orcamentos/:id/impressao" element={<OrcamentoImpressao />} />
-                <Route path="/clientes" element={<Clientes />} />
-                <Route path="/estoque" element={<Estoque />} />
-                <Route path="/catalogo" element={<CatalogoProdutos />} />
-                <Route path="/calculadora" element={<CalculadoraPrecos />} />
-                <Route path="/relatorios" element={<Relatorios />} />
-                <Route path="/financeiro" element={<ControleFinanceiro />} />
-                <Route path="/assinatura" element={<Assinatura />} />
-                <Route path="/minha-conta" element={<MinhaConta />} />
-                <Route path="/agenda" element={<Agenda />} />
+                {/* Rotas protegidas com Layout */}
+                <Route path="/" element={<Layout />}>
+                  <Route index element={<Dashboard />} />
+                  <Route path="pedidos" element={<Pedidos />} />
+                  <Route path="pedidos/novo" element={<NovoPedido />} />
+                  <Route path="pedidos/:id" element={<PedidoDetalhe />} />
+                  <Route path="orcamentos" element={<Orcamentos />} />
+                  <Route path="orcamentos/novo" element={<NovoOrcamento />} />
+                  <Route path="orcamentos/:id/impressao" element={<OrcamentoImpressao />} />
+                  <Route path="clientes" element={<Clientes />} />
+                  <Route path="estoque" element={<Estoque />} />
+                  <Route path="catalogo" element={<CatalogoProdutos />} />
+                  <Route path="calculadora" element={<CalculadoraPrecos />} />
+                  <Route path="relatorios" element={<Relatorios />} />
+                  <Route path="financeiro" element={<ControleFinanceiro />} />
+                  <Route path="assinatura" element={<Assinatura />} />
+                  <Route path="minha-conta" element={<MinhaConta />} />
+                  <Route path="agenda" element={<Agenda />} />
+                </Route>
               </Routes>
             </BrowserRouter>
           </SyncProvider>
