@@ -91,6 +91,25 @@ export async function updateInventoryItem(id: string, input: { name?: string; qu
     }
     
     console.log("✅ Item encontrado, prosseguindo com atualização...");
+    console.log("🔍 Item details:", existingItem);
+    
+    // Verificar se usuário tem acesso à empresa do item
+    console.log("🔍 Verificando acesso do usuário à empresa...");
+    const { data: userEmpresas, error: userError } = await supabase
+      .from("user_empresas")
+      .select("empresa_id")
+      .eq("user_id", (await supabase.auth.getUser()).data.user?.id);
+    
+    console.log("🔍 Empresas do usuário:", userEmpresas);
+    console.log("🔍 Empresa do item:", existingItem.empresa_id);
+    
+    const hasAccess = userEmpresas?.some(ue => ue.empresa_id === existingItem.empresa_id);
+    console.log("🔍 Usuário tem acesso?", hasAccess);
+    
+    if (!hasAccess) {
+      console.error("❌ Usuário não tem acesso à empresa do item!");
+      return { ok: false, error: "Usuário não tem permissão para editar este item" };
+    }
     
     // Atualizar diretamente
     console.log("🔄 Executando atualização direta...");
