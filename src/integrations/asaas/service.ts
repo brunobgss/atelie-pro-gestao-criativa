@@ -39,7 +39,7 @@ if (!ASAAS_API_KEY) {
 }
 
 class ASAASService {
-  private async makeRequest(action: string, data: any) {
+  private async makeRequest(action: string, data: unknown) {
     console.log(`🔄 ASAAS Request: ${action}`, data);
 
     const response = await fetch('/api/asaas', {

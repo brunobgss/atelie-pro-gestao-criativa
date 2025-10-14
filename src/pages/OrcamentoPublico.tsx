@@ -36,7 +36,7 @@ export default function OrcamentoPublico() {
       } as Quote;
     }
     return null;
-  }, [data, id]);
+  }, [data]);
 
   const total = quote?.items.reduce((sum, item) => sum + item.quantity * item.value, 0) ?? 0;
 

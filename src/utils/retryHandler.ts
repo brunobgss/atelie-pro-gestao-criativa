@@ -4,7 +4,7 @@ export interface RetryOptions {
   baseDelay: number;
   maxDelay: number;
   backoffMultiplier: number;
-  retryCondition?: (error: any) => boolean;
+  retryCondition?: (error: unknown) => boolean;
 }
 
 export const DEFAULT_RETRY_OPTIONS: RetryOptions = {
@@ -41,9 +41,9 @@ export class RetryHandler {
     operation: () => Promise<T>,
     context: string,
     options: Partial<RetryOptions> = {}
-  ): Promise<{ success: boolean; data?: T; error?: any; attempts: number }> {
+  ): Promise<{ success: boolean; data?: T; error?: unknown; attempts: number }> {
     const config = { ...DEFAULT_RETRY_OPTIONS, ...options };
-    let lastError: any;
+    let lastError: unknown;
     let attempts = 0;
 
     // Inicializar estatísticas
@@ -67,7 +67,7 @@ export class RetryHandler {
         console.log(`✅ [${context}] Sucesso na tentativa ${attempt}`);
         return { success: true, data, attempts };
         
-      } catch (error: any) {
+      } catch (error: unknown) {
         lastError = error;
         
         console.warn(`❌ [${context}] Falha na tentativa ${attempt}:`, error.message);
@@ -103,7 +103,7 @@ export class RetryHandler {
     fallback: () => Promise<T>,
     context: string,
     options: Partial<RetryOptions> = {}
-  ): Promise<{ success: boolean; data?: T; error?: any; usedFallback: boolean }> {
+  ): Promise<{ success: boolean; data?: T; error?: unknown; usedFallback: boolean }> {
     const result = await this.executeWithRetry(operation, context, options);
     
     if (result.success) {
@@ -126,7 +126,7 @@ export class RetryHandler {
   async executeParallelWithRetry<T>(
     operations: Array<{ operation: () => Promise<T>; context: string }>,
     options: Partial<RetryOptions> = {}
-  ): Promise<Array<{ success: boolean; data?: T; error?: any; context: string }>> {
+  ): Promise<Array<{ success: boolean; data?: T; error?: unknown; context: string }>> {
     const promises = operations.map(async ({ operation, context }) => {
       const result = await this.executeWithRetry(operation, context, options);
       return { ...result, context };
@@ -141,7 +141,7 @@ export class RetryHandler {
     context: string,
     failureThreshold: number = 5,
     timeout: number = 60000
-  ): Promise<{ success: boolean; data?: T; error?: any; circuitOpen: boolean }> {
+  ): Promise<{ success: boolean; data?: T; error?: unknown; circuitOpen: boolean }> {
     const stats = this.retryStats.get(context) || { attempts: 0, successes: 0, failures: 0 };
     
     // Verificar se o circuit breaker está aberto
@@ -171,7 +171,7 @@ export class RetryHandler {
 
   // Obter estatísticas de retry
   getRetryStats(): Record<string, { attempts: number; successes: number; failures: number; successRate: number }> {
-    const result: Record<string, any> = {};
+    const result: Record<string, unknown> = {};
     
     this.retryStats.forEach((stats, context) => {
       result[context] = {

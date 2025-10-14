@@ -21,7 +21,7 @@ export default function Estoque() {
   const queryClient = useQueryClient();
   const { invalidateRelated } = useSync();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<any>(null);
+  const [editingItem, setEditingItem] = useState<unknown>(null);
   const [editForm, setEditForm] = useState({
     name: "",
     quantity: "",
@@ -29,7 +29,7 @@ export default function Estoque() {
     minQuantity: ""
   });
 
-  const handleEditItem = (item: any) => {
+  const handleEditItem = (item: unknown) => {
     setEditingItem(item);
     setEditForm({
       name: item.name || "",
@@ -68,7 +68,7 @@ export default function Estoque() {
     }
   };
 
-  const handleDeleteItem = async (item: any) => {
+  const handleDeleteItem = async (item: unknown) => {
     if (confirm(`Tem certeza que deseja excluir "${item.name}"?`)) {
       try {
         // Buscar o ID do item no banco

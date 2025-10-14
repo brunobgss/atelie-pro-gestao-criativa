@@ -95,7 +95,7 @@ export default function Cadastro() {
         toast.success("Cadastro realizado com sucesso!");
         navigate("/login");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro no cadastro:", error);
       toast.error(error.message || "Erro ao fazer cadastro");
     } finally {

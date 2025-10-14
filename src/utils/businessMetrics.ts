@@ -6,7 +6,7 @@ export interface BusinessMetric {
   type: 'count' | 'revenue' | 'conversion' | 'performance' | 'user_behavior';
   context: string;
   timestamp: string;
-  metadata?: any;
+  metadata?: unknown;
 }
 
 export interface MetricConfig {
@@ -52,7 +52,7 @@ export class BusinessMetrics {
     value: number,
     type: BusinessMetric['type'],
     context: string,
-    metadata?: any
+    metadata?: unknown 
   ): void {
     if (!this.config.enableTracking) return;
 
@@ -101,7 +101,7 @@ export class BusinessMetrics {
     this.recordMetric('inventory_items_created', 1, 'count', context, { itemType });
   }
 
-  recordUserAction(action: string, context: string, metadata?: any): void {
+  recordUserAction(action: string, context: string, metadata?: unknown): void {
     this.recordMetric('user_actions', 1, 'user_behavior', context, { action, ...metadata });
   }
 
@@ -113,7 +113,7 @@ export class BusinessMetrics {
     this.recordMetric('operation_duration', duration, 'performance', context, { operation });
   }
 
-  recordErrorMetric(errorType: string, context: string, metadata?: any): void {
+  recordErrorMetric(errorType: string, context: string, metadata?: unknown): void {
     this.recordMetric('errors', 1, 'count', context, { errorType, ...metadata });
   }
 
@@ -334,7 +334,7 @@ export const businessMetrics = BusinessMetrics.getInstance();
 
 // Funções auxiliares
 export const metrics = {
-  record: (name: string, value: number, type: BusinessMetric['type'], context: string, metadata?: any) => 
+  record: (name: string, value: number, type: BusinessMetric['type'], context: string, metadata?: unknown) => 
     businessMetrics.recordMetric(name, value, type, context, metadata),
   orderCreated: (orderValue: number, customerType: string, context: string) => 
     businessMetrics.recordOrderCreated(orderValue, customerType, context),
@@ -346,13 +346,13 @@ export const metrics = {
     businessMetrics.recordCustomerCreated(customerType, context),
   inventoryItemCreated: (itemType: string, context: string) => 
     businessMetrics.recordInventoryItemCreated(itemType, context),
-  userAction: (action: string, context: string, metadata?: any) => 
+  userAction: (action: string, context: string, metadata?: unknown) => 
     businessMetrics.recordUserAction(action, context, metadata),
   pageView: (page: string, context: string) => 
     businessMetrics.recordPageView(page, context),
   performance: (operation: string, duration: number, context: string) => 
     businessMetrics.recordPerformanceMetric(operation, duration, context),
-  error: (errorType: string, context: string, metadata?: any) => 
+  error: (errorType: string, context: string, metadata?: unknown) => 
     businessMetrics.recordErrorMetric(errorType, context, metadata),
   trialEvent: (eventType: 'started' | 'extended' | 'expired', context: string) => 
     businessMetrics.recordTrialEvent(eventType, context),

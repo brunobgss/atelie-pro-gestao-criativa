@@ -12,7 +12,7 @@ export interface LogEntry {
   message: string;
   context: string;
   timestamp: string;
-  data?: any;
+  data?: unknown;
   userId?: string;
   sessionId?: string;
 }
@@ -36,7 +36,7 @@ export class Logger {
   }
 
   // Adicionar log
-  private addLog(level: LogLevel, message: string, context: string, data?: any): void {
+  private addLog(level: LogLevel, message: string, context: string, data?: unknown): void {
     if (level < this.currentLevel) return;
 
     const logEntry: LogEntry = {
@@ -61,61 +61,61 @@ export class Logger {
   }
 
   // Debug
-  debug(message: string, context: string, data?: any): void {
+  debug(message: string, context: string, data?: unknown): void {
     this.addLog(LogLevel.DEBUG, message, context, data);
   }
 
   // Info
-  info(message: string, context: string, data?: any): void {
+  info(message: string, context: string, data?: unknown): void {
     this.addLog(LogLevel.INFO, message, context, data);
   }
 
   // Warning
-  warn(message: string, context: string, data?: any): void {
+  warn(message: string, context: string, data?: unknown): void {
     this.addLog(LogLevel.WARN, message, context, data);
   }
 
   // Error
-  error(message: string, context: string, data?: any): void {
+  error(message: string, context: string, data?: unknown): void {
     this.addLog(LogLevel.ERROR, message, context, data);
   }
 
   // Critical
-  critical(message: string, context: string, data?: any): void {
+  critical(message: string, context: string, data?: unknown): void {
     this.addLog(LogLevel.CRITICAL, message, context, data);
   }
 
   // Log de performance
-  performance(operation: string, duration: number, context: string, data?: any): void {
+  performance(operation: string, duration: number, context: string, data?: unknown): void {
     this.info(`Performance: ${operation} took ${duration}ms`, context, { ...data, duration });
   }
 
   // Log de operação do usuário
-  userAction(action: string, context: string, data?: any): void {
+  userAction(action: string, context: string, data?: unknown): void {
     this.info(`User Action: ${action}`, context, data);
   }
 
   // Log de operação do sistema
-  systemEvent(event: string, context: string, data?: any): void {
+  systemEvent(event: string, context: string, data?: unknown): void {
     this.info(`System Event: ${event}`, context, data);
   }
 
   // Log de sincronização
-  sync(operation: string, resource: string, success: boolean, data?: any): void {
+  sync(operation: string, resource: string, success: boolean, data?: unknown): void {
     const level = success ? LogLevel.INFO : LogLevel.ERROR;
     const message = `Sync: ${operation} ${resource} ${success ? 'successful' : 'failed'}`;
     this.addLog(level, message, 'SYNC', { operation, resource, success, ...data });
   }
 
   // Log de cache
-  cache(operation: string, key: string, success: boolean, data?: any): void {
+  cache(operation: string, key: string, success: boolean, data?: unknown): void {
     const level = success ? LogLevel.DEBUG : LogLevel.WARN;
     const message = `Cache: ${operation} ${key} ${success ? 'successful' : 'failed'}`;
     this.addLog(level, message, 'CACHE', { operation, key, success, ...data });
   }
 
   // Log de API
-  api(method: string, endpoint: string, status: number, duration?: number, data?: any): void {
+  api(method: string, endpoint: string, status: number, duration?: number, data?: unknown): void {
     const level = status >= 400 ? LogLevel.ERROR : LogLevel.INFO;
     const message = `API: ${method} ${endpoint} ${status}${duration ? ` (${duration}ms)` : ''}`;
     this.addLog(level, message, 'API', { method, endpoint, status, duration, ...data });
@@ -243,21 +243,21 @@ export const logger = Logger.getInstance();
 
 // Funções auxiliares para logging rápido
 export const log = {
-  debug: (message: string, context: string, data?: any) => logger.debug(message, context, data),
-  info: (message: string, context: string, data?: any) => logger.info(message, context, data),
-  warn: (message: string, context: string, data?: any) => logger.warn(message, context, data),
-  error: (message: string, context: string, data?: any) => logger.error(message, context, data),
-  critical: (message: string, context: string, data?: any) => logger.critical(message, context, data),
-  performance: (operation: string, duration: number, context: string, data?: any) => 
+  debug: (message: string, context: string, data?: unknown) => logger.debug(message, context, data),
+  info: (message: string, context: string, data?: unknown) => logger.info(message, context, data),
+  warn: (message: string, context: string, data?: unknown) => logger.warn(message, context, data),
+  error: (message: string, context: string, data?: unknown) => logger.error(message, context, data),
+  critical: (message: string, context: string, data?: unknown) => logger.critical(message, context, data),
+  performance: (operation: string, duration: number, context: string, data?: unknown) => 
     logger.performance(operation, duration, context, data),
-  userAction: (action: string, context: string, data?: any) => 
+  userAction: (action: string, context: string, data?: unknown) => 
     logger.userAction(action, context, data),
-  systemEvent: (event: string, context: string, data?: any) => 
+  systemEvent: (event: string, context: string, data?: unknown) => 
     logger.systemEvent(event, context, data),
-  sync: (operation: string, resource: string, success: boolean, data?: any) => 
+  sync: (operation: string, resource: string, success: boolean, data?: unknown) => 
     logger.sync(operation, resource, success, data),
-  cache: (operation: string, key: string, success: boolean, data?: any) => 
+  cache: (operation: string, key: string, success: boolean, data?: unknown) => 
     logger.cache(operation, key, success, data),
-  api: (method: string, endpoint: string, status: number, duration?: number, data?: any) => 
+  api: (method: string, endpoint: string, status: number, duration?: number, data?: unknown) => 
     logger.api(method, endpoint, status, duration, data)
 };

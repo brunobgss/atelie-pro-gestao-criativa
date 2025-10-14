@@ -120,7 +120,7 @@ export class SecurityManager {
   }
 
   // Sanitizar dados de entrada
-  sanitizeInput(input: any): any {
+  sanitizeInput(input: unknown): any {
     if (typeof input === 'string') {
       return input
         .trim()
@@ -134,7 +134,7 @@ export class SecurityManager {
     }
 
     if (typeof input === 'object' && input !== null) {
-      const sanitized: any = {};
+      const sanitized: unknown = {};
       for (const [key, value] of Object.entries(input)) {
         sanitized[this.sanitizeInput(key)] = this.sanitizeInput(value);
       }
@@ -145,7 +145,7 @@ export class SecurityManager {
   }
 
   // Validar dados sensíveis
-  validateSensitiveData(data: any): { isValid: boolean; errors: string[] } {
+  validateSensitiveData(data: unknown): { isValid: boolean; errors: string[] } {
     const errors: string[] = [];
 
     // Verificar se contém dados sensíveis
@@ -159,7 +159,7 @@ export class SecurityManager {
       /confidential/i
     ];
 
-    const checkSensitiveData = (obj: any, path: string = ''): void => {
+    const checkSensitiveData = (obj: unknown, path: string = ''): void => {
       if (typeof obj === 'string') {
         sensitivePatterns.forEach(pattern => {
           if (pattern.test(obj)) {
@@ -223,7 +223,7 @@ export class SecurityManager {
   }
 
   // Registrar auditoria
-  audit(action: string, resource: string, success: boolean, userId?: string, metadata?: any): void {
+  audit(action: string, resource: string, success: boolean, userId?: string, metadata?: unknown): void {
     if (!this.config.enableAuditLog) return;
 
     const auditEntry = {
@@ -370,11 +370,11 @@ export const securityManager = SecurityManager.getInstance();
 // Funções auxiliares
 export const security = {
   validatePassword: (password: string) => securityManager.validatePassword(password),
-  sanitizeInput: (input: any) => securityManager.sanitizeInput(input),
-  validateSensitiveData: (data: any) => securityManager.validateSensitiveData(data),
+  sanitizeInput: (input: unknown) => securityManager.sanitizeInput(input),
+  validateSensitiveData: (data: unknown) => securityManager.validateSensitiveData(data),
   encryptSensitiveData: (data: string) => securityManager.encryptSensitiveData(data),
   decryptSensitiveData: (data: string) => securityManager.decryptSensitiveData(data),
-  audit: (action: string, resource: string, success: boolean, userId?: string, metadata?: any) => 
+  audit: (action: string, resource: string, success: boolean, userId?: string, metadata?: unknown) => 
     securityManager.audit(action, resource, success, userId, metadata),
   checkPermission: (userId: string, resource: string, action: string) => 
     securityManager.checkPermission(userId, resource, action),

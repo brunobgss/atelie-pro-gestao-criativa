@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
 import { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -97,9 +97,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       subscription.unsubscribe();
       if (intervalId) clearInterval(intervalId);
     };
-  }, [empresa]);
+  }, [empresa, fetchEmpresa]);
 
-  const fetchEmpresa = async (userId: string) => {
+  const fetchEmpresa = useCallback(async (userId: string) => {
     try {
       // Timeout aumentado para 15 segundos para melhor conectividade
       const timeoutPromise = new Promise((_, reject) => 
@@ -124,7 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .eq("user_id", userId)
         .maybeSingle();
 
-      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
+      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as { data: unknown; error: unknown };
 
       if (error) {
         console.warn("⚠️ Erro ao buscar empresa do Supabase:", error.message);
@@ -173,7 +173,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setEmpresa(null);
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Log apenas uma vez por sessão para evitar spam
       if (!window.authErrorLogged) {
         console.warn("Erro ao buscar empresa, usando dados persistidos:", error.message);
@@ -200,7 +200,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [empresa]);
 
   const signOut = async () => {
     try {
@@ -222,7 +222,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         window.location.href = '/login';
       }, 1000);
       
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Erro inesperado no logout:", error);
       // Mesmo com erro, dados já foram limpos
       toast.success("Logout realizado");

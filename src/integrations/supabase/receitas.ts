@@ -43,7 +43,7 @@ export async function listReceitas(): Promise<ReceitaRow[]> {
 
     console.log("Receitas encontradas:", data?.length || 0);
     return data ?? [];
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("Erro ao buscar receitas:", e);
     return [];
   }
@@ -75,7 +75,7 @@ export async function getReceitaByOrderCode(orderCode: string): Promise<ReceitaR
 
     console.log("Receita encontrada:", data);
     return data as ReceitaRow;
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("Erro ao buscar receita:", e);
     return null;
   }
@@ -119,7 +119,7 @@ export async function createReceita(input: {
 
     console.log("Receita criada com sucesso:", data);
     return { ok: true, id: data.id };
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("Erro ao criar receita:", e);
     return { ok: false, error: e.message };
   }
@@ -158,7 +158,7 @@ export async function updateReceita(
 
     console.log("Receita atualizada com sucesso:", data);
     return { ok: true, data: data as ReceitaRow };
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("Erro ao atualizar receita:", e);
     return { ok: false, error: e.message };
   }
@@ -181,7 +181,7 @@ export async function deleteReceita(id: string): Promise<{ ok: boolean; error?: 
 
     console.log("Receita deletada com sucesso");
     return { ok: true };
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("Erro ao deletar receita:", e);
     return { ok: false, error: e.message };
   }
@@ -235,7 +235,7 @@ export async function updatePaymentStatus(
 
     console.log("Status de pagamento atualizado com sucesso");
     return { ok: true };
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("Erro ao atualizar status de pagamento:", e);
     return { ok: false, error: e.message };
   }

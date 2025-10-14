@@ -14,7 +14,7 @@ export interface Alert {
   message: string;
   context: string;
   timestamp: string;
-  metadata?: any;
+  metadata?: unknown;
   resolved: boolean;
 }
 
@@ -56,7 +56,7 @@ export class AlertSystem {
     title: string,
     message: string,
     context: string,
-    metadata?: any
+    metadata?: unknown 
   ): void {
     const alertId = `${context}-${type}-${Date.now()}`;
     
@@ -133,7 +133,7 @@ export class AlertSystem {
   }
 
   // Alertas específicos para diferentes tipos de erros
-  alertDatabaseError(error: any, context: string, operation: string): void {
+  alertDatabaseError(error: unknown, context: string, operation: string): void {
     this.createAlert(
       'error',
       'Erro de Banco de Dados',
@@ -143,7 +143,7 @@ export class AlertSystem {
     );
   }
 
-  alertNetworkError(error: any, context: string, endpoint: string): void {
+  alertNetworkError(error: unknown, context: string, endpoint: string): void {
     this.createAlert(
       'error',
       'Erro de Rede',
@@ -350,17 +350,17 @@ export const alertSystem = AlertSystem.getInstance();
 
 // Funções auxiliares
 export const alert = {
-  error: (title: string, message: string, context: string, metadata?: any) => 
+  error: (title: string, message: string, context: string, metadata?: unknown) => 
     alertSystem.createAlert('error', title, message, context, metadata),
-  warning: (title: string, message: string, context: string, metadata?: any) => 
+  warning: (title: string, message: string, context: string, metadata?: unknown) => 
     alertSystem.createAlert('warning', title, message, context, metadata),
-  info: (title: string, message: string, context: string, metadata?: any) => 
+  info: (title: string, message: string, context: string, metadata?: unknown) => 
     alertSystem.createAlert('info', title, message, context, metadata),
-  success: (title: string, message: string, context: string, metadata?: any) => 
+  success: (title: string, message: string, context: string, metadata?: unknown) => 
     alertSystem.createAlert('success', title, message, context, metadata),
-  databaseError: (error: any, context: string, operation: string) => 
+  databaseError: (error: unknown, context: string, operation: string) => 
     alertSystem.alertDatabaseError(error, context, operation),
-  networkError: (error: any, context: string, endpoint: string) => 
+  networkError: (error: unknown, context: string, endpoint: string) => 
     alertSystem.alertNetworkError(error, context, endpoint),
   validationError: (errors: string[], context: string, form: string) => 
     alertSystem.alertValidationError(errors, context, form),

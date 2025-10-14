@@ -170,7 +170,7 @@ export async function createQuote(input: {
     }
 
     return { ok: true, id: code };
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("Erro ao criar orçamento:", e);
     return { ok: false, error: e?.message ?? "Erro ao criar orçamento" };
   }
@@ -214,7 +214,7 @@ export async function deleteQuote(quoteCode: string): Promise<{ ok: boolean; err
     if (deleteError) throw deleteError;
 
     return { ok: true };
-  } catch (e: any) {
+  } catch (e: unknown) {
     return { ok: false, error: e?.message ?? "Erro ao excluir orçamento" };
   }
 }
@@ -257,7 +257,7 @@ export async function approveQuote(quoteCode: string): Promise<{ ok: boolean; er
     
     // Criar pedido
     console.log("Criando pedido...");
-    let { data: order, error: orderError } = await supabase
+    const { data: order, error: orderError } = await supabase
       .from("atelie_orders")
       .insert({
         code: orderCode,
@@ -330,7 +330,7 @@ export async function approveQuote(quoteCode: string): Promise<{ ok: boolean; er
 
     console.log("Orçamento aprovado com sucesso!");
     return { ok: true };
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("Erro ao aprovar orçamento:", e);
     return { ok: false, error: e?.message ?? "Erro ao aprovar orçamento" };
   }
@@ -355,7 +355,7 @@ export async function updateQuote(quoteCode: string, input: {
     if (!quote) throw new Error("Orçamento não encontrado");
 
     // Atualizar dados do orçamento
-    const updateData: any = {};
+    const updateData: unknown = {};
     if (input.customer_name !== undefined) updateData.customer_name = input.customer_name;
     if (input.customer_phone !== undefined) updateData.customer_phone = input.customer_phone;
     if (input.date !== undefined) updateData.date = input.date;
@@ -410,7 +410,7 @@ export async function updateQuote(quoteCode: string, input: {
     }
 
     return { ok: true };
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("Erro ao atualizar orçamento:", e);
     return { ok: false, error: e?.message ?? "Erro ao atualizar orçamento" };
   }
@@ -440,7 +440,7 @@ async function syncQuoteToOrder(quoteCode: string, input: {
     }
 
     // Preparar dados para atualização do pedido
-    const orderUpdateData: any = {};
+    const orderUpdateData: unknown = {};
     
     if (input.customer_name !== undefined) orderUpdateData.customer_name = input.customer_name;
     if (input.customer_phone !== undefined) orderUpdateData.customer_phone = input.customer_phone;

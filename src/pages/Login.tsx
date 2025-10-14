@@ -30,7 +30,7 @@ export default function Login() {
         toast.success("Login realizado com sucesso!");
         navigate("/");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast.error(error.message || "Erro ao fazer login");
     } finally {
       setLoading(false);

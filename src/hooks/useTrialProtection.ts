@@ -43,7 +43,7 @@ export function useTrialProtection() {
       console.log("🚫 Trial expirado - redirecionando para assinatura");
       navigate("/assinatura", { replace: true });
     }
-  }, [empresa?.trial_end_date, location.pathname, navigate]);
+  }, [empresa?.trial_end_date, location.pathname, navigate, isTrialExpired, empresa]);
 
   return {
     isTrialExpired,

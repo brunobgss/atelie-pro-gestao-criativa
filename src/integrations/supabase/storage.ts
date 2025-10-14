@@ -34,7 +34,7 @@ export async function uploadOrderFile(file: File, orderCode: string): Promise<{ 
     console.log("URL pública gerada:", urlData.publicUrl);
     
     return { ok: true, url: urlData.publicUrl };
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("Erro no upload:", e);
     return { ok: false, error: e?.message ?? "Falha no upload" };
   }

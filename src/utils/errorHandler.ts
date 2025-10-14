@@ -2,7 +2,7 @@
 export interface AppError {
   code: string;
   message: string;
-  details?: any;
+  details?: unknown;
   timestamp: string;
 }
 
@@ -24,7 +24,7 @@ export class AppErrorHandler {
   }
 
   // Criar erro padronizado
-  createError(code: string, message: string, details?: any): AppError {
+  createError(code: string, message: string, details?: unknown): AppError {
     return {
       code,
       message,
@@ -34,12 +34,14 @@ export class AppErrorHandler {
   }
 
   // Tratar erro de Supabase
-  handleSupabaseError(error: any, context: string): AppError {
+  handleSupabaseError(error: unknown, context: string): AppError {
     let code = 'SUPABASE_ERROR';
     let message = 'Erro no banco de dados';
+    let errorObj: { code: string; message?: string } | undefined;
 
-    if (error?.code) {
-      switch (error.code) {
+    if (error && typeof error === 'object' && 'code' in error) {
+      errorObj = error as { code: string; message?: string };
+      switch (errorObj.code) {
         case '23505':
           code = 'DUPLICATE_KEY';
           message = 'Registro já existe';
@@ -61,16 +63,16 @@ export class AppErrorHandler {
           message = 'Política de segurança bloqueou a operação';
           break;
         default:
-          code = `SUPABASE_${error.code}`;
-          message = error.message || 'Erro desconhecido no banco de dados';
+          code = `SUPABASE_${errorObj.code}`;
+          message = errorObj.message || 'Erro desconhecido no banco de dados';
       }
     }
 
     const appError = this.createError(code, message, {
       context,
       originalError: error,
-      supabaseCode: error?.code,
-      supabaseMessage: error?.message
+      supabaseCode: errorObj?.code,
+      supabaseMessage: errorObj?.message
     });
 
     this.logError(appError);
@@ -78,25 +80,31 @@ export class AppErrorHandler {
   }
 
   // Tratar erro de rede
-  handleNetworkError(error: any, context: string): AppError {
+  handleNetworkError(error: unknown, context: string): AppError {
     let code = 'NETWORK_ERROR';
     let message = 'Erro de conexão';
 
-    if (error?.message?.includes('timeout')) {
-      code = 'TIMEOUT_ERROR';
-      message = 'Tempo limite excedido';
-    } else if (error?.message?.includes('Failed to fetch')) {
-      code = 'CONNECTION_ERROR';
-      message = 'Falha na conexão com o servidor';
-    } else if (error?.status) {
-      code = `HTTP_${error.status}`;
-      message = `Erro HTTP ${error.status}`;
+    if (error && typeof error === 'object' && 'message' in error) {
+      const errorObj = error as { message: string; status?: number };
+      if (errorObj.message?.includes('timeout')) {
+        code = 'TIMEOUT_ERROR';
+        message = 'Tempo limite excedido';
+      } else if (errorObj.message?.includes('Failed to fetch')) {
+        code = 'CONNECTION_ERROR';
+        message = 'Falha na conexão com o servidor';
+      }
+    }
+
+    if (error && typeof error === 'object' && 'status' in error) {
+      const errorObj = error as { status: number };
+      code = `HTTP_${errorObj.status}`;
+      message = `Erro HTTP ${errorObj.status}`;
     }
 
     const appError = this.createError(code, message, {
       context,
       originalError: error,
-      status: error?.status
+      status: error && typeof error === 'object' && 'status' in error ? (error as { status: number }).status : undefined
     });
 
     this.logError(appError);
@@ -115,19 +123,22 @@ export class AppErrorHandler {
   }
 
   // Tratar erro de autenticação
-  handleAuthError(error: any, context: string): AppError {
+  handleAuthError(error: unknown, context: string): AppError {
     let code = 'AUTH_ERROR';
     let message = 'Erro de autenticação';
 
-    if (error?.message?.includes('Invalid login credentials')) {
-      code = 'INVALID_CREDENTIALS';
-      message = 'Credenciais inválidas';
-    } else if (error?.message?.includes('Email not confirmed')) {
-      code = 'EMAIL_NOT_CONFIRMED';
-      message = 'Email não confirmado';
-    } else if (error?.message?.includes('User not found')) {
-      code = 'USER_NOT_FOUND';
-      message = 'Usuário não encontrado';
+    if (error && typeof error === 'object' && 'message' in error) {
+      const errorObj = error as { message: string };
+      if (errorObj.message?.includes('Invalid login credentials')) {
+        code = 'INVALID_CREDENTIALS';
+        message = 'Credenciais inválidas';
+      } else if (errorObj.message?.includes('Email not confirmed')) {
+        code = 'EMAIL_NOT_CONFIRMED';
+        message = 'Email não confirmado';
+      } else if (errorObj.message?.includes('User not found')) {
+        code = 'USER_NOT_FOUND';
+        message = 'Usuário não encontrado';
+      }
     }
 
     const appError = this.createError(code, message, {
@@ -178,18 +189,27 @@ export async function handleAsyncError<T>(
   try {
     const data = await operation();
     return { success: true, data };
-  } catch (error: any) {
+  } catch (error: unknown) {
     let appError: AppError;
 
-    if (error?.code && error?.message) {
+    if (error && typeof error === 'object' && 'code' in error && 'message' in error) {
       // Erro do Supabase
       appError = errorHandler.handleSupabaseError(error, context);
-    } else if (error?.message?.includes('fetch') || error?.message?.includes('network')) {
-      // Erro de rede
-      appError = errorHandler.handleNetworkError(error, context);
+    } else if (error && typeof error === 'object' && 'message' in error) {
+      const errorObj = error as { message: string };
+      if (errorObj.message?.includes('fetch') || errorObj.message?.includes('network')) {
+        // Erro de rede
+        appError = errorHandler.handleNetworkError(error, context);
+      } else {
+        // Erro genérico
+        appError = errorHandler.createError('UNKNOWN_ERROR', errorObj.message || 'Erro desconhecido', {
+          context,
+          originalError: error
+        });
+      }
     } else {
       // Erro genérico
-      appError = errorHandler.createError('UNKNOWN_ERROR', error?.message || 'Erro desconhecido', {
+      appError = errorHandler.createError('UNKNOWN_ERROR', 'Erro desconhecido', {
         context,
         originalError: error
       });

@@ -41,6 +41,19 @@ export function validatePhone(phone: string): ValidationResult {
     errors.push("Telefone deve ter no máximo 11 dígitos");
   }
   
+  // Validação específica para telefones brasileiros
+  if (cleanPhone.length === 11 && !cleanPhone.startsWith('11')) {
+    // Telefone celular com DDD diferente de 11 (SP)
+    if (!cleanPhone.match(/^[1-9][1-9]9[0-9]{8}$/)) {
+      errors.push("Formato de telefone celular inválido");
+    }
+  } else if (cleanPhone.length === 10) {
+    // Telefone fixo
+    if (!cleanPhone.match(/^[1-9][1-9][0-9]{8}$/)) {
+      errors.push("Formato de telefone fixo inválido");
+    }
+  }
+  
   return { isValid: errors.length === 0, errors };
 }
 
@@ -238,7 +251,7 @@ function isValidCNPJ(cnpj: string): boolean {
 }
 
 // Validação combinada para formulários
-export function validateForm(data: Record<string, any>, rules: Record<string, (value: any) => ValidationResult>): ValidationResult {
+export function validateForm(data: Record<string, unknown>, rules: Record<string, (value: unknown) => ValidationResult>): ValidationResult {
   const allErrors: string[] = [];
   let isValid = true;
   

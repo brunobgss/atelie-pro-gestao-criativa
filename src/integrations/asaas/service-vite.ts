@@ -27,7 +27,7 @@ if (!ASAAS_API_KEY) {
 }
 
 class ASAASService {
-  private async makeRequest(endpoint: string, data: any) {
+  private async makeRequest(endpoint: string, data: unknown) {
     console.log(`🔄 ASAAS Request: ${endpoint}`, data);
 
     // Usar nossa API intermediária local

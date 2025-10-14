@@ -204,7 +204,7 @@ export default function PedidoDetalhe() {
       } as OrderItem;
     }
     return null;
-  }, [orderDb, id, forceUpdate]);
+  }, [orderDb, forceUpdate]);
 
   // Função para determinar o status de pagamento
   const getPaymentStatus = () => {

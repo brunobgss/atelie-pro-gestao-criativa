@@ -74,7 +74,7 @@ export async function getOrderByCode(code: string): Promise<OrderRow | null> {
     
     console.log("Pedido encontrado:", data);
     return data as OrderRow;
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("Erro ao buscar pedido:", e);
     return null;
   }
@@ -125,7 +125,7 @@ export async function createOrder(input: {
 
     console.log("Pedido criado com sucesso:", data);
     return { ok: true, id: data.id };
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("Erro ao criar pedido:", e);
     return { ok: false, error: e.message };
   }
@@ -149,7 +149,7 @@ export async function updateOrderStatus(
     }
     
     // Preparar dados para atualização
-    const updateData: any = {
+    const updateData: unknown = {
       updated_at: new Date().toISOString()
     };
     
@@ -186,7 +186,7 @@ export async function updateOrderStatus(
     
     console.log("Pedido atualizado com sucesso:", data);
     return { ok: true, data: data as OrderRow };
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("Erro ao atualizar pedido:", e);
     return { ok: false, error: e.message };
   }
@@ -245,7 +245,7 @@ export async function updateOrder(
     
     console.log("Pedido atualizado com sucesso:", data);
     return { ok: true, data: data as OrderRow };
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("Erro ao atualizar pedido:", e);
     return { ok: false, error: e.message };
   }

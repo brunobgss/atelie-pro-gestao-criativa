@@ -146,7 +146,7 @@ export default function OrcamentoImpressao() {
                     date: String(quote?.date || new Date().toISOString().split('T')[0])
                   };
 
-                  const safeItems = (items || []).map((item: any, index: number) => ({
+                  const safeItems = (items || []).map((item: unknown, index: number) => ({
                     index: index + 1,
                     description: String(item?.description || 'Produto personalizado'),
                     quantity: Number(item?.quantity || 1),
@@ -480,7 +480,7 @@ export default function OrcamentoImpressao() {
                     </tr>
                   </thead>
                   <tbody>
-                    {items.map((item: any, index: number) => (
+                    {items.map((item: unknown, index: number) => (
                       <tr key={item.id || index}>
                         <td className="border border-gray-300 px-3 py-2 text-center font-medium">{index + 1}</td>
                         <td className="border border-gray-300 px-3 py-2">{item.description || 'Produto personalizado'}</td>

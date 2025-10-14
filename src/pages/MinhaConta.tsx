@@ -54,13 +54,13 @@ export default function MinhaConta() {
   const handleSave = async () => {
     // Validação robusta
     const validation = validateForm(
-      { 
-        nome: formData.nome, 
-        email: formData.email, 
+      {
+        nome: formData.nome,
+        email: formData.email,
         telefone: formData.telefone, 
         cpf_cnpj: formData.cpf_cnpj,
-        responsavel: formData.responsavel,
-        endereco: formData.endereco
+        responsavel: formData.responsavel
+        // endereco: formData.endereco // Campo removido - coluna não existe na tabela
       },
       {
         nome: validateName,
@@ -68,7 +68,7 @@ export default function MinhaConta() {
         telefone: validatePhone,
         cpf_cnpj: validateCpfCnpj,
         responsavel: (value) => value ? validateName(value) : { isValid: true, errors: [] },
-        endereco: (value) => value ? { isValid: true, errors: [] } : { isValid: true, errors: [] }
+        // endereco: (value) => value ? { isValid: true, errors: [] } : { isValid: true, errors: [] } // Campo removido
       }
     );
     
@@ -92,7 +92,7 @@ export default function MinhaConta() {
               nome: formData.nome,
               email: formData.email,
               telefone: formData.telefone,
-              endereco: formData.endereco,
+              // endereco: formData.endereco, // Campo removido - coluna não existe na tabela
               responsavel: formData.responsavel,
               cpf_cnpj: formData.cpf_cnpj,
               updated_at: new Date().toISOString()
@@ -120,7 +120,7 @@ export default function MinhaConta() {
       invalidateRelated('empresas');
       // Refetch automático
       queryClient.refetchQueries({ queryKey: ["empresa"] });
-    } catch (error: any) {
+    } catch (error: unknown) {
       const appError = errorHandler.handleSupabaseError(error, 'updateCompanyData');
       logger.error('Falha ao atualizar dados da empresa', 'MINHA_CONTA', { 
         companyId: empresa?.id, 

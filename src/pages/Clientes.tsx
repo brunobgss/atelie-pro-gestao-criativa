@@ -22,7 +22,7 @@ export default function Clientes() {
   const { syncAfterCreate, syncAfterUpdate, syncAfterDelete, syncWithToast } = useSyncOperations();
   const [searchTerm, setSearchTerm] = useState("");
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [editingClient, setEditingClient] = useState<any>(null);
+  const [editingClient, setEditingClient] = useState<unknown>(null);
   const [editForm, setEditForm] = useState({
     name: "",
     phone: "",
@@ -30,7 +30,7 @@ export default function Clientes() {
     address: ""
   });
 
-  const handleEditClient = (client: any) => {
+  const handleEditClient = (client: unknown) => {
     setEditingClient(client);
     setEditForm({
       name: client.name || "",
@@ -75,7 +75,7 @@ export default function Clientes() {
       }
       
       // Preparar dados para atualização
-      const updateData: any = {
+      const updateData: unknown = {
         name: editForm.name.trim(),
         phone: editForm.phone.trim()
       };
@@ -105,7 +105,7 @@ export default function Clientes() {
     }
   };
 
-  const handleDeleteClient = async (client: any) => {
+  const handleDeleteClient = async (client: unknown) => {
     if (confirm(`Tem certeza que deseja excluir "${client.name}"?`)) {
       // Se for um cliente de demonstração, simular exclusão
       if (client.id.startsWith('demo-')) {

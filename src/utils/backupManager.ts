@@ -251,9 +251,9 @@ export class BackupManager {
   }
 
   // Funções privadas
-  private async collectAllData(): Promise<any> {
+  private async collectAllData(): Promise<unknown> {
     // Coletar todos os dados do localStorage e sessionStorage
-    const data: any = {
+    const data: unknown = {
       localStorage: {},
       sessionStorage: {},
       timestamp: new Date().toISOString()
@@ -278,13 +278,13 @@ export class BackupManager {
     return data;
   }
 
-  private async collectChangedData(since: string): Promise<any> {
+  private async collectChangedData(since: string): Promise<unknown> {
     // Implementação básica - em produção, comparar timestamps dos dados
     const data = await this.collectAllData();
     return data;
   }
 
-  private async restoreData(data: any): Promise<void> {
+  private async restoreData(data: unknown): Promise<void> {
     // Restaurar localStorage
     if (data.localStorage) {
       for (const [key, value] of Object.entries(data.localStorage)) {
@@ -304,11 +304,11 @@ export class BackupManager {
     return `backup-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  private calculateDataSize(data: any): number {
+  private calculateDataSize(data: unknown): number {
     return JSON.stringify(data).length;
   }
 
-  private calculateChecksum(data: any): string {
+  private calculateChecksum(data: unknown): string {
     // Implementação simples de checksum
     const str = JSON.stringify(data);
     let hash = 0;
@@ -320,7 +320,7 @@ export class BackupManager {
     return hash.toString(36);
   }
 
-  private encryptData(data: any): any {
+  private encryptData(data: unknown): any {
     // Implementação simples de criptografia
     const str = JSON.stringify(data);
     let encrypted = '';
@@ -331,7 +331,7 @@ export class BackupManager {
     return btoa(encrypted);
   }
 
-  private decryptData(encryptedData: any): any {
+  private decryptData(encryptedData: unknown): any {
     try {
       const str = atob(encryptedData);
       let decrypted = '';

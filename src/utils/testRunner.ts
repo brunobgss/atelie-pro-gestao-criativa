@@ -16,7 +16,7 @@ export interface TestResult {
   status: 'passed' | 'failed' | 'skipped' | 'timeout';
   duration: number;
   error?: string;
-  metadata?: any;
+  metadata?: unknown;
   timestamp: string;
 }
 
@@ -141,7 +141,7 @@ export class TestRunner {
         this.results.push(testResult);
         return testResult;
 
-      } catch (error: any) {
+      } catch (error: unknown) {
         lastError = error;
         
         if (attempt < retries) {

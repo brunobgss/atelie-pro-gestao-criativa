@@ -7,7 +7,7 @@ const STORAGE_KEY_USER = 'atelie-pro-user-id';
 
 export interface TrialData {
   trialEndDate: string;
-  empresaData: any;
+  empresaData: unknown;
   userId: string;
 }
 

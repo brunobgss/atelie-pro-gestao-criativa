@@ -23,7 +23,7 @@ interface Plan {
   discount?: string;
   features: string[];
   popular?: boolean;
-  icon: any;
+  icon: React.ComponentType<{ className?: string }>;
   color: string;
 }
 
@@ -188,7 +188,7 @@ export default function Assinatura() {
         toast.error(appError.message);
       }
       
-    } catch (error: any) {
+    } catch (error: unknown) {
       const appError = errorHandler.handleSupabaseError(error, 'createSubscription');
       logger.error('Erro ao processar assinatura', 'ASSINATURA', { 
         planType: pendingPlanId, 

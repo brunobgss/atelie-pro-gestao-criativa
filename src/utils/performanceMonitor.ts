@@ -4,7 +4,7 @@ export interface PerformanceMetric {
   duration: number;
   timestamp: string;
   context: string;
-  metadata?: any;
+  metadata?: unknown;
 }
 
 export interface PerformanceStats {
@@ -35,7 +35,7 @@ export class PerformanceMonitor {
     name: string,
     operation: () => Promise<T>,
     context: string,
-    metadata?: any
+    metadata?: unknown 
   ): Promise<T> {
     const startTime = performance.now();
     
@@ -64,7 +64,7 @@ export class PerformanceMonitor {
     name: string,
     operation: () => T,
     context: string,
-    metadata?: any
+    metadata?: unknown 
   ): T {
     const startTime = performance.now();
     
@@ -89,7 +89,7 @@ export class PerformanceMonitor {
   }
 
   // Registrar métrica
-  private recordMetric(name: string, duration: number, context: string, metadata?: any): void {
+  private recordMetric(name: string, duration: number, context: string, metadata?: unknown): void {
     const metric: PerformanceMetric = {
       name,
       duration,
@@ -282,11 +282,11 @@ export class PerformanceMonitor {
 export const performanceMonitor = PerformanceMonitor.getInstance();
 
 // Decorator para medir performance automaticamente
-export function measurePerformance(name: string, context: string, metadata?: any) {
-  return function (target: any, propertyName: string, descriptor: PropertyDescriptor) {
+export function measurePerformance(name: string, context: string, metadata?: unknown) {
+  return function (target: unknown, propertyName: string, descriptor: PropertyDescriptor) {
     const method = descriptor.value;
 
-    descriptor.value = async function (...args: any[]) {
+    descriptor.value = async function (...args: unknown[]) {
       return performanceMonitor.measure(name, () => method.apply(this, args), context, metadata);
     };
 
@@ -299,7 +299,7 @@ export async function measure<T>(
   name: string,
   operation: () => Promise<T>,
   context: string,
-  metadata?: any
+  metadata?: unknown 
 ): Promise<T> {
   return performanceMonitor.measure(name, operation, context, metadata);
 }
@@ -309,7 +309,7 @@ export function measureSync<T>(
   name: string,
   operation: () => T,
   context: string,
-  metadata?: any
+  metadata?: unknown 
 ): T {
   return performanceMonitor.measureSync(name, operation, context, metadata);
 }

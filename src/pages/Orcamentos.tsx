@@ -100,7 +100,7 @@ export default function Orcamentos() {
     window.open(url, "_blank");
   };
 
-  const openWhatsApp = async (quote: any) => {
+  const openWhatsApp = async (quote: unknown) => {
     try {
       console.log("Iniciando envio WhatsApp para orçamento:", quote.id);
       
@@ -172,7 +172,7 @@ ${empresa?.nome || 'Ateliê'}`;
     navigate(`/orcamentos/editar/${quoteId}`);
   };
 
-  const handleApproveQuote = async (quote: any) => {
+  const handleApproveQuote = async (quote: unknown) => {
     try {
       console.log("Iniciando aprovação do orçamento:", quote);
       

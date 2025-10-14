@@ -199,7 +199,7 @@ export default function NovoPedido() {
     }
 
     // Usar arquivo já carregado se disponível
-    let file_url: string | undefined = uploadedFileUrl || undefined;
+    const file_url: string | undefined = uploadedFileUrl || undefined;
 
     // Montar descrição com informações do kit ou quantidade simples
     let finalDescription = description;

@@ -47,7 +47,7 @@ export default function Pedidos() {
     }
   };
 
-  const duplicateOrder = (order: any) => {
+  const duplicateOrder = (order: unknown) => {
     // Armazenar dados do pedido para duplicação
     const orderData = {
       client: order.client,

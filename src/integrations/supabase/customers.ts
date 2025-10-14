@@ -43,7 +43,7 @@ export async function createCustomer(input: { name: string; phone?: string; emai
     
     console.log("✅ Cliente criado com sucesso:", data.id);
     return { ok: true, id: data?.id, data: data };
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("❌ Erro na função createCustomer:", e);
     return { ok: false, error: e?.message ?? "Erro ao criar cliente" };
   }
@@ -72,7 +72,7 @@ export async function updateCustomer(id: string, input: { name?: string; phone?:
     
     console.log("✅ Cliente encontrado:", existingCustomer.name);
     
-    const updateData: any = {};
+    const updateData: unknown = {};
     if (input.name !== undefined) updateData.name = input.name;
     if (input.phone !== undefined) updateData.phone = input.phone;
     if (input.email !== undefined) updateData.email = input.email;
@@ -110,7 +110,7 @@ export async function updateCustomer(id: string, input: { name?: string; phone?:
     
     console.log("✅ Cliente atualizado com sucesso:", data[0]);
     return { ok: true, data: data[0] as CustomerRow };
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("❌ Erro na função updateCustomer:", e);
     return { ok: false, error: e?.message ?? "Erro ao atualizar cliente" };
   }
@@ -124,7 +124,7 @@ export async function deleteCustomer(id: string): Promise<{ ok: boolean; error?:
       .eq("id", id);
     if (error) throw error;
     return { ok: true };
-  } catch (e: any) {
+  } catch (e: unknown) {
     return { ok: false, error: e?.message ?? "Erro ao excluir cliente" };
   }
 }

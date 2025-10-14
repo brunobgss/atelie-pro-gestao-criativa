@@ -33,7 +33,7 @@ export async function listInventory(): Promise<InventoryRow[]> {
 
 export async function updateInventoryItem(id: string, input: { name?: string; quantity?: number; unit?: string; min_quantity?: number }): Promise<{ ok: boolean; data?: InventoryRow; error?: string }> {
   try {
-    const updateData: any = {};
+    const updateData: unknown = {};
     if (input.name !== undefined) updateData.name = input.name;
     if (input.quantity !== undefined) updateData.quantity = input.quantity;
     if (input.unit !== undefined) updateData.unit = input.unit;
@@ -48,7 +48,7 @@ export async function updateInventoryItem(id: string, input: { name?: string; qu
     
     if (error) throw error;
     return { ok: true, data: data as InventoryRow };
-  } catch (e: any) {
+  } catch (e: unknown) {
     return { ok: false, error: e?.message ?? "Erro ao atualizar item do estoque" };
   }
 }
@@ -67,7 +67,7 @@ export type ProductRow = {
 export async function saveProduct(productData: {
   name: string;
   type: string;
-  materials: any;
+  materials: unknown;
   workHours: number;
   unitPrice: number;
   profitMargin: number;
@@ -96,7 +96,7 @@ export async function saveProduct(productData: {
     
     console.log("✅ Produto salvo com sucesso:", data);
     return { ok: true, id: data?.id };
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("❌ Erro na função saveProduct:", e);
     return { ok: false, error: e?.message ?? "Erro ao salvar produto" };
   }
@@ -118,7 +118,7 @@ export async function getProducts(): Promise<ProductRow[]> {
     
     console.log("✅ Produtos encontrados:", data?.length || 0);
     return (data ?? []) as ProductRow[];
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error("❌ Erro na função getProducts:", e);
     return [];
   }

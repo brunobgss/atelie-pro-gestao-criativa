@@ -69,7 +69,7 @@ export default function CatalogoProdutos() {
               basePrice: product.unit_price || 0,
               estimatedTime: product.work_hours || 0,
               materials: Array.isArray(product.materials) 
-                ? product.materials.map((mat: any) => {
+                ? product.materials.map((mat: unknown) => {
                     if (typeof mat === 'string') return mat;
                     if (typeof mat === 'object' && mat.name) return mat.name;
                     return 'Material';
