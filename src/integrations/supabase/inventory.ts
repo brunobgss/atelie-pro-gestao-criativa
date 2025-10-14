@@ -48,16 +48,20 @@ export async function updateInventoryItem(id: string, input: { name?: string; qu
       .from("inventory_items")
       .update(updateData)
       .eq("id", id)
-      .select("*")
-      .single();
+      .select("*");
     
     if (error) {
       console.error("❌ Erro do Supabase:", error);
       throw error;
     }
     
-    console.log("✅ Item atualizado com sucesso:", data);
-    return { ok: true, data: data as InventoryRow };
+    if (!data || data.length === 0) {
+      console.error("❌ Nenhum item encontrado para atualizar");
+      return { ok: false, error: "Item não encontrado" };
+    }
+    
+    console.log("✅ Item atualizado com sucesso:", data[0]);
+    return { ok: true, data: data[0] as InventoryRow };
   } catch (e: unknown) {
     console.error("❌ Erro na atualização:", e);
     return { ok: false, error: e?.message ?? "Erro ao atualizar item do estoque" };

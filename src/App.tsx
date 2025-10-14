@@ -21,7 +21,7 @@ import EditarPedido from "./pages/EditarPedido";
 import PedidoDetalhe from "./pages/PedidoDetalhe";
 import Orcamentos from "./pages/Orcamentos";
 import NovoOrcamento from "./pages/NovoOrcamento";
-import OrcamentoImpressao from "./pages/OrcamentoImpressao";
+import OrcamentoImpressaoNovo from "./pages/OrcamentoImpressaoNovo";
 import Clientes from "./pages/Clientes";
 import Estoque from "./pages/Estoque";
 import CatalogoProdutos from "./pages/CatalogoProdutos";
@@ -56,7 +56,7 @@ function App() {
                 <Route path="/login" element={<Login />} />
                 <Route path="/cadastro" element={<Cadastro />} />
                 <Route path="/orcamento/:id" element={<OrcamentoPublico />} />
-                <Route path="/orcamentos/:id/impressao" element={<OrcamentoImpressao />} />
+                <Route path="/orcamentos/:id/impressao" element={<OrcamentoImpressaoNovo />} />
                 
                 {/* Rotas protegidas com Layout */}
                 <Route path="/" element={<Layout />}>

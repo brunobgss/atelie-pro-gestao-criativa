@@ -178,10 +178,19 @@ export default function OrcamentoImpressao() {
             <div className="flex items-center gap-3">
             <Button
               onClick={() => {
-                  console.log("=== INICIANDO IMPRESSÃO ===");
-                  console.log("Usando dados já serializados:", { safeQuote, safeItems });
+                  console.log("=== GERANDO PDF ORÇAMENTO ===");
+                  console.log("Safe Quote:", safeQuote);
+                  console.log("Safe Items:", safeItems);
 
-                  // Gerar HTML do PDF
+                  // Função formatCurrency segura
+                  const formatCurrency = (value: number) => {
+                    return new Intl.NumberFormat('pt-BR', {
+                      style: 'currency',
+                      currency: 'BRL'
+                    }).format(value);
+                  };
+
+                  // Gerar HTML completo do PDF
                   const pdfHtml = `
                     <!DOCTYPE html>
                     <html>
