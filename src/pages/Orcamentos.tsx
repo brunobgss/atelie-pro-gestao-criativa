@@ -224,15 +224,16 @@ ${empresa?.nome || 'Ateliê'}`;
       console.log("Orçamento inválido:", quote);
       return false;
     }
-    // Validação mais flexível - apenas verificar se tem ID e cliente
-    const isValid = quote.id && quote.client;
+    // Validação mais flexível - apenas verificar se tem ID ou código
+    const isValid = quote.id || quote.code;
     if (!isValid) {
       console.log("Orçamento não passou na validação:", quote);
     }
     return isValid;
   }) : [];
-  
+
   console.log("Orçamentos após filtro:", safeQuotes.length, "de", quotes.length);
+  console.log("Orçamentos válidos:", safeQuotes);
 
   // Se houver erro, mostrar mensagem
   if (error) {
