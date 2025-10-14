@@ -55,7 +55,8 @@ function App() {
                 <Route path="/login" element={<Login />} />
                 <Route path="/cadastro" element={<Cadastro />} />
                 <Route path="/orcamento/:id" element={<OrcamentoPublico />} />
-                <Route path="/orcamentos/:id/impressao" element={<div style={{padding: "20px", backgroundColor: "red", color: "white"}}><h1>TESTE DIRETO</h1><p>Rota funcionando!</p></div>} />
+                <Route path="/teste-impressao" element={<div style={{padding: "20px", backgroundColor: "red", color: "white"}}><h1>TESTE SIMPLES</h1><p>Se você vê isso, as rotas funcionam!</p></div>} />
+                <Route path="/orcamentos/:id/impressao" element={<div style={{padding: "20px", backgroundColor: "blue", color: "white"}}><h1>IMPRESSÃO FUNCIONANDO</h1><p>Rota de impressão ativa!</p></div>} />
                 
                 {/* Rotas protegidas com Layout */}
                 <Route path="/" element={<Layout />}>

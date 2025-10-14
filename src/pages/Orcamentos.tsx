@@ -337,7 +337,7 @@ ${empresa?.nome || 'Ateliê'}`;
                         variant="outline"
                         size="sm"
                         className="border-border"
-                        onClick={() => navigate(`/orcamentos/imprimir/${quote.id}`)}
+                        onClick={() => navigate(`/orcamentos/${quote.id}/impressao`)}
                       >
                         <Printer className="w-4 h-4 mr-2" />
                         Imprimir
