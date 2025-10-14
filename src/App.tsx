@@ -21,6 +21,7 @@ import PedidoDetalhe from "./pages/PedidoDetalhe";
 import Orcamentos from "./pages/Orcamentos";
 import NovoOrcamento from "./pages/NovoOrcamento";
 import OrcamentoImpressao from "./pages/OrcamentoImpressao";
+import OrcamentoImpressaoTeste from "./pages/OrcamentoImpressaoTeste";
 import Clientes from "./pages/Clientes";
 import Estoque from "./pages/Estoque";
 import CatalogoProdutos from "./pages/CatalogoProdutos";
@@ -63,7 +64,7 @@ function App() {
                   <Route path="pedidos/:id" element={<PedidoDetalhe />} />
                   <Route path="orcamentos" element={<Orcamentos />} />
                   <Route path="orcamentos/novo" element={<NovoOrcamento />} />
-                  <Route path="orcamentos/:id/impressao" element={<OrcamentoImpressao />} />
+                  <Route path="orcamentos/:id/impressao" element={<OrcamentoImpressaoTeste />} />
                   <Route path="clientes" element={<Clientes />} />
                   <Route path="estoque" element={<Estoque />} />
                   <Route path="catalogo" element={<CatalogoProdutos />} />
