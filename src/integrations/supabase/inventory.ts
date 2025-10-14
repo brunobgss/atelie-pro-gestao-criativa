@@ -64,20 +64,27 @@ export async function updateInventoryItem(id: string, input: { name?: string; qu
     
     console.log("📝 Dados para atualização:", updateData);
     
-    // Primeiro, listar todos os itens para debug
-    console.log("🔍 DEBUG: Listando todos os itens do estoque...");
-    const { data: allItems, error: listError } = await supabase
+    // Primeiro, verificar se o item existe especificamente
+    console.log("🔍 DEBUG: Verificando se item existe...");
+    const { data: existingItem, error: checkError } = await supabase
       .from("inventory_items")
-      .select("id, name");
+      .select("id, name, quantity, unit, min_quantity")
+      .eq("id", normalizedId)
+      .single();
     
-    if (listError) {
-      console.error("❌ Erro ao listar itens:", listError);
-    } else {
-      console.log("📋 Todos os itens encontrados:", allItems);
-      console.log("🔍 Procurando ID:", normalizedId);
-      const foundItem = allItems?.find(item => item.id === normalizedId);
-      console.log("🎯 Item encontrado na lista:", foundItem);
+    console.log("🔍 Resultado da verificação:", { existingItem, checkError });
+    
+    if (checkError) {
+      console.error("❌ Erro ao verificar item:", checkError);
+      return { ok: false, error: `Item não encontrado: ${checkError.message}` };
     }
+    
+    if (!existingItem) {
+      console.error("❌ Item não existe no banco de dados");
+      return { ok: false, error: "Item não encontrado no banco de dados" };
+    }
+    
+    console.log("✅ Item encontrado, prosseguindo com atualização...");
     
     // Atualizar diretamente
     console.log("🔄 Executando atualização direta...");
