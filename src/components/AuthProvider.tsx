@@ -97,7 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       subscription.unsubscribe();
       if (intervalId) clearInterval(intervalId);
     };
-  }, [empresa, fetchEmpresa]);
+  }, []);
 
   const fetchEmpresa = useCallback(async (userId: string) => {
     try {
@@ -200,7 +200,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false);
     }
-  }, [empresa]);
+  }, []);
 
   const signOut = async () => {
     try {
