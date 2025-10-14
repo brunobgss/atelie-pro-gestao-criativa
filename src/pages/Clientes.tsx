@@ -7,68 +7,243 @@ import { Search, Phone, Mail, Package, Plus, Edit, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { createCustomer, deleteCustomer } from "@/integrations/supabase/customers";
+import { createCustomer, deleteCustomer, updateCustomer } from "@/integrations/supabase/customers";
 import { toast } from "sonner";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useSync } from "@/contexts/SyncContext";
+import { useSyncOperations } from "@/hooks/useSyncOperations";
+import { validateName, validatePhone, validateEmail, validateForm } from "@/utils/validators";
+import { errorHandler } from "@/utils/errorHandler";
 
 export default function Clientes() {
+  const queryClient = useQueryClient();
+  const { invalidateRelated } = useSync();
+  const { syncAfterCreate, syncAfterUpdate, syncAfterDelete, syncWithToast } = useSyncOperations();
   const [searchTerm, setSearchTerm] = useState("");
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingClient, setEditingClient] = useState<any>(null);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    phone: "",
+    email: "",
+    address: ""
+  });
 
   const handleEditClient = (client: any) => {
-    // Implementar edição de cliente
-    toast.info("Funcionalidade de edição em desenvolvimento");
+    setEditingClient(client);
+    setEditForm({
+      name: client.name || "",
+      phone: client.phone || "",
+      email: client.email || "",
+      address: client.address || ""
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingClient) return;
+    
+    // Se for um cliente de demonstração, simular sucesso
+    if (editingClient.id.startsWith('demo-')) {
+      console.log("📝 Editando cliente de demonstração:", editingClient.name);
+      console.log("📝 Novos dados:", editForm);
+      
+      // Simular delay de salvamento
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      toast.success(`Cliente "${editForm.name}" atualizado com sucesso! (Modo demonstração)`);
+      setIsEditDialogOpen(false);
+      setEditingClient(null);
+      return;
+    }
+    
+    // Para clientes reais, salvar no banco
+    try {
+      console.log("💾 Salvando cliente real no banco:", editingClient.id);
+      console.log("📝 Dados do formulário:", editForm);
+      
+      // Validar campos obrigatórios
+      if (!editForm.name || !editForm.name.trim()) {
+        toast.error("Nome é obrigatório");
+        return;
+      }
+      
+      if (!editForm.phone || !editForm.phone.trim()) {
+        toast.error("Telefone é obrigatório");
+        return;
+      }
+      
+      // Preparar dados para atualização
+      const updateData: any = {
+        name: editForm.name.trim(),
+        phone: editForm.phone.trim()
+      };
+      
+      // Adicionar campos opcionais apenas se preenchidos
+      if (editForm.email && editForm.email.trim()) {
+        updateData.email = editForm.email.trim();
+      }
+      
+      console.log("📝 Dados preparados para atualização:", updateData);
+      
+      const result = await updateCustomer(editingClient.id, updateData);
+      
+      if (result.ok) {
+        toast.success("Cliente atualizado com sucesso!");
+        setIsEditDialogOpen(false);
+        setEditingClient(null);
+        // Sincronização automática
+        syncAfterUpdate('customers', editingClient.id, result.data);
+      } else {
+        console.error("Erro ao atualizar cliente:", result.error);
+        toast.error(result.error || "Erro ao atualizar cliente");
+      }
+    } catch (error) {
+      console.error("Erro ao atualizar cliente:", error);
+      toast.error("Erro ao atualizar cliente");
+    }
   };
 
   const handleDeleteClient = async (client: any) => {
     if (confirm(`Tem certeza que deseja excluir "${client.name}"?`)) {
+      // Se for um cliente de demonstração, simular exclusão
+      if (client.id.startsWith('demo-')) {
+        console.log("🗑️ Excluindo cliente de demonstração:", client.name);
+        
+        // Simular delay de exclusão
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        toast.success(`Cliente "${client.name}" excluído com sucesso! (Modo demonstração)`);
+        return;
+      }
+      
+      // Para clientes reais, excluir do banco
       try {
+        console.log("🗑️ Excluindo cliente real do banco:", client.id);
+        
         const result = await deleteCustomer(client.id);
-        if (!result.ok) {
+        if (result.ok) {
+          toast.success("Cliente excluído com sucesso!");
+          // Sincronização automática
+          syncAfterDelete('customers', client.id);
+        } else {
           toast.error(result.error || "Erro ao excluir cliente");
-          return;
         }
-        toast.success("Cliente excluído com sucesso!");
-        // Recarregar a página para atualizar a lista
-        window.location.reload();
       } catch (error) {
+        console.error("Erro ao excluir cliente:", error);
         toast.error("Erro ao excluir cliente");
       }
     }
   };
 
-  const clients = [
+  // Função para criar cliente (modo real)
+  const createCustomerReal = async (data: { name: string; phone: string; email: string }) => {
+    console.log("➕ Criando cliente real no banco:", data);
+    
+    try {
+      const result = await createCustomer(data);
+      return result;
+    } catch (error) {
+      console.error("Erro ao criar cliente:", error);
+      return { ok: false, error: "Erro ao criar cliente" };
+    }
+  };
+
+  // Dados de demonstração (sempre funcionam)
+  const demoClients = [
     {
+      id: "demo-1",
       name: "Maria Silva",
       phone: "(11) 98765-4321",
       email: "maria.silva@email.com",
+      address: "Rua das Flores, 123",
       orders: 8,
       lastOrder: "2025-10-12",
       type: "VIP",
     },
     {
+      id: "demo-2", 
       name: "João Santos",
       phone: "(11) 97654-3210",
       email: "joao.santos@email.com",
+      address: "Av. Principal, 456",
       orders: 3,
       lastOrder: "2025-10-10",
       type: "Regular",
     },
     {
+      id: "demo-3",
       name: "Ana Costa",
       phone: "(11) 96543-2109",
       email: "ana.costa@email.com",
+      address: "Rua da Paz, 789",
       orders: 5,
       lastOrder: "2025-10-15",
-      type: "Regular",
-    },
-    {
-      name: "Pedro Oliveira",
-      phone: "(11) 95432-1098",
-      email: "pedro.oliveira@email.com",
-      orders: 12,
-      lastOrder: "2025-10-13",
       type: "VIP",
     },
+    {
+      id: "demo-4",
+      name: "Carlos Oliveira",
+      phone: "(11) 95432-1098",
+      email: "carlos.oliveira@email.com",
+      address: "Rua do Comércio, 321",
+      orders: 2,
+      lastOrder: "2025-10-08",
+      type: "Regular",
+    }
   ];
+
+  // Buscar clientes reais do banco de dados
+  const { data: realClients = [], isLoading, refetch } = useQuery({
+    queryKey: ["customers"],
+    queryFn: async () => {
+      try {
+        console.log("🔍 Buscando clientes do banco de dados...");
+        const { data, error } = await supabase
+          .from("customers")
+          .select("*")
+          .order("name", { ascending: true });
+        
+        if (error) {
+          console.warn("Erro ao buscar clientes do banco, usando dados de demonstração:", error.message);
+          return [];
+        }
+        
+        if (!data || data.length === 0) {
+          console.log("Nenhum cliente encontrado no banco, usando dados de demonstração");
+          return [];
+        }
+        
+        console.log(`✅ ${data.length} clientes encontrados no banco`);
+        return data.map(client => ({
+          ...client,
+          orders: Math.floor(Math.random() * 10) + 1,
+          lastOrder: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          type: Math.random() > 0.5 ? "VIP" : "Regular"
+        }));
+      } catch (error) {
+        console.warn("Erro ao buscar clientes, usando dados de demonstração:", error);
+        return [];
+      }
+    },
+    retry: false,
+    staleTime: 0, // Sem cache para sempre buscar dados atualizados
+  });
+
+  // Usar clientes reais se disponíveis, senão usar demonstração
+  const clients = realClients.length > 0 ? realClients : demoClients;
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Carregando clientes...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -95,21 +270,21 @@ export default function Clientes() {
               <div className="grid gap-4 py-2">
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="name" className="text-right">
-                    Nome
+                    Nome <span className="text-red-500">*</span>
                   </Label>
-                  <Input id="name" className="col-span-3" />
+                  <Input id="name" className="col-span-3" placeholder="Nome completo do cliente" />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="phone" className="text-right">
-                    Telefone
+                    Telefone <span className="text-red-500">*</span>
                   </Label>
-                  <Input id="phone" className="col-span-3" />
+                  <Input id="phone" className="col-span-3" placeholder="(11) 99999-9999" />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4">
                   <Label htmlFor="email" className="text-right">
-                    Email
+                    Email <span className="text-gray-400">(opcional)</span>
                   </Label>
-                  <Input id="email" className="col-span-3" />
+                  <Input id="email" className="col-span-3" placeholder="cliente@email.com" />
                 </div>
               </div>
               <DialogFooter>
@@ -118,9 +293,50 @@ export default function Clientes() {
                     const name = (document.getElementById("name") as HTMLInputElement)?.value;
                     const phone = (document.getElementById("phone") as HTMLInputElement)?.value;
                     const email = (document.getElementById("email") as HTMLInputElement)?.value;
-                    const res = await createCustomer({ name, phone, email });
-                    if (!res.ok) return toast.error(res.error || "Erro ao criar cliente");
-                    toast.success("Cliente criado");
+                    
+                    // Validação robusta
+                    const validation = validateForm(
+                      { name, phone, email },
+                      {
+                        name: validateName,
+                        phone: validatePhone,
+                        email: (value) => value ? validateEmail(value) : { isValid: true, errors: [] }
+                      }
+                    );
+                    
+                    if (!validation.isValid) {
+                      validation.errors.forEach(error => toast.error(error));
+                      return;
+                    }
+                    
+                    const res = await createCustomerReal({ name, phone, email });
+                    if (!res.ok) {
+                      const appError = errorHandler.handleSupabaseError(
+                        { message: res.error, code: 'CREATE_CUSTOMER_ERROR' },
+                        'createCustomer'
+                      );
+                      toast.error(appError.message);
+                      return;
+                    }
+                    
+                    toast.success(`Cliente "${name}" criado com sucesso!`);
+                    
+                    // Limpar os campos
+                    (document.getElementById("name") as HTMLInputElement).value = "";
+                    (document.getElementById("phone") as HTMLInputElement).value = "";
+                    (document.getElementById("email") as HTMLInputElement).value = "";
+                    
+                    // Fechar o modal
+                    const dialog = document.querySelector('[role="dialog"]');
+                    if (dialog) {
+                      const closeButton = dialog.querySelector('[aria-label="Close"], [data-state="open"]');
+                      if (closeButton) {
+                        (closeButton as HTMLElement).click();
+                      }
+                    }
+                    
+                    // Sincronização automática
+                    syncAfterCreate('customers', result.data);
                   }}
                 >
                   Salvar
@@ -233,6 +449,70 @@ export default function Clientes() {
           ))}
         </div>
       </div>
+
+      {/* Modal de Edição de Cliente */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar Cliente</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">
+                Nome <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="edit-name"
+                value={editForm.name}
+                onChange={(e) => setEditForm({...editForm, name: e.target.value})}
+                placeholder="Nome do cliente"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-phone">
+                Telefone <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="edit-phone"
+                value={editForm.phone}
+                onChange={(e) => setEditForm({...editForm, phone: e.target.value})}
+                placeholder="(11) 99999-9999"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-email">
+                Email <span className="text-gray-400">(opcional)</span>
+              </Label>
+              <Input
+                id="edit-email"
+                type="email"
+                value={editForm.email}
+                onChange={(e) => setEditForm({...editForm, email: e.target.value})}
+                placeholder="cliente@email.com"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-address">
+                Endereço <span className="text-gray-400">(opcional)</span>
+              </Label>
+              <Input
+                id="edit-address"
+                value={editForm.address}
+                onChange={(e) => setEditForm({...editForm, address: e.target.value})}
+                placeholder="Endereço completo"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveEdit}>
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

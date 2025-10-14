@@ -11,11 +11,15 @@ import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { getOrderByCode, updateOrder } from "@/integrations/supabase/orders";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSync } from "@/contexts/SyncContext";
+import { useSyncOperations } from "@/hooks/useSyncOperations";
 
 export default function EditarPedido() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { invalidateRelated } = useSync();
+  const { syncAfterUpdate } = useSyncOperations();
   
   const [client, setClient] = useState("");
   const [type, setType] = useState("");
@@ -46,8 +50,20 @@ export default function EditarPedido() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!client || !type || !description || value <= 0) {
-      toast.error("Preencha todos os campos obrigatórios");
+    if (!client || !client.trim()) {
+      toast.error("Nome do cliente é obrigatório");
+      return;
+    }
+    if (!type || !type.trim()) {
+      toast.error("Tipo do pedido é obrigatório");
+      return;
+    }
+    if (!description || !description.trim()) {
+      toast.error("Descrição é obrigatória");
+      return;
+    }
+    if (value <= 0) {
+      toast.error("Valor deve ser maior que zero");
       return;
     }
 
@@ -68,9 +84,9 @@ export default function EditarPedido() {
       
       if (result.ok) {
         toast.success("Pedido atualizado com sucesso!");
-        // Invalidar cache para atualizar a lista de pedidos
-        queryClient.invalidateQueries({ queryKey: ["orders"] });
-        queryClient.invalidateQueries({ queryKey: ["order", id] });
+        // Sincronização automática
+        syncAfterUpdate('orders', id!, result.data);
+        invalidateRelated('orders');
         navigate(`/pedidos/${id}`);
       } else {
         toast.error(result.error || "Erro ao atualizar pedido");

@@ -7,6 +7,12 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { useQueryClient } from "@tanstack/react-query";
+import { useSync } from "@/contexts/SyncContext";
+import { validateName, validateEmail, validatePhone, validateCpfCnpj, validateForm } from "@/utils/validators";
+import { errorHandler } from "@/utils/errorHandler";
+import { logger } from "@/utils/logger";
+import { performanceMonitor } from "@/utils/performanceMonitor";
 import { 
   User, 
   Mail, 
@@ -26,6 +32,8 @@ import { toast } from "sonner";
 export default function MinhaConta() {
   const navigate = useNavigate();
   const { empresa, user, logout } = useAuth();
+  const queryClient = useQueryClient();
+  const { invalidateRelated } = useSync();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     nome: empresa?.nome || "",
@@ -33,6 +41,7 @@ export default function MinhaConta() {
     telefone: empresa?.telefone || "",
     endereco: empresa?.endereco || "",
     responsavel: empresa?.responsavel || "",
+    cpf_cnpj: empresa?.cpf_cnpj || "",
   });
 
   const handleInputChange = (field: string, value: string) => {
@@ -43,12 +52,81 @@ export default function MinhaConta() {
   };
 
   const handleSave = async () => {
+    // Validação robusta
+    const validation = validateForm(
+      { 
+        nome: formData.nome, 
+        email: formData.email, 
+        telefone: formData.telefone, 
+        cpf_cnpj: formData.cpf_cnpj,
+        responsavel: formData.responsavel,
+        endereco: formData.endereco
+      },
+      {
+        nome: validateName,
+        email: validateEmail,
+        telefone: validatePhone,
+        cpf_cnpj: validateCpfCnpj,
+        responsavel: (value) => value ? validateName(value) : { isValid: true, errors: [] },
+        endereco: (value) => value ? { isValid: true, errors: [] } : { isValid: true, errors: [] }
+      }
+    );
+    
+    if (!validation.isValid) {
+      validation.errors.forEach(error => toast.error(error));
+      return;
+    }
+
     try {
-      // Aqui você implementaria a lógica para salvar os dados da empresa
+      // Medir performance da atualização
+      await performanceMonitor.measure(
+        'updateCompanyData',
+        async () => {
+          // Importar supabase
+          const { supabase } = await import("@/integrations/supabase/client");
+          
+          // Atualizar dados da empresa no Supabase
+          const { error } = await supabase
+            .from("empresas")
+            .update({
+              nome: formData.nome,
+              email: formData.email,
+              telefone: formData.telefone,
+              endereco: formData.endereco,
+              responsavel: formData.responsavel,
+              cpf_cnpj: formData.cpf_cnpj,
+              updated_at: new Date().toISOString()
+            })
+            .eq("id", empresa?.id);
+
+          if (error) {
+            throw error;
+          }
+
+          return { success: true };
+        },
+        'MinhaConta'
+      );
+
+      logger.userAction('company_data_updated', 'MINHA_CONTA', { 
+        companyId: empresa?.id, 
+        fields: Object.keys(formData).filter(key => formData[key as keyof typeof formData])
+      });
+      
       toast.success("Dados atualizados com sucesso!");
       setIsEditing(false);
-    } catch (error) {
-      toast.error("Erro ao atualizar dados");
+      
+      // Invalidar cache e recursos relacionados
+      invalidateRelated('empresas');
+      // Refetch automático
+      queryClient.refetchQueries({ queryKey: ["empresa"] });
+    } catch (error: any) {
+      const appError = errorHandler.handleSupabaseError(error, 'updateCompanyData');
+      logger.error('Falha ao atualizar dados da empresa', 'MINHA_CONTA', { 
+        companyId: empresa?.id, 
+        error: error.message 
+      });
+      toast.error(appError.message);
     }
   };
 
@@ -59,6 +137,7 @@ export default function MinhaConta() {
       telefone: empresa?.telefone || "",
       endereco: empresa?.endereco || "",
       responsavel: empresa?.responsavel || "",
+      cpf_cnpj: empresa?.cpf_cnpj || "",
     });
     setIsEditing(false);
   };
@@ -188,12 +267,15 @@ export default function MinhaConta() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="nome">Nome da Empresa</Label>
+                <Label htmlFor="nome">
+                  Nome da Empresa <span className="text-red-500">*</span>
+                </Label>
                 {isEditing ? (
                   <Input
                     id="nome"
                     value={formData.nome}
                     onChange={(e) => handleInputChange("nome", e.target.value)}
+                    placeholder="Nome da sua empresa"
                   />
                 ) : (
                   <p className="text-sm font-medium">{formData.nome || "Não informado"}</p>
@@ -201,13 +283,16 @@ export default function MinhaConta() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">
+                  Email <span className="text-red-500">*</span>
+                </Label>
                 {isEditing ? (
                   <Input
                     id="email"
                     type="email"
                     value={formData.email}
                     onChange={(e) => handleInputChange("email", e.target.value)}
+                    placeholder="seu@email.com"
                   />
                 ) : (
                   <p className="text-sm font-medium">{formData.email || "Não informado"}</p>
@@ -215,12 +300,15 @@ export default function MinhaConta() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="telefone">Telefone</Label>
+                <Label htmlFor="telefone">
+                  Telefone <span className="text-red-500">*</span>
+                </Label>
                 {isEditing ? (
                   <Input
                     id="telefone"
                     value={formData.telefone}
                     onChange={(e) => handleInputChange("telefone", e.target.value)}
+                    placeholder="(11) 99999-9999"
                   />
                 ) : (
                   <p className="text-sm font-medium">{formData.telefone || "Não informado"}</p>
@@ -228,26 +316,48 @@ export default function MinhaConta() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="responsavel">Responsável</Label>
+                <Label htmlFor="responsavel">
+                  Responsável <span className="text-red-500">*</span>
+                </Label>
                 {isEditing ? (
                   <Input
                     id="responsavel"
                     value={formData.responsavel}
                     onChange={(e) => handleInputChange("responsavel", e.target.value)}
+                    placeholder="Nome do responsável"
                   />
                 ) : (
                   <p className="text-sm font-medium">{formData.responsavel || "Não informado"}</p>
                 )}
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="cpf_cnpj">
+                  CPF/CNPJ <span className="text-red-500">*</span>
+                </Label>
+                {isEditing ? (
+                  <Input
+                    id="cpf_cnpj"
+                    value={formData.cpf_cnpj}
+                    onChange={(e) => handleInputChange("cpf_cnpj", e.target.value)}
+                    placeholder="000.000.000-00 ou 00.000.000/0000-00"
+                  />
+                ) : (
+                  <p className="text-sm font-medium">{formData.cpf_cnpj || "Não informado"}</p>
+                )}
+              </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="endereco">Endereço</Label>
+              <Label htmlFor="endereco">
+                Endereço <span className="text-gray-400">(opcional)</span>
+              </Label>
               {isEditing ? (
                 <Input
                   id="endereco"
                   value={formData.endereco}
                   onChange={(e) => handleInputChange("endereco", e.target.value)}
+                  placeholder="Endereço completo da empresa"
                 />
               ) : (
                 <p className="text-sm font-medium">{formData.endereco || "Não informado"}</p>

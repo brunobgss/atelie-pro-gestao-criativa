@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Package, Clock, CheckCircle, Plus, TrendingUp, MessageCircle, Calculator, BookOpen, AlertTriangle, Bell, DollarSign, Users, Calendar } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { MobileSidebarTrigger } from "@/components/MobileSidebarTrigger";
 import { TrialBannerSmall } from "@/components/TrialBannerSmall";
 import { useQuery } from "@tanstack/react-query";
 import { listOrders } from "@/integrations/supabase/orders";
@@ -227,7 +228,8 @@ _${empresa?.nome || 'Ateliê'}_`;
       <div className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 sticky top-0 z-10 shadow-sm">
         <div className="p-6 flex justify-between items-center">
           <div className="flex items-center gap-4">
-            <SidebarTrigger className="text-gray-700 hover:bg-gray-100" />
+            <MobileSidebarTrigger />
+            <SidebarTrigger className="text-gray-700 hover:bg-gray-100 hidden md:flex" />
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
               <p className="text-gray-600 text-sm mt-0.5">Visão geral do seu negócio</p>

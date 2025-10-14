@@ -31,6 +31,28 @@ export async function listInventory(): Promise<InventoryRow[]> {
   }
 }
 
+export async function updateInventoryItem(id: string, input: { name?: string; quantity?: number; unit?: string; min_quantity?: number }): Promise<{ ok: boolean; data?: InventoryRow; error?: string }> {
+  try {
+    const updateData: any = {};
+    if (input.name !== undefined) updateData.name = input.name;
+    if (input.quantity !== undefined) updateData.quantity = input.quantity;
+    if (input.unit !== undefined) updateData.unit = input.unit;
+    if (input.min_quantity !== undefined) updateData.min_quantity = input.min_quantity;
+    
+    const { data, error } = await supabase
+      .from("inventory_items")
+      .update(updateData)
+      .eq("id", id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return { ok: true, data: data as InventoryRow };
+  } catch (e: any) {
+    return { ok: false, error: e?.message ?? "Erro ao atualizar item do estoque" };
+  }
+}
+
 export type ProductRow = {
   id: string;
   name: string;

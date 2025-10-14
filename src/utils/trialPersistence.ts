@@ -36,7 +36,7 @@ export function saveTrialData(trialData: TrialData): void {
     localStorage.setItem(STORAGE_KEY, trialData.trialEndDate);
     localStorage.setItem(STORAGE_KEY_EMPRESA, JSON.stringify(trialData.empresaData));
     localStorage.setItem(STORAGE_KEY_USER, trialData.userId);
-    console.log('Dados do trial salvos com sucesso');
+    // Log apenas em caso de erro ou primeira vez
   } catch (error) {
     console.error('Erro ao salvar dados do trial:', error);
   }

@@ -11,6 +11,13 @@ import { Package, Plus, Edit, Trash2, Copy, Search, Filter } from "lucide-react"
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { toast } from "sonner";
 import { getProducts } from "@/integrations/supabase/inventory";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useSync } from "@/contexts/SyncContext";
+import { useSyncOperations } from "@/hooks/useSyncOperations";
+import { validateName, validateMoney, validateDescription, validateForm } from "@/utils/validators";
+import { errorHandler } from "@/utils/errorHandler";
+import { logger } from "@/utils/logger";
+import { performanceMonitor } from "@/utils/performanceMonitor";
 
 interface Product {
   id: string;
@@ -25,8 +32,9 @@ interface Product {
 }
 
 export default function CatalogoProdutos() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+  const { invalidateRelated } = useSync();
+  const { syncAfterCreate, syncAfterUpdate, syncAfterDelete } = useSyncOperations();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -42,9 +50,10 @@ export default function CatalogoProdutos() {
 
   const categories = ["all", "Uniforme", "Personalizado", "Bordado", "Estampado"];
 
-  // Buscar produtos do Supabase
-  useEffect(() => {
-    const fetchProducts = async () => {
+  // Buscar produtos do Supabase usando React Query
+  const { data: products = [], isLoading: loading, refetch } = useQuery({
+    queryKey: ["products"],
+    queryFn: async () => {
       try {
         console.log("🔍 Buscando produtos do catálogo...");
         const productsData = await getProducts();
@@ -84,18 +93,15 @@ export default function CatalogoProdutos() {
         });
         
         console.log("✅ Produtos carregados:", convertedProducts.length);
-        setProducts(convertedProducts);
+        return convertedProducts;
       } catch (error) {
         console.error("❌ Erro ao buscar produtos:", error);
         toast.error("Erro ao carregar produtos");
-        setProducts([]);
-      } finally {
-        setLoading(false);
+        return [];
       }
-    };
-
-    fetchProducts();
-  }, []);
+    },
+    staleTime: 0, // Sempre buscar dados frescos
+  });
 
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -107,25 +113,68 @@ export default function CatalogoProdutos() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (editingProduct) {
-      // Editar produto existente
-      setProducts(products.map(p => 
-        p.id === editingProduct.id 
-          ? { ...p, ...formData, materials: formData.materials.split(",").map(m => m.trim()) }
-          : p
-      ));
-      toast.success("Produto atualizado com sucesso!");
-    } else {
-      // Criar novo produto
-      const newProduct: Product = {
-        id: Date.now().toString(),
-        ...formData,
-        materials: formData.materials.split(",").map(m => m.trim()),
-        createdAt: new Date().toISOString().split('T')[0]
-      };
-      setProducts([...products, newProduct]);
-      toast.success("Produto adicionado com sucesso!");
+    // Validação robusta
+    const validation = validateForm(
+      { 
+        name: formData.name, 
+        category: formData.category, 
+        basePrice: formData.basePrice, 
+        materials: formData.materials,
+        description: formData.description,
+        estimatedTime: formData.estimatedTime
+      },
+      {
+        name: validateName,
+        category: (value) => value ? { isValid: true, errors: [] } : { isValid: false, errors: ['Categoria é obrigatória'] },
+        basePrice: validateMoney,
+        materials: (value) => value ? { isValid: true, errors: [] } : { isValid: false, errors: ['Materiais são obrigatórios'] },
+        description: (value) => value ? validateDescription(value, 1000) : { isValid: true, errors: [] },
+        estimatedTime: (value) => value ? { isValid: true, errors: [] } : { isValid: true, errors: [] }
+      }
+    );
+    
+    if (!validation.isValid) {
+      validation.errors.forEach(error => toast.error(error));
+      return;
     }
+    
+    // Medir performance da operação
+    performanceMonitor.measureSync(
+      editingProduct ? 'updateProduct' : 'createProduct',
+      () => {
+        if (editingProduct) {
+          // Editar produto existente
+          setProducts(products.map(p => 
+            p.id === editingProduct.id 
+              ? { ...p, ...formData, materials: formData.materials.split(",").map(m => m.trim()) }
+              : p
+          ));
+          logger.userAction('product_updated', 'CATALOGO_PRODUTOS', { 
+            productId: editingProduct.id, 
+            name: formData.name, 
+            category: formData.category 
+          });
+          toast.success("Produto atualizado com sucesso!");
+        } else {
+          // Criar novo produto
+          const newProduct: Product = {
+            id: Date.now().toString(),
+            ...formData,
+            materials: formData.materials.split(",").map(m => m.trim()),
+            createdAt: new Date().toISOString().split('T')[0]
+          };
+          setProducts([...products, newProduct]);
+          logger.userAction('product_created', 'CATALOGO_PRODUTOS', { 
+            productId: newProduct.id, 
+            name: formData.name, 
+            category: formData.category,
+            basePrice: formData.basePrice
+          });
+          toast.success("Produto adicionado com sucesso!");
+        }
+      },
+      'CatalogoProdutos'
+    );
     
     setIsDialogOpen(false);
     setEditingProduct(null);
@@ -222,7 +271,9 @@ _Orçamento gerado pelo Ateliê Pro_
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Nome do Produto</Label>
+                    <Label>
+                      Nome do Produto <span className="text-red-500">*</span>
+                    </Label>
                     <Input
                       value={formData.name}
                       onChange={(e) => setFormData({...formData, name: e.target.value})}
@@ -231,7 +282,9 @@ _Orçamento gerado pelo Ateliê Pro_
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Categoria</Label>
+                    <Label>
+                      Categoria <span className="text-red-500">*</span>
+                    </Label>
                     <Select value={formData.category} onValueChange={(value) => setFormData({...formData, category: value})}>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione a categoria" />
@@ -247,18 +300,21 @@ _Orçamento gerado pelo Ateliê Pro_
                 </div>
                 
                 <div className="space-y-2">
-                  <Label>Descrição</Label>
+                  <Label>
+                    Descrição <span className="text-gray-400">(opcional)</span>
+                  </Label>
                   <Textarea
                     value={formData.description}
                     onChange={(e) => setFormData({...formData, description: e.target.value})}
                     placeholder="Descreva o produto..."
-                    required
                   />
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Preço Base (R$)</Label>
+                    <Label>
+                      Preço Base (R$) <span className="text-red-500">*</span>
+                    </Label>
                     <Input
                       type="number"
                       step="0.01"
@@ -269,20 +325,23 @@ _Orçamento gerado pelo Ateliê Pro_
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Tempo Estimado (horas)</Label>
+                    <Label>
+                      Tempo Estimado (horas) <span className="text-gray-400">(opcional)</span>
+                    </Label>
                     <Input
                       type="number"
                       step="0.5"
                       value={formData.estimatedTime}
                       onChange={(e) => setFormData({...formData, estimatedTime: Number(e.target.value)})}
                       placeholder="0"
-                      required
                     />
                   </div>
                 </div>
                 
                 <div className="space-y-2">
-                  <Label>Materiais (separados por vírgula)</Label>
+                  <Label>
+                    Materiais (separados por vírgula) <span className="text-red-500">*</span>
+                  </Label>
                   <Input
                     value={formData.materials}
                     onChange={(e) => setFormData({...formData, materials: e.target.value})}

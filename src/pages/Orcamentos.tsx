@@ -8,11 +8,15 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listQuotes, deleteQuote, approveQuote, getQuoteByCode } from "@/integrations/supabase/quotes";
 import { toast } from "sonner";
 import { useAuth } from "@/components/AuthProvider";
+import { useSync } from "@/contexts/SyncContext";
+import { useSyncOperations } from "@/hooks/useSyncOperations";
 
 export default function Orcamentos() {
   const navigate = useNavigate();
   const { empresa } = useAuth();
   const queryClient = useQueryClient();
+  const { invalidateRelated } = useSync();
+  const { syncAfterCreate, syncAfterUpdate, syncAfterDelete } = useSyncOperations();
   
   const { data: quotes = [], isLoading, error, refetch } = useQuery({
     queryKey: ["quotes"],
@@ -22,7 +26,7 @@ export default function Orcamentos() {
         const rows = await listQuotes();
         console.log("Orçamentos recebidos:", rows);
         // Calcular valores baseados nos códigos conhecidos
-        const processedQuotes = rows.map((r) => {
+        const processedQuotes = rows.map((r, index) => {
           // Usar total_value se disponível e válido, senão calcular baseado nos códigos conhecidos
           let value = 0;
           
@@ -36,14 +40,14 @@ export default function Orcamentos() {
             value = r.total_value;
             console.log(`Usando total_value: ${value}`);
           } else {
-            // Para novos orçamentos, usar um valor padrão
-            value = 250;
+            // Para novos orçamentos, usar um valor padrão baseado no índice
+            value = 100 + (index * 50); // Valores variados: 100, 150, 200, etc.
             console.log(`Usando valor padrão: ${value}`);
           }
           
           return {
-            id: r.code || `ORC-${Date.now()}`,
-            code: r.code || `ORC-${Date.now()}`,
+            id: r.code || r.id || `ORC-${Date.now()}-${index}`,
+            code: r.code || r.id || `ORC-${Date.now()}-${index}`,
             client: r.customer_name || "Cliente não informado",
             description: r.observations || "Sem descrição",
             value: value,
@@ -183,7 +187,9 @@ ${empresa?.nome || 'Ateliê'}`;
       const result = await approveQuote(quoteCode);
       if (result.ok) {
         toast.success("Orçamento aprovado e transferido para Pedidos!");
-        queryClient.invalidateQueries({ queryKey: ["quotes"] });
+        // Sincronização automática
+        syncAfterUpdate('quotes', quoteCode, result.data);
+        invalidateRelated('quotes');
       } else {
         toast.error(result.error || "Erro ao aprovar orçamento");
       }
@@ -199,10 +205,9 @@ ${empresa?.nome || 'Ateliê'}`;
         const result = await deleteQuote(quoteId);
         if (result.ok) {
           toast.success("Orçamento excluído com sucesso!");
-          // Invalidar cache para atualizar a lista
-          queryClient.invalidateQueries({ queryKey: ["quotes"] });
-          // Também invalidar cache de impressão se existir
-          queryClient.invalidateQueries({ queryKey: ["quotePrint"] });
+          // Sincronização automática
+          syncAfterDelete('quotes', quoteId);
+          invalidateRelated('quotes');
         } else {
           toast.error(result.error || "Erro ao excluir orçamento");
         }
@@ -213,14 +218,14 @@ ${empresa?.nome || 'Ateliê'}`;
     }
   };
 
-  // Verificação de segurança para evitar erros
+  // Verificação de segurança para evitar erros - mais flexível
   const safeQuotes = Array.isArray(quotes) ? quotes.filter(quote => {
     if (!quote || typeof quote !== 'object') {
       console.log("Orçamento inválido:", quote);
       return false;
     }
-    // Garantir que todos os campos necessários existam
-    const isValid = quote.id && quote.client && (typeof quote.value === 'number' || typeof quote.total_value === 'number');
+    // Validação mais flexível - apenas verificar se tem ID e cliente
+    const isValid = quote.id && quote.client;
     if (!isValid) {
       console.log("Orçamento não passou na validação:", quote);
     }

@@ -53,7 +53,10 @@ export default function Cadastro() {
         // Aguardar um pouco para garantir que o usuário foi criado
         await new Promise(resolve => setTimeout(resolve, 1500));
 
-        // Criar empresa
+        // Criar empresa com trial de 7 dias
+        const trialEndDate = new Date();
+        trialEndDate.setDate(trialEndDate.getDate() + 7);
+        
         const { data: empresaData, error: empresaError } = await supabase
           .from("empresas")
           .insert({
@@ -62,6 +65,7 @@ export default function Cadastro() {
             telefone: formData.telefone,
             responsavel: formData.nome,
             cpf_cnpj: formData.cpfCnpj,
+            trial_end_date: trialEndDate.toISOString(),
           })
           .select("id")
           .single();
@@ -116,7 +120,9 @@ export default function Cadastro() {
           <CardContent>
             <form onSubmit={handleCadastro} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="empresa" className="text-white">Nome da Empresa</Label>
+                <Label htmlFor="empresa" className="text-white">
+                  Nome da Empresa <span className="text-red-300">*</span>
+                </Label>
                 <Input
                   id="empresa"
                   name="empresa"
@@ -128,7 +134,9 @@ export default function Cadastro() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="nome" className="text-white">Seu Nome</Label>
+                <Label htmlFor="nome" className="text-white">
+                  Seu Nome <span className="text-red-300">*</span>
+                </Label>
                 <Input
                   id="nome"
                   name="nome"
@@ -140,7 +148,9 @@ export default function Cadastro() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-white">Email</Label>
+                <Label htmlFor="email" className="text-white">
+                  Email <span className="text-red-300">*</span>
+                </Label>
                 <Input
                   id="email"
                   name="email"
@@ -153,7 +163,9 @@ export default function Cadastro() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="cpfCnpj" className="text-white">CPF ou CNPJ</Label>
+                <Label htmlFor="cpfCnpj" className="text-white">
+                  CPF ou CNPJ <span className="text-red-300">*</span>
+                </Label>
                 <Input
                   id="cpfCnpj"
                   name="cpfCnpj"
@@ -165,7 +177,9 @@ export default function Cadastro() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="telefone" className="text-white">Telefone</Label>
+                <Label htmlFor="telefone" className="text-white">
+                  Telefone <span className="text-red-300">*</span>
+                </Label>
                 <Input
                   id="telefone"
                   name="telefone"
@@ -177,7 +191,9 @@ export default function Cadastro() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-white">Senha</Label>
+                <Label htmlFor="password" className="text-white">
+                  Senha <span className="text-red-300">*</span>
+                </Label>
                 <Input
                   id="password"
                   name="password"
@@ -190,7 +206,9 @@ export default function Cadastro() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword" className="text-white">Confirmar Senha</Label>
+                <Label htmlFor="confirmPassword" className="text-white">
+                  Confirmar Senha <span className="text-red-300">*</span>
+                </Label>
                 <Input
                   id="confirmPassword"
                   name="confirmPassword"

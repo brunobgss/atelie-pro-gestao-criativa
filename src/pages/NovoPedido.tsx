@@ -12,9 +12,19 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { createOrder, generateOrderCode } from "@/integrations/supabase/orders";
 import { uploadOrderFile } from "@/integrations/supabase/storage";
+import { useQueryClient } from "@tanstack/react-query";
+import { useSync } from "@/contexts/SyncContext";
+import { useSyncOperations } from "@/hooks/useSyncOperations";
+import { validateName, validateMoney, validateDate, validateDescription, validateForm } from "@/utils/validators";
+import { errorHandler } from "@/utils/errorHandler";
+import { logger } from "@/utils/logger";
+import { performanceMonitor } from "@/utils/performanceMonitor";
 
 export default function NovoPedido() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { invalidateRelated } = useSync();
+  const { syncAfterCreate } = useSyncOperations();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [quantity, setQuantity] = useState<number>(1);
   const [color, setColor] = useState<string>("");
@@ -169,6 +179,25 @@ export default function NovoPedido() {
     const delivery = (document.getElementById("delivery") as HTMLInputElement)?.value || undefined;
     const code = generateOrderCode();
 
+    // Validação de campos obrigatórios
+    // Validação robusta
+    const validation = validateForm(
+      { client, type, description, value, delivery, quantity },
+      {
+        client: validateName,
+        type: (value) => value && value !== "outro" ? { isValid: true, errors: [] } : { isValid: false, errors: ['Tipo do pedido é obrigatório'] },
+        description: validateDescription,
+        value: validateMoney,
+        delivery: validateDate,
+        quantity: (value) => value > 0 ? { isValid: true, errors: [] } : { isValid: false, errors: ['Quantidade deve ser maior que zero'] }
+      }
+    );
+    
+    if (!validation.isValid) {
+      validation.errors.forEach(error => toast.error(error));
+      return;
+    }
+
     // Usar arquivo já carregado se disponível
     let file_url: string | undefined = uploadedFileUrl || undefined;
 
@@ -195,27 +224,50 @@ export default function NovoPedido() {
       file_url
     });
 
-    const result = await createOrder({
-      code,
-      customer_name: client,
-      type,
-      description: finalDescription,
-      value,
-      paid,
-      delivery_date: delivery,
-      file_url,
-    });
+    // Medir performance e criar pedido
+    const result = await performanceMonitor.measure(
+      'createOrder',
+      async () => {
+        return await createOrder({
+          code,
+          customer_name: client,
+          type,
+          description: finalDescription,
+          value,
+          paid,
+          delivery_date: delivery,
+          file_url,
+        });
+      },
+      'NovoPedido'
+    );
     
     console.log("Resultado da criação do pedido:", result);
     
     if (!result.ok) {
-      console.error("Erro ao criar pedido:", result.error);
-      toast.error(result.error || "Erro ao criar pedido");
+      const appError = errorHandler.handleSupabaseError(
+        { message: result.error, code: 'CREATE_ORDER_ERROR' },
+        'createOrder'
+      );
+      logger.error('Falha ao criar pedido', 'NOVO_PEDIDO', { client, type, value, error: result.error });
+      toast.error(appError.message);
       return;
     }
     
+    // Log de sucesso
+    logger.userAction('order_created', 'NOVO_PEDIDO', { 
+      orderCode: code, 
+      client, 
+      type, 
+      value, 
+      quantity: isKitMode ? getTotalKitQuantity() : quantity 
+    });
+    
     console.log("Pedido criado com sucesso! Redirecionando para:", `/pedidos/${code}`);
     toast.success("Pedido criado com sucesso!");
+    // Sincronização automática
+    syncAfterCreate('orders', result.data);
+    invalidateRelated('orders');
     navigate(`/pedidos/${code}`);
   };
 

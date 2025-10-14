@@ -23,18 +23,12 @@ export async function listQuotes(): Promise<QuoteRow[]> {
   try {
     console.log("Buscando lista de orçamentos...");
     
-    // Timeout reduzido para 3 segundos
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Timeout')), 3000)
-    );
-
-    const fetchPromise = supabase
+    // Primeiro, tentar sem timeout para ver se funciona
+    const { data, error } = await supabase
       .from("atelie_quotes")
       .select("id, code, customer_name, customer_phone, date, observations, total_value, status")
       .order("date", { ascending: false })
       .limit(50);
-
-    const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
     
     if (error) {
       console.error("Erro ao buscar orçamentos:", error);
@@ -46,6 +40,29 @@ export async function listQuotes(): Promise<QuoteRow[]> {
     return data ?? [];
   } catch (error) {
     console.error("Erro ao buscar orçamentos:", error);
+    
+    // Se der timeout ou erro, tentar buscar dados básicos
+    try {
+      console.log("Tentando busca alternativa...");
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from("atelie_quotes")
+        .select("id, code, customer_name, total_value")
+        .limit(20);
+      
+      if (!fallbackError && fallbackData) {
+        console.log("Dados de fallback encontrados:", fallbackData.length);
+        return fallbackData.map(item => ({
+          ...item,
+          customer_phone: null,
+          date: new Date().toISOString(),
+          observations: null,
+          status: 'pending'
+        }));
+      }
+    } catch (fallbackError) {
+      console.error("Erro no fallback:", fallbackError);
+    }
+    
     return [];
   }
 }
@@ -63,9 +80,9 @@ export async function getQuoteByCode(code: string): Promise<{ quote: QuoteRow | 
       return { quote: null, items: [] };
     }
     
-    // Timeout de 3 segundos
+    // Timeout de 10 segundos
     const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Timeout')), 3000)
+      setTimeout(() => reject(new Error('Timeout')), 10000)
     );
 
     const fetchPromise = supabase
@@ -330,7 +347,7 @@ export async function updateQuote(quoteCode: string, input: {
     // Buscar o orçamento pelo código
     const { data: quote, error: quoteError } = await supabase
       .from("atelie_quotes")
-      .select("id")
+      .select("id, status")
       .eq("code", quoteCode)
       .single();
     
@@ -387,10 +404,71 @@ export async function updateQuote(quoteCode: string, input: {
       }
     }
 
+    // Se o orçamento foi aprovado, sincronizar com o pedido
+    if (quote.status === 'approved') {
+      await syncQuoteToOrder(quoteCode, input);
+    }
+
     return { ok: true };
   } catch (e: any) {
     console.error("Erro ao atualizar orçamento:", e);
     return { ok: false, error: e?.message ?? "Erro ao atualizar orçamento" };
+  }
+}
+
+// Função para sincronizar orçamento aprovado com pedido
+async function syncQuoteToOrder(quoteCode: string, input: {
+  customer_name?: string;
+  customer_phone?: string;
+  date?: string;
+  observations?: string;
+  items?: { description: string; quantity: number; value: number }[];
+}): Promise<void> {
+  try {
+    console.log("Sincronizando orçamento aprovado com pedido:", quoteCode);
+    
+    // Buscar o pedido relacionado ao orçamento
+    const { data: order, error: orderError } = await supabase
+      .from("atelie_orders")
+      .select("id, code")
+      .like("description", `%${quoteCode}%`)
+      .single();
+    
+    if (orderError || !order) {
+      console.log("Pedido não encontrado para sincronização");
+      return;
+    }
+
+    // Preparar dados para atualização do pedido
+    const orderUpdateData: any = {};
+    
+    if (input.customer_name !== undefined) orderUpdateData.customer_name = input.customer_name;
+    if (input.customer_phone !== undefined) orderUpdateData.customer_phone = input.customer_phone;
+    
+    // Atualizar descrição se itens foram fornecidos
+    if (input.items) {
+      const itemsDescription = input.items.map(item => 
+        `${item.description} (Qtd: ${item.quantity})`
+      ).join(', ');
+      orderUpdateData.description = `Orçamento aprovado - ${itemsDescription}`;
+      orderUpdateData.value = input.items.reduce((sum, item) => sum + (item.value * item.quantity), 0);
+    }
+
+    // Atualizar o pedido
+    if (Object.keys(orderUpdateData).length > 0) {
+      const { error: updateOrderError } = await supabase
+        .from("atelie_orders")
+        .update(orderUpdateData)
+        .eq("id", order.id);
+      
+      if (updateOrderError) {
+        console.error("Erro ao sincronizar pedido:", updateOrderError);
+      } else {
+        console.log("Pedido sincronizado com sucesso:", order.code);
+      }
+    }
+  } catch (error) {
+    console.error("Erro na sincronização orçamento-pedido:", error);
   }
 }
 

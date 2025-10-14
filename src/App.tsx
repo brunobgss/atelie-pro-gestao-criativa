@@ -29,8 +29,17 @@ import MinhaConta from "./pages/MinhaConta";
 import Login from "./pages/Login";
 import Cadastro from "./pages/Cadastro";
 import NotFound from "./pages/NotFound";
+import { SyncProvider } from "./contexts/SyncContext";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 0, // Sempre buscar dados frescos
+      refetchOnWindowFocus: false, // Não refetch ao focar na janela
+      retry: 1, // Tentar apenas 1 vez em caso de erro
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -39,6 +48,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+          <SyncProvider>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/cadastro" element={<Cadastro />} />
@@ -67,6 +77,7 @@ const App = () => (
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </SyncProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

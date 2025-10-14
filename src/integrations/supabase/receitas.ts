@@ -1,4 +1,5 @@
 import { supabase } from "./client";
+import { getCurrentEmpresaId } from "./auth-utils";
 import { checkDatabaseHealth } from "./config";
 
 export interface ReceitaRow {
@@ -94,7 +95,7 @@ export async function createReceita(input: {
     console.log("Criando receita:", input);
     
     // Obter empresa_id do usuário logado
-    const empresa_id = "temp-empresa-id"; // TODO: Implementar getCurrentEmpresaId
+    const empresa_id = await getCurrentEmpresaId();
     
     const { data, error } = await supabase
       .from("atelie_receitas")
@@ -194,17 +195,42 @@ export async function updatePaymentStatus(
   try {
     console.log(`Atualizando status de pagamento para ${orderCode}:`, status);
     
-    const { data, error } = await supabase
-      .from("atelie_receitas")
+    // Buscar o pedido para obter o valor total
+    const { data: order, error: orderError } = await supabase
+      .from("atelie_orders")
+      .select("id, value, paid")
+      .eq("code", orderCode)
+      .single();
+
+    if (orderError || !order) {
+      console.error("Erro ao buscar pedido:", orderError);
+      return { ok: false, error: "Pedido não encontrado" };
+    }
+
+    // Calcular novo valor pago baseado no status
+    let newPaidValue = order.paid;
+    
+    if (status === 'pago') {
+      newPaidValue = order.value; // Pago = valor total
+    } else if (status === 'pendente') {
+      newPaidValue = 0; // Pendente = nada pago
+    } else if (status === 'parcial') {
+      // Manter valor atual ou metade se for 0
+      newPaidValue = order.paid > 0 ? order.paid : order.value / 2;
+    }
+
+    // Atualizar o pedido com o novo valor pago
+    const { error: updateError } = await supabase
+      .from("atelie_orders")
       .update({ 
-        status: status,
+        paid: newPaidValue,
         updated_at: new Date().toISOString()
       })
-      .eq("order_code", orderCode);
+      .eq("code", orderCode);
 
-    if (error) {
-      console.error("Erro ao atualizar status de pagamento:", error);
-      return { ok: false, error: error.message };
+    if (updateError) {
+      console.error("Erro ao atualizar status de pagamento:", updateError);
+      return { ok: false, error: updateError.message };
     }
 
     console.log("Status de pagamento atualizado com sucesso");

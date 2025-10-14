@@ -8,6 +8,10 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/components/AuthProvider";
+import { validateCpfCnpj, validatePhone, validateForm } from "@/utils/validators";
+import { errorHandler } from "@/utils/errorHandler";
+import { logger } from "@/utils/logger";
+import { performanceMonitor } from "@/utils/performanceMonitor";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface Plan {
@@ -102,36 +106,60 @@ export default function Assinatura() {
     try {
       const userName = empresa?.responsavel || empresa?.nome || user?.email || "Usuário";
       const userEmail = empresa?.email || user?.email || "";
+      const cpfCnpj = empresa?.cpf_cnpj || "";
+      const telefone = empresa?.telefone || "";
       
-      if (!userEmail) {
-        toast.error("Email não encontrado. Faça login novamente.");
+      // Validação robusta dos dados necessários
+      const validation = validateForm(
+        { userEmail, cpfCnpj, telefone },
+        {
+          userEmail: (value) => value ? { isValid: true, errors: [] } : { isValid: false, errors: ['Email é obrigatório'] },
+          cpfCnpj: (value) => value ? validateCpfCnpj(value) : { isValid: false, errors: ['CPF/CNPJ é obrigatório'] },
+          telefone: (value) => value ? validatePhone(value) : { isValid: false, errors: ['Telefone é obrigatório'] }
+        }
+      );
+      
+      if (!validation.isValid) {
+        validation.errors.forEach(error => toast.error(error));
+        setIsLoading(false);
         return;
       }
 
-      // Criar assinatura no ASAAS usando dados salvos
-      let result;
-      
-      if (pendingPlanId === 'monthly') {
-        result = await asaasService.createMonthlySubscription(
-          userEmail, 
-          userName, 
-          empresa?.id, 
-          empresa?.cpf_cnpj, 
-          empresa?.telefone,
-          selectedPaymentMethod
-        );
-      } else {
-        result = await asaasService.createYearlySubscription(
-          userEmail, 
-          userName, 
-          empresa?.id, 
-          empresa?.cpf_cnpj, 
-          empresa?.telefone,
-          selectedPaymentMethod
-        );
-      }
+      // Medir performance da criação de assinatura
+      const result = await performanceMonitor.measure(
+        'createSubscription',
+        async () => {
+          if (pendingPlanId === 'monthly') {
+            return await asaasService.createMonthlySubscription(
+              userEmail, 
+              userName, 
+              empresa?.id, 
+              cpfCnpj, 
+              telefone,
+              selectedPaymentMethod
+            );
+          } else {
+            return await asaasService.createYearlySubscription(
+              userEmail, 
+              userName, 
+              empresa?.id, 
+              cpfCnpj, 
+              telefone,
+              selectedPaymentMethod
+            );
+          }
+        },
+        'Assinatura'
+      );
 
       if (result && result.payment) {
+        logger.userAction('subscription_created', 'ASSINATURA', { 
+          planType: pendingPlanId, 
+          paymentMethod: selectedPaymentMethod,
+          userEmail,
+          companyId: empresa?.id
+        });
+        
         toast.success("Pagamento criado com sucesso!");
         
         // Mostrar informações do pagamento
@@ -140,20 +168,34 @@ export default function Assinatura() {
         // Redirecionar para o link de pagamento do ASAAS
         if (result.payment.invoiceUrl) {
           window.open(result.payment.invoiceUrl, '_blank');
-          toast.success(`Pagamento ${planId === 'monthly' ? 'Mensal' : 'Anual'} criado! Abra o link para pagar via PIX.`);
+          toast.success(`Pagamento ${pendingPlanId === 'monthly' ? 'Mensal' : 'Anual'} criado! Abra o link para pagar via PIX.`);
         } else {
-          toast.success(`Pagamento ${planId === 'monthly' ? 'Mensal' : 'Anual'} criado! Verifique seu email para o PIX.`);
+          toast.success(`Pagamento ${pendingPlanId === 'monthly' ? 'Mensal' : 'Anual'} criado! Verifique seu email para o PIX.`);
         }
         
         // Aqui você pode redirecionar ou mostrar mais informações
         // Por enquanto, apenas mostra sucesso
       } else {
-        toast.error("Erro ao criar pagamento");
+        const appError = errorHandler.handleSupabaseError(
+          { message: 'Erro ao criar pagamento', code: 'CREATE_SUBSCRIPTION_ERROR' },
+          'createSubscription'
+        );
+        logger.error('Falha ao criar assinatura', 'ASSINATURA', { 
+          planType: pendingPlanId, 
+          userEmail, 
+          error: result 
+        });
+        toast.error(appError.message);
       }
       
-    } catch (error) {
-      console.error("Erro ao processar assinatura:", error);
-      toast.error("Erro ao processar assinatura. Tente novamente.");
+    } catch (error: any) {
+      const appError = errorHandler.handleSupabaseError(error, 'createSubscription');
+      logger.error('Erro ao processar assinatura', 'ASSINATURA', { 
+        planType: pendingPlanId, 
+        userEmail, 
+        error: error.message 
+      });
+      toast.error(appError.message);
     } finally {
       setIsLoading(false);
     }
@@ -400,54 +442,54 @@ export default function Assinatura() {
 
       {/* Modal de Seleção de Forma de Pagamento */}
       <Dialog open={isPaymentModalOpen} onOpenChange={setIsPaymentModalOpen}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-md max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-center text-purple-800 text-xl">
+            <DialogTitle className="text-center text-purple-800 text-lg">
               Escolha a Forma de Pagamento
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-6 py-4">
-            <div className="grid grid-cols-1 gap-4">
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-1 gap-3">
               <Button
                 variant={selectedPaymentMethod === 'PIX' ? 'default' : 'outline'}
                 onClick={() => setSelectedPaymentMethod('PIX')}
-                className={`h-20 flex flex-col items-center justify-center gap-2 p-4 ${
+                className={`h-16 flex flex-col items-center justify-center gap-1 p-3 ${
                   selectedPaymentMethod === 'PIX' 
                     ? 'bg-purple-600 hover:bg-purple-700 text-white' 
                     : 'hover:bg-purple-50'
                 }`}
               >
-                <div className="text-3xl">📱</div>
-                <div className="font-semibold text-base">PIX</div>
-                <div className="text-sm opacity-75">Pagamento instantâneo</div>
+                <div className="text-2xl">📱</div>
+                <div className="font-semibold text-sm">PIX</div>
+                <div className="text-xs opacity-75">Pagamento instantâneo</div>
               </Button>
               
               <Button
                 variant={selectedPaymentMethod === 'CREDIT_CARD' ? 'default' : 'outline'}
                 onClick={() => setSelectedPaymentMethod('CREDIT_CARD')}
-                className={`h-20 flex flex-col items-center justify-center gap-2 p-4 ${
+                className={`h-16 flex flex-col items-center justify-center gap-1 p-3 ${
                   selectedPaymentMethod === 'CREDIT_CARD' 
                     ? 'bg-purple-600 hover:bg-purple-700 text-white' 
                     : 'hover:bg-purple-50'
                 }`}
               >
-                <div className="text-3xl">💳</div>
-                <div className="font-semibold text-base">Cartão</div>
-                <div className="text-sm opacity-75">Crédito ou débito</div>
+                <div className="text-2xl">💳</div>
+                <div className="font-semibold text-sm">Cartão</div>
+                <div className="text-xs opacity-75">Crédito ou débito</div>
               </Button>
               
               <Button
                 variant={selectedPaymentMethod === 'BOLETO' ? 'default' : 'outline'}
                 onClick={() => setSelectedPaymentMethod('BOLETO')}
-                className={`h-20 flex flex-col items-center justify-center gap-2 p-4 ${
+                className={`h-16 flex flex-col items-center justify-center gap-1 p-3 ${
                   selectedPaymentMethod === 'BOLETO' 
                     ? 'bg-purple-600 hover:bg-purple-700 text-white' 
                     : 'hover:bg-purple-50'
                 }`}
               >
-                <div className="text-3xl">📄</div>
-                <div className="font-semibold text-base">Boleto</div>
-                <div className="text-sm opacity-75">Bancário</div>
+                <div className="text-2xl">📄</div>
+                <div className="font-semibold text-sm">Boleto</div>
+                <div className="text-xs opacity-75">Bancário</div>
               </Button>
             </div>
             

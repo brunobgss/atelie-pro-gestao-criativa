@@ -12,6 +12,7 @@ import { ArrowLeft, Calendar, CheckCircle2, Clock, Package, Upload, User, Play, 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getOrderByCode, updateOrderStatus } from "@/integrations/supabase/orders";
 import { getReceitaByOrderCode } from "@/integrations/supabase/receitas";
+import { useSync } from "@/contexts/SyncContext";
 import { toast } from "sonner";
 
 type OrderItem = {
@@ -22,7 +23,7 @@ type OrderItem = {
   value: number;
   paid: number;
   delivery: string; // ISO
-  status: "Aguardando aprovação" | "Em produção" | "Pronto" | "Aguardando retirada" | "Entregue";
+  status: "Aguardando aprovação" | "Em produção" | "Finalizando" | "Pronto" | "Aguardando retirada" | "Entregue";
   file?: string;
 };
 
@@ -31,6 +32,7 @@ function getStatusStepIndex(status: OrderItem["status"]) {
   const steps: OrderItem["status"][] = [
     "Aguardando aprovação",
     "Em produção",
+    "Finalizando",
     "Pronto",
     "Aguardando retirada",
     "Entregue",
@@ -42,10 +44,12 @@ export default function PedidoDetalhe() {
   const { id } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { invalidateRelated } = useSync();
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
   const [isPaidDialogOpen, setIsPaidDialogOpen] = useState(false);
   const [newStatus, setNewStatus] = useState("");
   const [newPaidValue, setNewPaidValue] = useState("");
+  const [newDescription, setNewDescription] = useState("");
   const [forceUpdate, setForceUpdate] = useState(0); // Para forçar re-render
   const [localStatus, setLocalStatus] = useState<string | null>(null); // Estado local do status
 
@@ -74,9 +78,11 @@ export default function PedidoDetalhe() {
         // Manter o estado local atualizado
         setLocalStatus(newStatus);
         
-        // Invalidar cache para sincronização futura
-        await queryClient.invalidateQueries({ queryKey: ["order", code] });
-        await queryClient.invalidateQueries({ queryKey: ["orders"] });
+        // Invalidar cache e recursos relacionados
+        invalidateRelated('orders');
+        // Refetch automático
+        queryClient.refetchQueries({ queryKey: ["order", code] });
+        queryClient.refetchQueries({ queryKey: ["orders"] });
         
       } else {
         console.error("Erro ao atualizar status:", result.error);
@@ -138,6 +144,33 @@ export default function PedidoDetalhe() {
     }
   };
 
+  const handleUpdateDescription = async () => {
+    if (!newDescription.trim()) {
+      toast.error("Digite uma descrição válida");
+      return;
+    }
+
+    try {
+      // Atualizando descrição do pedido
+      const result = await updateOrderStatus(code, undefined, undefined, newDescription);
+      if (result.ok) {
+        toast.success("Descrição atualizada com sucesso!");
+        setNewDescription(""); // Limpar o campo
+        
+        // Forçar refetch para atualizar a interface
+        await queryClient.invalidateQueries({ queryKey: ["order", code] });
+        await queryClient.invalidateQueries({ queryKey: ["orders"] });
+        refetch();
+      } else {
+        console.error("Erro ao atualizar descrição:", result.error);
+        toast.error(result.error || "Erro ao atualizar descrição");
+      }
+    } catch (error) {
+      console.error("Erro ao atualizar descrição:", error);
+      toast.error("Erro ao atualizar descrição");
+    }
+  };
+
   const { data: orderDb, isLoading, error, refetch } = useQuery({
     queryKey: ["order", code],
     queryFn: () => getOrderByCode(code),
@@ -194,6 +227,7 @@ export default function PedidoDetalhe() {
   const steps: { key: OrderItem["status"]; label: string; icon: any; description: string }[] = [
     { key: "Aguardando aprovação", label: "Aguardando Aprovação", icon: Clock, description: "Pedido recebido, aguardando confirmação do cliente" },
     { key: "Em produção", label: "Em Produção", icon: Play, description: "Trabalho iniciado, produção em andamento" },
+    { key: "Finalizando", label: "Finalizando", icon: Package, description: "Produto quase pronto, acabamentos finais" },
     { key: "Pronto", label: "Pronto", icon: CheckCircle, description: "Produto finalizado, pronto para entrega" },
     { key: "Aguardando retirada", label: "Aguardando Retirada", icon: Truck, description: "Produto pronto, aguardando retirada pelo cliente" },
     { key: "Entregue", label: "Entregue", icon: CheckCircle2, description: "Produto entregue ao cliente, pedido finalizado" },
@@ -338,7 +372,40 @@ export default function PedidoDetalhe() {
               </div>
 
               <div>
-                <p className="text-xs text-muted-foreground">Descrição</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">Descrição</p>
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                        <Edit className="w-3 h-3" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Editar Descrição do Pedido</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div>
+                          <Label htmlFor="description">Descrição</Label>
+                          <Input
+                            id="description"
+                            placeholder="Descrição do pedido"
+                            defaultValue={order.description}
+                            onChange={(e) => setNewDescription(e.target.value)}
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <Button onClick={handleUpdateDescription} className="flex-1">
+                            Atualizar
+                          </Button>
+                          <Button variant="outline" onClick={() => setNewDescription("")}>
+                            Cancelar
+                          </Button>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
                 <p className="text-foreground mt-1">{order.description}</p>
               </div>
 
@@ -450,6 +517,7 @@ export default function PedidoDetalhe() {
                         <SelectContent>
                           <SelectItem value="Aguardando aprovação">Aguardando aprovação</SelectItem>
                           <SelectItem value="Em produção">Em produção</SelectItem>
+                          <SelectItem value="Finalizando">Finalizando</SelectItem>
                           <SelectItem value="Pronto">Pronto</SelectItem>
                           <SelectItem value="Aguardando retirada">Aguardando retirada</SelectItem>
                           <SelectItem value="Entregue">Entregue</SelectItem>

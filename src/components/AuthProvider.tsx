@@ -32,6 +32,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
+    let intervalId: NodeJS.Timeout | null = null;
+
+    // Função para restaurar dados se necessário
+    const restoreDataIfNeeded = (userId: string) => {
+      if (!mounted) return;
+      
+      const trialData = getTrialData();
+      if (!empresa && trialData && trialData.userId === userId && trialData.empresaData.nome !== "Empresa Temporária") {
+        // Log apenas uma vez por sessão
+        if (!window.dataRestored) {
+          console.log("🔄 Restaurando dados perdidos do localStorage");
+          window.dataRestored = true;
+        }
+        setEmpresa(trialData.empresaData);
+      }
+    };
 
     // Verificar sessão inicial
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -40,6 +56,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchEmpresa(session.user.id);
+        
+        // Verificar dados a cada 5 minutos para evitar perda
+        intervalId = setInterval(() => {
+          if (mounted && session?.user) {
+            restoreDataIfNeeded(session.user.id);
+          }
+        }, 300000); // 5 minutos
       } else {
         setLoading(false);
       }
@@ -53,9 +76,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null);
         if (session?.user) {
           await fetchEmpresa(session.user.id);
+          
+          // Reiniciar verificação periódica
+          if (intervalId) clearInterval(intervalId);
+          intervalId = setInterval(() => {
+            if (mounted && session?.user) {
+              restoreDataIfNeeded(session.user.id);
+            }
+          }, 15000);
         } else {
           setEmpresa(null);
           setLoading(false);
+          if (intervalId) clearInterval(intervalId);
         }
       }
     );
@@ -63,8 +95,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       mounted = false;
       subscription.unsubscribe();
+      if (intervalId) clearInterval(intervalId);
     };
-  }, []);
+  }, [empresa]);
 
   const fetchEmpresa = async (userId: string) => {
     try {
@@ -84,6 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             telefone,
             responsavel,
             cpf_cnpj,
+            trial_end_date,
             created_at
           )
         `)
@@ -93,7 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
 
       if (error) {
-        console.warn("Erro ao buscar empresa, usando dados persistidos:", error.message);
+        console.warn("⚠️ Erro ao buscar empresa do Supabase:", error.message);
         
         // Tentar recuperar dados persistidos
         const trialData = getTrialData();
@@ -101,47 +135,67 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (trialData && trialData.userId === userId && trialData.empresaData.nome !== "Empresa Temporária") {
           // Usar dados persistidos apenas se não for temporário
           setEmpresa(trialData.empresaData);
-          console.log("Usando dados persistidos do localStorage");
+          console.log("📱 Usando dados persistidos do localStorage (timeout)");
         } else {
-          // Não criar dados temporários, aguardar Supabase
-          console.log("Aguardando dados reais do Supabase...");
-          setEmpresa(null);
+          // Não criar dados temporários, manter estado atual
+          console.log("⏳ Aguardando dados reais do Supabase...");
+          // Não alterar o estado se já temos dados válidos
+          if (!empresa) {
+            setEmpresa(null);
+          }
         }
         return;
       }
 
       if (data?.empresas) {
         setEmpresa(data.empresas);
+        // Salvar dados no localStorage para persistência
+        saveTrialData({
+          userId: userId,
+          empresaData: data.empresas,
+          trialEndDate: data.empresas.trial_end_date || ''
+        });
+        // Log apenas na primeira vez ou em caso de mudança
+        if (!empresa || empresa.id !== data.empresas.id) {
+          console.log("✅ Dados da empresa carregados:", data.empresas.nome);
+        }
       } else {
         // Tentar recuperar dados persistidos
         const trialData = getTrialData();
         
-        if (trialData && trialData.userId === userId) {
+        if (trialData && trialData.userId === userId && trialData.empresaData.nome !== "Empresa Temporária") {
           // Usar dados persistidos
           setEmpresa(trialData.empresaData);
           console.log("Usando dados persistidos do localStorage (sem empresa)");
         } else {
-          // Criar novo trial
-          const newTrialData = createNewTrial(userId);
-          setEmpresa(newTrialData.empresaData);
-          console.log("Criando novo trial de 7 dias (sem empresa)");
+          // NÃO criar novo trial - aguardar dados reais
+          console.log("❌ Nenhum dado persistido válido - aguardando dados reais do Supabase");
+          setEmpresa(null);
         }
       }
     } catch (error: any) {
-      console.warn("Erro ao buscar empresa, usando dados persistidos:", error.message);
+      // Log apenas uma vez por sessão para evitar spam
+      if (!window.authErrorLogged) {
+        console.warn("Erro ao buscar empresa, usando dados persistidos:", error.message);
+        window.authErrorLogged = true;
+      }
       
       // Tentar recuperar dados persistidos
       const trialData = getTrialData();
       
-      if (trialData && trialData.userId === userId) {
+      if (trialData && trialData.userId === userId && trialData.empresaData.nome !== "Empresa Temporária") {
         // Usar dados persistidos
         setEmpresa(trialData.empresaData);
-        console.log("Usando dados persistidos do localStorage (catch)");
+        // Log apenas uma vez por sessão
+        if (!window.localStorageUsed) {
+          console.log("Usando dados persistidos do localStorage (catch)");
+          window.localStorageUsed = true;
+        }
       } else {
-        // Criar novo trial
-        const newTrialData = createNewTrial(userId);
-        setEmpresa(newTrialData.empresaData);
-        console.log("Criando novo trial de 7 dias (catch)");
+        // NÃO criar novo trial - manter estado atual
+        if (!empresa) {
+          setEmpresa(null);
+        }
       }
     } finally {
       setLoading(false);

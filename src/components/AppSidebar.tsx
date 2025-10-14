@@ -34,7 +34,11 @@ export function AppSidebar() {
   const { empresa, signOut } = useAuth();
 
   return (
-    <Sidebar collapsible="none" className="bg-card border-r border-border">
+    <Sidebar 
+      collapsible="none" 
+      className="bg-card border-r border-border md:relative fixed md:translate-x-0 z-50"
+      side="left"
+    >
       <div className="p-6 border-b border-border/50">
         {!isCollapsed && (
           <div className="flex flex-col items-center space-y-4">

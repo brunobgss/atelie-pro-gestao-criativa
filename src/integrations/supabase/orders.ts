@@ -134,7 +134,8 @@ export async function createOrder(input: {
 export async function updateOrderStatus(
   code: string,
   status?: OrderRow['status'],
-  paid?: number
+  paid?: number,
+  description?: string
 ): Promise<{ ok: boolean; data?: OrderRow; error?: string }> {
   try {
     console.log(`Atualizando pedido ${code}:`, { status, paid });
@@ -158,6 +159,10 @@ export async function updateOrderStatus(
     
     if (paid !== undefined) {
       updateData.paid = paid;
+    }
+    
+    if (description !== undefined) {
+      updateData.description = description;
     }
     
     // Timeout de 5 segundos

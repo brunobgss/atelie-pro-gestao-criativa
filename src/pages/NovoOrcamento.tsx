@@ -10,10 +10,20 @@ import { toast } from "sonner";
 import { useState } from "react";
 import { createQuote, generateQuoteCode } from "@/integrations/supabase/quotes";
 import { useAuth } from "@/components/AuthProvider";
+import { useQueryClient } from "@tanstack/react-query";
+import { useSync } from "@/contexts/SyncContext";
+import { useSyncOperations } from "@/hooks/useSyncOperations";
+import { validateName, validateMoney, validateDescription, validateForm } from "@/utils/validators";
+import { errorHandler } from "@/utils/errorHandler";
+import { logger } from "@/utils/logger";
+import { performanceMonitor } from "@/utils/performanceMonitor";
 
 export default function NovoOrcamento() {
   const navigate = useNavigate();
   const { empresa } = useAuth();
+  const queryClient = useQueryClient();
+  const { invalidateRelated } = useSync();
+  const { syncAfterCreate } = useSyncOperations();
   const [items, setItems] = useState([{ description: "", quantity: 1, value: 0 }]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -25,21 +35,78 @@ export default function NovoOrcamento() {
     const observations = (document.getElementById("observations") as HTMLTextAreaElement)?.value || undefined;
     const code = generateQuoteCode();
 
-    const result = await createQuote({
-      code,
-      customer_name: clientInput,
-      customer_phone: phoneInput,
-      date: dateInput,
-      observations: (observations || '') + (deliveryDateInput ? `\nData de entrega estimada: ${new Date(deliveryDateInput).toLocaleDateString('pt-BR')}` : ''),
-      items,
-    });
-
-    if (!result.ok) {
-      toast.error(result.error || "Erro ao criar orçamento");
+    // Validação de campos obrigatórios
+    // Validação robusta
+    const validation = validateForm(
+      { client: clientInput, items },
+      {
+        client: validateName,
+        items: (items) => {
+          if (!Array.isArray(items) || items.length === 0) {
+            return { isValid: false, errors: ['Adicione pelo menos um item ao orçamento'] };
+          }
+          
+          const errors: string[] = [];
+          items.forEach((item, index) => {
+            if (!item.description?.trim()) {
+              errors.push(`Item ${index + 1}: Descrição é obrigatória`);
+            }
+            if (!item.quantity || item.quantity <= 0) {
+              errors.push(`Item ${index + 1}: Quantidade deve ser maior que zero`);
+            }
+            if (!item.value || item.value <= 0) {
+              errors.push(`Item ${index + 1}: Valor deve ser maior que zero`);
+            }
+          });
+          
+          return { isValid: errors.length === 0, errors };
+        }
+      }
+    );
+    
+    if (!validation.isValid) {
+      validation.errors.forEach(error => toast.error(error));
       return;
     }
 
+    // Medir performance e criar orçamento
+    const result = await performanceMonitor.measure(
+      'createQuote',
+      async () => {
+        return await createQuote({
+          code,
+          customer_name: clientInput,
+          customer_phone: phoneInput,
+          date: dateInput,
+          observations: (observations || '') + (deliveryDateInput ? `\nData de entrega estimada: ${new Date(deliveryDateInput).toLocaleDateString('pt-BR')}` : ''),
+          items,
+        });
+      },
+      'NovoOrcamento'
+    );
+
+    if (!result.ok) {
+      const appError = errorHandler.handleSupabaseError(
+        { message: result.error, code: 'CREATE_QUOTE_ERROR' },
+        'createQuote'
+      );
+      logger.error('Falha ao criar orçamento', 'NOVO_ORCAMENTO', { client: clientInput, itemsCount: items.length, error: result.error });
+      toast.error(appError.message);
+      return;
+    }
+    
+    // Log de sucesso
+    logger.userAction('quote_created', 'NOVO_ORCAMENTO', { 
+      quoteCode: code, 
+      client: clientInput, 
+      itemsCount: items.length, 
+      totalValue: items.reduce((sum, item) => sum + (item.quantity * item.value), 0)
+    });
+
     toast.success("Orçamento criado com sucesso!");
+    // Sincronização automática
+    syncAfterCreate('quotes', result.data);
+    invalidateRelated('quotes');
     navigate(`/orcamento/${code}`);
   };
 
