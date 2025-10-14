@@ -33,22 +33,33 @@ export async function listInventory(): Promise<InventoryRow[]> {
 
 export async function updateInventoryItem(id: string, input: { name?: string; quantity?: number; unit?: string; min_quantity?: number }): Promise<{ ok: boolean; data?: InventoryRow; error?: string }> {
   try {
-    const updateData: unknown = {};
-    if (input.name !== undefined) updateData.name = input.name;
-    if (input.quantity !== undefined) updateData.quantity = input.quantity;
-    if (input.unit !== undefined) updateData.unit = input.unit;
-    if (input.min_quantity !== undefined) updateData.min_quantity = input.min_quantity;
+    console.log("🔄 Atualizando item do estoque:", { id, input });
+    
+    // Preparar dados de forma mais segura
+    const updateData: Record<string, unknown> = {};
+    if (input.name !== undefined) updateData.name = String(input.name);
+    if (input.quantity !== undefined) updateData.quantity = Number(input.quantity);
+    if (input.unit !== undefined) updateData.unit = String(input.unit);
+    if (input.min_quantity !== undefined) updateData.min_quantity = Number(input.min_quantity);
+    
+    console.log("📝 Dados para atualização:", updateData);
     
     const { data, error } = await supabase
       .from("inventory_items")
       .update(updateData)
       .eq("id", id)
-      .select()
+      .select("*")
       .single();
     
-    if (error) throw error;
+    if (error) {
+      console.error("❌ Erro do Supabase:", error);
+      throw error;
+    }
+    
+    console.log("✅ Item atualizado com sucesso:", data);
     return { ok: true, data: data as InventoryRow };
   } catch (e: unknown) {
+    console.error("❌ Erro na atualização:", e);
     return { ok: false, error: e?.message ?? "Erro ao atualizar item do estoque" };
   }
 }

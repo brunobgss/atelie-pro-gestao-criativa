@@ -120,6 +120,28 @@ export default function OrcamentoImpressao() {
     );
   }
 
+  // FORÇAR SERIALIZAÇÃO CORRETA DOS DADOS
+  const safeQuote = {
+    code: String(quote?.code || 'N/A'),
+    customer_name: String(quote?.customer_name || 'Cliente não informado'),
+    customer_phone: String(quote?.customer_phone || 'Não informado'),
+    total_value: Number(quote?.total_value || 0),
+    observations: String(quote?.observations || 'Sem observações'),
+    date: String(quote?.date || new Date().toISOString().split('T')[0])
+  };
+
+  const safeItems = (items || []).map((item: unknown, index: number) => ({
+    index: index + 1,
+    description: String(item?.description || 'Produto personalizado'),
+    quantity: Number(item?.quantity || 1),
+    unit_value: Number(item?.unit_value || 0),
+    total: Number(item?.quantity || 1) * Number(item?.unit_value || 0)
+  }));
+
+  console.log("=== DADOS FINAIS SERIALIZADOS ===");
+  console.log("Safe Quote:", safeQuote);
+  console.log("Safe Items:", safeItems);
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
@@ -157,72 +179,7 @@ export default function OrcamentoImpressao() {
             <Button
               onClick={() => {
                   console.log("=== INICIANDO IMPRESSÃO ===");
-                  console.log("Quote original:", quote);
-                  console.log("Items original:", items);
-                  
-                  // Preparar dados seguros para evitar [object Object]
-                  const safeQuote = {
-                    code: String(quote?.code || 'N/A'),
-                    customer_name: String(quote?.customer_name || 'Cliente não informado'),
-                    customer_phone: String(quote?.customer_phone || 'Não informado'),
-                    total_value: Number(quote?.total_value || 0),
-                    observations: String(quote?.observations || 'Sem observações'),
-                    date: String(quote?.date || new Date().toISOString().split('T')[0])
-                  };
-
-                  console.log("=== SERIALIZAÇÃO SEGURA ===");
-                  console.log("Quote original:", quote);
-                  console.log("Safe quote:", safeQuote);
-
-                  const safeItems = (items || []).map((item: unknown, index: number) => {
-                    const safeItem = {
-                      index: index + 1,
-                      description: String(item?.description || 'Produto personalizado'),
-                      quantity: Number(item?.quantity || 1),
-                      unit_value: Number(item?.unit_value || 0),
-                      total: Number(item?.quantity || 1) * Number(item?.unit_value || 0)
-                    };
-                    console.log(`Item ${index + 1}:`, { original: item, safe: safeItem });
-                    return safeItem;
-                  });
-
-                  console.log("Safe items final:", safeItems);
-
-                  console.log("Safe Quote:", safeQuote);
-                  console.log("Safe Items:", safeItems);
-
-                  // Função formatCurrency segura
-                  const formatCurrency = (value: number) => {
-                    try {
-                      const numValue = Number(value) || 0;
-                      const formatted = new Intl.NumberFormat('pt-BR', {
-                        style: 'currency',
-                        currency: 'BRL'
-                      }).format(numValue);
-                      console.log(`formatCurrency(${value}) = ${formatted}`);
-                      return formatted;
-                    } catch (e) {
-                      const fallback = `R$ ${(Number(value) || 0).toFixed(2).replace('.', ',')}`;
-                      console.log(`formatCurrency fallback(${value}) = ${fallback}`);
-                      return fallback;
-                    }
-                  };
-
-                  // Verificação final antes de gerar HTML
-                  console.log("=== VERIFICAÇÃO FINAL ===");
-                  console.log("Safe quote final:", JSON.stringify(safeQuote, null, 2));
-                  console.log("Safe items final:", JSON.stringify(safeItems, null, 2));
-                  
-                  // Verificar se há objetos não serializados
-                  const hasObjectObjects = JSON.stringify(safeQuote).includes('[object Object]') || 
-                                         JSON.stringify(safeItems).includes('[object Object]');
-                  if (hasObjectObjects) {
-                    console.error("❌ OBJETOS NÃO SERIALIZADOS DETECTADOS!");
-                    console.error("Quote com [object Object]:", JSON.stringify(safeQuote).includes('[object Object]'));
-                    console.error("Items com [object Object]:", JSON.stringify(safeItems).includes('[object Object]'));
-                  } else {
-                    console.log("✅ Dados serializados corretamente!");
-                  }
+                  console.log("Usando dados já serializados:", { safeQuote, safeItems });
 
                   // Gerar HTML do PDF
                   const pdfHtml = `
