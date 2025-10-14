@@ -68,11 +68,17 @@ export async function updateInventoryItem(id: string, input: { name?: string; qu
     console.log("🔍 DEBUG: Verificando se item existe...");
     const { data: existingItem, error: checkError } = await supabase
       .from("inventory_items")
-      .select("id, name, quantity, unit, min_quantity")
+      .select("id, name, quantity, unit, min_quantity, empresa_id")
       .eq("id", normalizedId)
       .single();
     
     console.log("🔍 Resultado da verificação:", { existingItem, checkError });
+    
+    // Verificar se o item tem empresa_id
+    if (existingItem && !existingItem.empresa_id) {
+      console.error("❌ Item não tem empresa_id definido!");
+      return { ok: false, error: "Item não tem empresa associada" };
+    }
     
     if (checkError) {
       console.error("❌ Erro ao verificar item:", checkError);
