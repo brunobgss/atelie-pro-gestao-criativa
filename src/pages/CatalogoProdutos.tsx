@@ -192,8 +192,13 @@ export default function CatalogoProdutos() {
         toast.success("Produto adicionado com sucesso!");
       }
       
-      // Invalidar cache e recarregar dados
-      queryClient.invalidateQueries({ queryKey: ["products"] });
+      // Sincronizar dados
+      if (editingProduct) {
+        syncAfterUpdate('products', editingProduct.id, result.data);
+      } else {
+        syncAfterCreate('products', result.data);
+      }
+      invalidateRelated('products');
       refetch();
       
     } catch (error) {
@@ -235,7 +240,8 @@ export default function CatalogoProdutos() {
       }
       
       toast.success("Produto removido com sucesso!");
-      queryClient.invalidateQueries({ queryKey: ["products"] });
+      syncAfterDelete('products', id);
+      invalidateRelated('products');
       refetch();
     } catch (error) {
       console.error("Erro ao deletar produto:", error);
@@ -260,7 +266,8 @@ export default function CatalogoProdutos() {
       }
       
       toast.success("Produto duplicado com sucesso!");
-      queryClient.invalidateQueries({ queryKey: ["products"] });
+      syncAfterCreate('products', result.data);
+      invalidateRelated('products');
       refetch();
     } catch (error) {
       console.error("Erro ao duplicar produto:", error);

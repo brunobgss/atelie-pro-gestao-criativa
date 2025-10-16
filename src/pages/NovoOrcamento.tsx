@@ -3,14 +3,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { ArrowLeft, Save, Share2, Plus, Trash2, MessageCircle, Printer } from "lucide-react";
+import { ArrowLeft, Save, Share2, Plus, Trash2, MessageCircle, Printer, Package } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useState } from "react";
 import { createQuote, generateQuoteCode } from "@/integrations/supabase/quotes";
+import { getProducts } from "@/integrations/supabase/products";
 import { useAuth } from "@/components/AuthProvider";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useSync } from "@/contexts/SyncContext";
 import { useSyncOperations } from "@/hooks/useSyncOperations";
 import { validateName, validateMoney, validateDescription, validateForm } from "@/utils/validators";
@@ -25,6 +27,13 @@ export default function NovoOrcamento() {
   const { invalidateRelated } = useSync();
   const { syncAfterCreate } = useSyncOperations();
   const [items, setItems] = useState([{ description: "", quantity: 1, value: 0 }]);
+  const [selectedProduct, setSelectedProduct] = useState<string>("");
+
+  // Query para buscar produtos do catálogo
+  const { data: products = [] } = useQuery({
+    queryKey: ["products"],
+    queryFn: getProducts,
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,6 +121,30 @@ export default function NovoOrcamento() {
 
   const addItem = () => {
     setItems([...items, { description: "", quantity: 1, value: 0 }]);
+  };
+
+  // Função para adicionar item do catálogo
+  const addCatalogItem = () => {
+    if (!selectedProduct) {
+      toast.error("Selecione um produto do catálogo");
+      return;
+    }
+
+    const product = products.find(p => p.id === selectedProduct);
+    if (!product) {
+      toast.error("Produto não encontrado");
+      return;
+    }
+
+    const newItem = {
+      description: `${product.name} - ${product.type}`,
+      quantity: 1,
+      value: product.unit_price
+    };
+
+    setItems([...items, newItem]);
+    setSelectedProduct(""); // Limpar seleção
+    toast.success("Produto adicionado ao orçamento!");
   };
 
   const removeItem = (index: number) => {
@@ -207,16 +240,67 @@ export default function NovoOrcamento() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <Label>Itens do Orçamento</Label>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={addItem}
-                    className="border-secondary text-secondary"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Adicionar Item
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addItem}
+                      className="border-secondary text-secondary"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Adicionar Item
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Seletor de Catálogo */}
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Package className="w-4 h-4 text-blue-600" />
+                    <Label className="text-blue-800 font-medium">Adicionar do Catálogo</Label>
+                  </div>
+                  <div className="flex gap-3">
+                    <Select value={selectedProduct} onValueChange={setSelectedProduct}>
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="Selecione um produto do catálogo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {products.map((product) => (
+                          <SelectItem key={product.id} value={product.id}>
+                            {product.name} - R$ {product.unit_price.toFixed(2)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      type="button"
+                      onClick={addCatalogItem}
+                      disabled={!selectedProduct}
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Adicionar
+                    </Button>
+                  </div>
+                  {selectedProduct && (
+                    <div className="mt-3 text-sm text-blue-700 bg-blue-100 p-2 rounded">
+                      {(() => {
+                        const product = products.find(p => p.id === selectedProduct);
+                        return product ? (
+                          <div>
+                            <p><strong>Nome:</strong> {product.name}</p>
+                            <p><strong>Preço:</strong> R$ {product.unit_price.toFixed(2)}</p>
+                            <p><strong>Tempo estimado:</strong> {product.work_hours}h</p>
+                            <p><strong>Tipo:</strong> {product.type}</p>
+                            {product.materials && product.materials.length > 0 && (
+                              <p><strong>Materiais:</strong> {product.materials.join(", ")}</p>
+                            )}
+                          </div>
+                        ) : null;
+                      })()}
+                    </div>
+                  )}
                 </div>
 
                 {items.map((item, index) => (
