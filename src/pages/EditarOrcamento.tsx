@@ -125,6 +125,21 @@ export default function EditarOrcamento() {
     );
   }
 
+  if (!quoteData) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-2xl font-semibold text-foreground mb-4">Orçamento não encontrado</h2>
+          <p className="text-muted-foreground mb-4">O orçamento solicitado não foi encontrado.</p>
+          <Button onClick={() => navigate("/orcamentos")}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Voltar para Orçamentos
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">

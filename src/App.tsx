@@ -21,6 +21,7 @@ import EditarPedido from "./pages/EditarPedido";
 import PedidoDetalhe from "./pages/PedidoDetalhe";
 import Orcamentos from "./pages/Orcamentos";
 import NovoOrcamento from "./pages/NovoOrcamento";
+import EditarOrcamento from "./pages/EditarOrcamento";
 import OrcamentoImpressaoNovo from "./pages/OrcamentoImpressaoNovo";
 import Clientes from "./pages/Clientes";
 import Estoque from "./pages/Estoque";
@@ -38,8 +39,12 @@ import OrdemProducao from "./pages/OrdemProducao";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutos
-      retry: 1,
+      staleTime: 0, // Sempre buscar dados frescos
+      cacheTime: 2 * 60 * 1000, // Cache por 2 minutos
+      retry: 3, // Tentar 3 vezes em caso de erro
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Backoff exponencial
+      refetchOnWindowFocus: false, // Não refetch ao focar na janela
+      refetchOnReconnect: true, // Refetch ao reconectar
     },
   },
 });
@@ -68,6 +73,7 @@ function App() {
                   <Route path="pedidos/:id" element={<PedidoDetalhe />} />
                   <Route path="orcamentos" element={<Orcamentos />} />
                   <Route path="orcamentos/novo" element={<NovoOrcamento />} />
+                  <Route path="orcamentos/editar/:id" element={<EditarOrcamento />} />
                   <Route path="clientes" element={<Clientes />} />
                   <Route path="estoque" element={<Estoque />} />
                   <Route path="catalogo" element={<CatalogoProdutos />} />

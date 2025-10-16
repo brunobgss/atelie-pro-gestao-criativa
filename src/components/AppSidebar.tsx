@@ -12,6 +12,7 @@ import {
   SidebarMenuButton,
 } from "@/components/ui/sidebar";
 import { useAuth } from "./AuthProvider";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const menuItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
@@ -29,14 +30,23 @@ const menuItems = [
 ];
 
 export function AppSidebar() {
-  const { state } = useSidebar();
+  const { state, setOpen, setOpenMobile } = useSidebar();
   const isCollapsed = state === "collapsed";
   const { empresa, signOut } = useAuth();
+  const isMobile = useIsMobile();
+
+  // Fechar menu no mobile quando clicar em um link
+  const handleLinkClick = () => {
+    if (isMobile) {
+      console.log("🔄 Link clicado no mobile, fechando menu");
+      setOpenMobile(false);
+    }
+  };
 
   return (
     <Sidebar 
-      collapsible="none" 
-      className="bg-card border-r border-border md:relative fixed md:translate-x-0 z-50"
+      collapsible="offcanvas" 
+      className="bg-card border-r border-border"
       side="left"
     >
       <div className="p-6 border-b border-border/50">
@@ -91,6 +101,7 @@ export function AppSidebar() {
                   <NavLink
                     to={item.url}
                     end={item.url === "/"}
+                    onClick={handleLinkClick}
                     className={({ isActive }) =>
                       `flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
                         isActive

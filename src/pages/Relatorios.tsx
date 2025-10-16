@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { TrendingUp, TrendingDown, DollarSign, Package, Users, Calendar, Download, Filter } from "lucide-react";
+import { toast } from "sonner";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useQuery } from "@tanstack/react-query";
 import { listOrders } from "@/integrations/supabase/orders";
@@ -106,35 +107,238 @@ export default function Relatorios() {
   }, [orders, quotes, selectedPeriod]);
 
   const exportReport = () => {
-    const reportText = `
-📊 RELATÓRIO FINANCEIRO - ATELIÊ PRO
-Período: ${reportData.period}
-
-💰 RESUMO FINANCEIRO
-• Receita Total: R$ ${reportData.totalRevenue.toFixed(2)}
-• Total de Pedidos: ${reportData.totalOrders}
-• Ticket Médio: R$ ${reportData.averageOrderValue.toFixed(2)}
-
-📦 PRODUTOS MAIS VENDIDOS
-${reportData.topProducts.map((product, index) => 
-  `${index + 1}. ${product.name}: ${product.count} vendas - R$ ${product.revenue.toFixed(2)}`
-).join('\n')}
-
-👥 CLIENTES TOP
-${reportData.topCustomers.map((customer, index) => 
-  `${index + 1}. ${customer.name}: ${customer.orders} pedidos - R$ ${customer.revenue.toFixed(2)}`
-).join('\n')}
-
-📈 STATUS DOS PEDIDOS
-${Object.entries(reportData.statusBreakdown).map(([status, count]) => 
-  `• ${status}: ${count} pedidos`
-).join('\n')}
-
-Relatório gerado em ${new Date().toLocaleDateString('pt-BR')}
-    `.trim();
-
-    navigator.clipboard.writeText(reportText);
-    // Aqui você poderia implementar download de PDF
+    console.log("=== GERANDO RELATÓRIO FINANCEIRO ===");
+    console.log("Report Data:", reportData);
+    
+    // Gerar HTML do relatório
+    const reportHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Relatório Financeiro - Ateliê Pro</title>
+          <meta charset="utf-8">
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { 
+              font-family: 'Arial', sans-serif; 
+              line-height: 1.6; 
+              color: #333; 
+              background: white; 
+              padding: 20px; 
+            }
+            .container { max-width: 800px; margin: 0 auto; }
+            .header { 
+              text-align: center; 
+              margin-bottom: 40px; 
+              border-bottom: 3px solid #7c3aed; 
+              padding-bottom: 20px; 
+            }
+            .header h1 { font-size: 28px; font-weight: bold; margin: 0; margin-bottom: 10px; color: #7c3aed; }
+            .header .subtitle { font-size: 16px; color: #6b7280; }
+            .section { 
+              margin-bottom: 30px; 
+              background: #f8fafc;
+              padding: 20px;
+              border-radius: 8px;
+              border-left: 4px solid #7c3aed;
+            }
+            .section h2 { 
+              font-size: 20px; 
+              font-weight: bold; 
+              margin-bottom: 15px; 
+              color: #7c3aed; 
+            }
+            .grid { 
+              display: grid; 
+              grid-template-columns: 1fr 1fr; 
+              gap: 20px; 
+              margin-bottom: 20px; 
+            }
+            .item { 
+              display: flex; 
+              flex-direction: column; 
+            }
+            .label { 
+              font-size: 12px; 
+              color: #6b7280; 
+              font-weight: bold; 
+              text-transform: uppercase; 
+              margin-bottom: 5px; 
+            }
+            .value { 
+              font-size: 16px; 
+              color: #1f2937; 
+              font-weight: 500; 
+            }
+            .metric-card {
+              background: white;
+              padding: 15px;
+              border-radius: 8px;
+              border: 1px solid #e5e7eb;
+              margin-bottom: 15px;
+            }
+            .metric-title {
+              font-size: 14px;
+              color: #6b7280;
+              margin-bottom: 5px;
+            }
+            .metric-value {
+              font-size: 24px;
+              font-weight: bold;
+              color: #059669;
+            }
+            .list-item {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              padding: 10px;
+              background: white;
+              border-radius: 6px;
+              margin-bottom: 8px;
+              border: 1px solid #e5e7eb;
+            }
+            .list-item .name {
+              font-weight: 500;
+              color: #1f2937;
+            }
+            .list-item .value {
+              font-weight: bold;
+              color: #059669;
+            }
+            .footer { 
+              margin-top: 40px; 
+              text-align: center; 
+              font-size: 12px; 
+              color: #6b7280; 
+              border-top: 1px solid #e5e7eb; 
+              padding-top: 20px; 
+            }
+            @media print {
+              body { padding: 0; }
+              .container { max-width: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>📊 RELATÓRIO FINANCEIRO</h1>
+              <div class="subtitle">Ateliê Pro - Sistema de Gestão</div>
+              <div class="subtitle">Período: ${reportData.period}</div>
+              <div class="subtitle">Gerado em: ${new Date().toLocaleDateString('pt-BR')}</div>
+            </div>
+            
+            <div class="section">
+              <h2>💰 Resumo Financeiro</h2>
+              <div class="grid">
+                <div class="metric-card">
+                  <div class="metric-title">Receita Total</div>
+                  <div class="metric-value">R$ ${reportData.totalRevenue.toFixed(2)}</div>
+                </div>
+                <div class="metric-card">
+                  <div class="metric-title">Total de Pedidos</div>
+                  <div class="metric-value">${reportData.totalOrders}</div>
+                </div>
+                <div class="metric-card">
+                  <div class="metric-title">Ticket Médio</div>
+                  <div class="metric-value">R$ ${reportData.averageOrderValue.toFixed(2)}</div>
+                </div>
+                <div class="metric-card">
+                  <div class="metric-title">Clientes Ativos</div>
+                  <div class="metric-value">${reportData.topCustomers.length}</div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="section">
+              <h2>📈 Análise de Rentabilidade</h2>
+              <div class="grid">
+                <div class="metric-card" style="background: #f0fdf4; border-left: 4px solid #059669;">
+                  <div class="metric-title">Margem de Lucro</div>
+                  <div class="metric-value" style="color: #059669;">${((reportData.totalRevenue * 0.35).toFixed(0))}%</div>
+                  <div style="font-size: 12px; color: #059669; margin-top: 5px;">
+                    R$ ${(reportData.totalRevenue * 0.35).toFixed(2)} lucro estimado
+                  </div>
+                </div>
+                <div class="metric-card" style="background: #eff6ff; border-left: 4px solid #3b82f6;">
+                  <div class="metric-title">Custos Estimados</div>
+                  <div class="metric-value" style="color: #3b82f6;">R$ ${(reportData.totalRevenue * 0.65).toFixed(2)}</div>
+                  <div style="font-size: 12px; color: #3b82f6; margin-top: 5px;">
+                    65% da receita total
+                  </div>
+                </div>
+                <div class="metric-card" style="background: #faf5ff; border-left: 4px solid #7c3aed;">
+                  <div class="metric-title">ROI Médio</div>
+                  <div class="metric-value" style="color: #7c3aed;">${reportData.totalOrders > 0 ? (((reportData.totalRevenue * 0.35) / reportData.totalOrders) * 100 / reportData.averageOrderValue).toFixed(1) : '0'}%</div>
+                  <div style="font-size: 12px; color: #7c3aed; margin-top: 5px;">
+                    Retorno por pedido
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="section">
+              <h2>📦 Produtos Mais Vendidos</h2>
+              ${reportData.topProducts.map((product, index) => `
+                <div class="list-item">
+                  <div>
+                    <div class="name">${index + 1}. ${product.name}</div>
+                    <div style="font-size: 12px; color: #6b7280;">${product.count} vendas</div>
+                  </div>
+                  <div class="value">R$ ${product.revenue.toFixed(2)}</div>
+                </div>
+              `).join('')}
+            </div>
+            
+            <div class="section">
+              <h2>👥 Clientes que Mais Compram</h2>
+              ${reportData.topCustomers.map((customer, index) => `
+                <div class="list-item">
+                  <div>
+                    <div class="name">${index + 1}. ${customer.name}</div>
+                    <div style="font-size: 12px; color: #6b7280;">${customer.orders} pedidos</div>
+                  </div>
+                  <div class="value">R$ ${customer.revenue.toFixed(2)}</div>
+                </div>
+              `).join('')}
+            </div>
+            
+            <div class="section">
+              <h2>📈 Status dos Pedidos</h2>
+              ${Object.entries(reportData.statusBreakdown).map(([status, count]) => `
+                <div class="list-item">
+                  <div class="name">${status}</div>
+                  <div class="value">${count} pedidos</div>
+                </div>
+              `).join('')}
+            </div>
+            
+            <div class="footer">
+              <p>Relatório gerado automaticamente pelo Ateliê Pro</p>
+              <p>Data: ${new Date().toLocaleString('pt-BR')}</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+    
+    // Abrir nova janela com o relatório
+    const newWindow = window.open('', '_blank');
+    if (newWindow) {
+      newWindow.document.write(reportHtml);
+      newWindow.document.close();
+      
+      // Aguardar carregamento e abrir diálogo de impressão
+      newWindow.onload = () => {
+        console.log("Relatório carregado, abrindo diálogo de impressão...");
+        newWindow.print();
+      };
+      
+      // Mostrar notificação de sucesso
+      toast.success("Relatório gerado com sucesso! Abrindo para impressão...");
+    } else {
+      toast.error("Não foi possível abrir a janela. Verifique se os pop-ups estão bloqueados.");
+    }
   };
 
   return (

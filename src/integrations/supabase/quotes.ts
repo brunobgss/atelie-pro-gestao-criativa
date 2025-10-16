@@ -23,10 +23,23 @@ export async function listQuotes(): Promise<QuoteRow[]> {
   try {
     console.log("Buscando lista de orçamentos...");
     
-    // Primeiro, tentar sem timeout para ver se funciona
+    // Obter empresa_id do usuário logado
+    const { data: userEmpresa } = await supabase
+      .from("user_empresas")
+      .select("empresa_id")
+      .eq("user_id", (await supabase.auth.getUser()).data.user?.id)
+      .single();
+    
+    if (!userEmpresa?.empresa_id) {
+      console.error("Usuário não tem empresa associada");
+      return [];
+    }
+    
+    // Filtrar por empresa_id
     const { data, error } = await supabase
       .from("atelie_quotes")
       .select("id, code, customer_name, customer_phone, date, observations, total_value, status")
+      .eq("empresa_id", userEmpresa.empresa_id)
       .order("date", { ascending: false })
       .limit(50);
     
@@ -50,6 +63,7 @@ export async function listQuotes(): Promise<QuoteRow[]> {
       const { data: fallbackData, error: fallbackError } = await supabase
         .from("atelie_quotes")
         .select("id, code, customer_name, total_value")
+        .eq("empresa_id", userEmpresa.empresa_id)
         .limit(20);
       
       if (!fallbackError && fallbackData) {
@@ -81,6 +95,18 @@ export async function getQuoteByCode(code: string): Promise<{ quote: QuoteRow | 
   try {
     console.log("Buscando orçamento por código:", code);
     
+    // Obter empresa_id do usuário logado
+    const { data: userEmpresa } = await supabase
+      .from("user_empresas")
+      .select("empresa_id")
+      .eq("user_id", (await supabase.auth.getUser()).data.user?.id)
+      .single();
+    
+    if (!userEmpresa?.empresa_id) {
+      console.error("Usuário não tem empresa associada");
+      return { quote: null, items: [] };
+    }
+    
     // Verificar se o banco está funcionando
     const isDbWorking = await checkDatabaseHealth();
     
@@ -102,6 +128,7 @@ export async function getQuoteByCode(code: string): Promise<{ quote: QuoteRow | 
       .from("atelie_quotes")
       .select("id, code, customer_name, customer_phone, date, observations, total_value, status")
       .eq(isUuid ? "id" : "code", code.trim())
+      .eq("empresa_id", userEmpresa.empresa_id)
       .maybeSingle();
 
     const { data: quote, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
@@ -281,7 +308,7 @@ export async function approveQuote(quoteCode: string): Promise<{ ok: boolean; er
         description: `Orçamento aprovado - ${itemsDescription}`,
         value: totalValue,
         paid: 0,
-        type: "outro", // Adicionar campo type obrigatório
+        type: "catalogo", // Adicionar campo type obrigatório
         delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 dias
         status: "Aguardando aprovação",
         empresa_id: empresa_id
@@ -304,7 +331,7 @@ export async function approveQuote(quoteCode: string): Promise<{ ok: boolean; er
             description: `Orçamento aprovado - ${itemsDescription}`,
             value: totalValue,
             paid: 0,
-            type: "outro", // Adicionar campo type obrigatório
+            type: "catalogo", // Adicionar campo type obrigatório
             delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
             status: "Aguardando aprovação"
           })

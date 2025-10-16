@@ -1,4 +1,5 @@
 import { supabase } from "./client";
+import { getCurrentEmpresaId } from "./auth-utils";
 
 export type CustomerRow = {
   id: string;
@@ -7,31 +8,27 @@ export type CustomerRow = {
   email?: string | null;
 };
 
-export async function createCustomer(input: { name: string; phone?: string; email?: string; address?: string }): Promise<{ ok: boolean; id?: string; data?: CustomerRow; error?: string }> {
+export async function createCustomer(input: { name: string; phone?: string; email?: string }): Promise<{ ok: boolean; id?: string; data?: CustomerRow; error?: string }> {
   try {
     console.log("➕ Criando cliente no banco:", input);
     
-    // Buscar o empresa_id do usuário atual
-    const { data: userEmpresa, error: userError } = await supabase
-      .from("user_empresas")
-      .select("empresa_id")
-      .single();
+    // Obter empresa_id do usuário logado usando a função existente
+    const empresa_id = await getCurrentEmpresaId();
     
-    if (userError || !userEmpresa) {
-      console.error("❌ Erro ao buscar empresa do usuário:", userError);
+    if (!empresa_id) {
+      console.error("❌ Erro ao obter empresa do usuário");
       return { ok: false, error: "Erro ao identificar empresa do usuário" };
     }
     
-    console.log("✅ Empresa encontrada:", userEmpresa.empresa_id);
+    console.log("✅ Empresa encontrada:", empresa_id);
     
     const { data, error } = await supabase
       .from("customers")
       .insert({
-        empresa_id: userEmpresa.empresa_id,
+        empresa_id: empresa_id,
         name: input.name, 
         phone: input.phone ?? null, 
-        email: input.email ?? null,
-        address: input.address ?? null
+        email: input.email ?? null
       })
       .select("*")
       .single();

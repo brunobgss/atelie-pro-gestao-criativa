@@ -22,6 +22,18 @@ export type OrderRow = {
 
 export async function listOrders(): Promise<OrderRow[]> {
   try {
+    // Obter empresa_id do usuário logado
+    const { data: userEmpresa } = await supabase
+      .from("user_empresas")
+      .select("empresa_id")
+      .eq("user_id", (await supabase.auth.getUser()).data.user?.id)
+      .single();
+    
+    if (!userEmpresa?.empresa_id) {
+      console.error("Usuário não tem empresa associada");
+      return [];
+    }
+    
     // Verificar se o banco está funcionando
     const isDbWorking = await checkDatabaseHealth();
     
@@ -33,6 +45,7 @@ export async function listOrders(): Promise<OrderRow[]> {
     const { data, error } = await supabase
       .from("atelie_orders")
       .select("id, code, customer_name, customer_phone, type, description, value, paid, delivery_date, status, file_url")
+      .eq("empresa_id", userEmpresa.empresa_id)
       .order("created_at", { ascending: false })
       .limit(100);
     
@@ -117,6 +130,7 @@ export async function createOrder(input: {
   delivery_date?: string;
   status?: string;
   observations?: string;
+  file_url?: string;
 }): Promise<{ ok: boolean; id?: string; error?: string }> {
   try {
     const code = input.code ?? generateOrderCode();
@@ -139,6 +153,7 @@ export async function createOrder(input: {
         delivery_date: input.delivery_date ?? null,
         status: input.status ?? "Aguardando aprovação",
         observations: input.observations ?? null,
+        file_url: input.file_url ?? null,
         empresa_id
       })
       .select()
@@ -231,6 +246,7 @@ export async function updateOrder(
     delivery_date: string;
     status: string;
     observations: string;
+    file_url: string;
   }>
 ): Promise<{ ok: boolean; data?: OrderRow; error?: string }> {
   try {

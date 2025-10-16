@@ -12,7 +12,8 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { createOrder, generateOrderCode } from "@/integrations/supabase/orders";
 import { uploadOrderFile } from "@/integrations/supabase/storage";
-import { useQueryClient } from "@tanstack/react-query";
+import { getProducts } from "@/integrations/supabase/products";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useSync } from "@/contexts/SyncContext";
 import { useSyncOperations } from "@/hooks/useSyncOperations";
 import { validateName, validateMoney, validateDate, validateDescription, validateForm } from "@/utils/validators";
@@ -25,9 +26,18 @@ export default function NovoPedido() {
   const queryClient = useQueryClient();
   const { invalidateRelated } = useSync();
   const { syncAfterCreate } = useSyncOperations();
+
+  // Buscar produtos do catálogo
+  const { data: products = [] } = useQuery({
+    queryKey: ["products"],
+    queryFn: getProducts,
+  });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [quantity, setQuantity] = useState<number>(1);
   const [color, setColor] = useState<string>("");
+  const [size, setSize] = useState<string>("");
+  const [type, setType] = useState<string>("");
+  const [selectedProduct, setSelectedProduct] = useState<string>("");
   const [isKitMode, setIsKitMode] = useState<boolean>(false);
   const [kitItems, setKitItems] = useState<Array<{size: string, quantity: number}>>([
     { size: "P", quantity: 0 },
@@ -172,7 +182,6 @@ export default function NovoPedido() {
     }
     
     const client = (document.getElementById("client") as HTMLInputElement)?.value;
-    const type = (document.querySelector("[data-select-type]") as HTMLButtonElement)?.dataset.value || "outro";
     const description = (document.getElementById("description") as HTMLTextAreaElement)?.value || "";
     const value = Number((document.getElementById("value") as HTMLInputElement)?.value || 0);
     const paid = Number((document.getElementById("paid") as HTMLInputElement)?.value || 0);
@@ -185,7 +194,7 @@ export default function NovoPedido() {
       { client, type, description, value, delivery, quantity },
       {
         client: validateName,
-        type: (value) => value && value !== "outro" ? { isValid: true, errors: [] } : { isValid: false, errors: ['Tipo do pedido é obrigatório'] },
+        type: (value) => value && value.trim() !== "" ? { isValid: true, errors: [] } : { isValid: false, errors: ['Tipo do pedido é obrigatório'] },
         description: validateDescription,
         value: validateMoney,
         delivery: validateDate,
@@ -203,14 +212,25 @@ export default function NovoPedido() {
 
     // Montar descrição com informações do kit ou quantidade simples
     let finalDescription = description;
+    
+    // Adicionar informações do produto selecionado se for "Item do Catálogo"
+    if (type === "catalogo" && selectedProduct) {
+      const product = products.find(p => p.id === selectedProduct);
+      if (product) {
+        finalDescription = `${description}\nProduto: ${product.name} (R$ ${product.unit_price.toFixed(2)})`;
+      }
+    }
+    
     if (isKitMode) {
       const kitInfo = kitItems
         .filter(item => item.quantity > 0)
         .map(item => `${item.quantity} ${item.size}`)
         .join(" | ");
-      finalDescription = `${description}\nKit: ${kitInfo}\nTotal: ${getTotalKitQuantity()} peças${color ? ` | Cor: ${color}` : ""}`;
+      finalDescription = `${finalDescription}\nKit: ${kitInfo}\nTotal: ${getTotalKitQuantity()} peças${color ? ` | Cor: ${color}` : ""}`;
     } else {
-      finalDescription = `${description}\nQtd: ${quantity}${color ? ` | Cor: ${color}` : ""}`;
+      const sizeInfo = size ? ` | Tamanho: ${size}` : "";
+      const colorInfo = color ? ` | Cor: ${color}` : "";
+      finalDescription = `${finalDescription}\nQtd: ${quantity}${sizeInfo}${colorInfo}`;
     }
 
     console.log("Dados do pedido a serem enviados:", {
@@ -312,19 +332,62 @@ export default function NovoPedido() {
 
                 <div className="space-y-2">
                   <Label htmlFor="type">Tipo de Pedido *</Label>
-                  <Select required>
-                    <SelectTrigger className="border-input" data-select-type>
+      <Select value={type} onValueChange={(value) => {
+        setType(value);
+        if (value !== "catalogo") {
+          setSelectedProduct("");
+        }
+      }} required>
+                    <SelectTrigger className="border-input">
                       <SelectValue placeholder="Selecione o tipo" />
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="bordado">Bordado Computadorizado</SelectItem>
-                      <SelectItem value="camiseta">Camiseta Personalizada</SelectItem>
-                      <SelectItem value="uniforme">Uniforme</SelectItem>
-                      <SelectItem value="personalizado">Personalizado</SelectItem>
-                      <SelectItem value="outro">Outro</SelectItem>
-                    </SelectContent>
+        <SelectContent>
+          <SelectItem value="bordado">Bordado Computadorizado</SelectItem>
+          <SelectItem value="camiseta">Camiseta Personalizada</SelectItem>
+          <SelectItem value="uniforme">Uniforme</SelectItem>
+          <SelectItem value="personalizado">Personalizado</SelectItem>
+          <SelectItem value="catalogo">Item do Catálogo</SelectItem>
+          <SelectItem value="outro">Outro</SelectItem>
+        </SelectContent>
                   </Select>
                 </div>
+
+                {/* Seletor de Catálogo - aparece quando escolher "Item do Catálogo" */}
+                {type === "catalogo" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="product">Produto do Catálogo</Label>
+                    <Select value={selectedProduct} onValueChange={setSelectedProduct}>
+                      <SelectTrigger className="border-input">
+                        <SelectValue placeholder="Selecione um produto do catálogo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {products.map((product) => (
+                          <SelectItem key={product.id} value={product.id}>
+                            {product.name} - R$ {product.unit_price.toFixed(2)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {selectedProduct && (
+                      <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded">
+                        {(() => {
+                          const product = products.find(p => p.id === selectedProduct);
+                          return product ? (
+                            <div>
+                              <p><strong>Nome:</strong> {product.name}</p>
+                              <p><strong>Preço:</strong> R$ {product.unit_price.toFixed(2)}</p>
+                              <p><strong>Tempo estimado:</strong> {product.work_hours}h</p>
+                              <p><strong>Tipo:</strong> {product.type}</p>
+                              {product.materials && product.materials.length > 0 && (
+                                <p><strong>Materiais:</strong> {product.materials.join(", ")}</p>
+                              )}
+                            </div>
+                          ) : null;
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -494,7 +557,26 @@ export default function NovoPedido() {
                   <Label htmlFor="qty">Quantidade</Label>
                   <Input id="qty" type="number" min="1" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} />
                 </div>
-                <div className="space-y-2 md:col-span-2">
+                <div className="space-y-2">
+                  <Label htmlFor="size">Tamanho</Label>
+                  <Select value={size} onValueChange={setSize}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o tamanho" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="PP">PP</SelectItem>
+                      <SelectItem value="P">P</SelectItem>
+                      <SelectItem value="M">M</SelectItem>
+                      <SelectItem value="G">G</SelectItem>
+                      <SelectItem value="GG">GG</SelectItem>
+                      <SelectItem value="XG">XG</SelectItem>
+                      <SelectItem value="XXG">XXG</SelectItem>
+                      <SelectItem value="Único">Único</SelectItem>
+                      <SelectItem value="Personalizado">Personalizado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
                   <Label htmlFor="color">Cor</Label>
                   <Input id="color" placeholder="Ex.: Preto, Azul..." value={color} onChange={(e) => setColor(e.target.value)} />
                 </div>

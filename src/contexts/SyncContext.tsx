@@ -13,15 +13,24 @@ const SyncContext = createContext<SyncContextType | undefined>(undefined);
 export function SyncProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
 
-  // Refresh automático a cada 30 segundos para garantir dados atualizados
+  // Refresh automático a cada 10 segundos para garantir dados atualizados
   useEffect(() => {
     const interval = setInterval(() => {
       console.log('🔄 Refresh automático dos dados...');
+      // Invalidar e refetch imediatamente
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
       queryClient.invalidateQueries({ queryKey: ['customers'] });
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
-    }, 30000); // 30 segundos
+      queryClient.invalidateQueries({ queryKey: ['receitas'] });
+      
+      // Forçar refetch imediato
+      queryClient.refetchQueries({ queryKey: ['orders'] });
+      queryClient.refetchQueries({ queryKey: ['quotes'] });
+      queryClient.refetchQueries({ queryKey: ['customers'] });
+      queryClient.refetchQueries({ queryKey: ['inventory'] });
+      queryClient.refetchQueries({ queryKey: ['receitas'] });
+    }, 10000); // 10 segundos
 
     return () => clearInterval(interval);
   }, [queryClient]);

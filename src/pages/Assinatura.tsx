@@ -8,11 +8,12 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAuth } from "@/components/AuthProvider";
-import { validateCpfCnpj, validatePhone, validateForm } from "@/utils/validators";
+import { validateCpfCnpj, validatePhone, validateForm, cleanPhone } from "@/utils/validators";
 import { errorHandler } from "@/utils/errorHandler";
 import { logger } from "@/utils/logger";
 import { performanceMonitor } from "@/utils/performanceMonitor";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { asaasService } from "@/integrations/asaas/service";
 
 interface Plan {
   id: string;
@@ -107,7 +108,7 @@ export default function Assinatura() {
       const userName = empresa?.responsavel || empresa?.nome || user?.email || "Usuário";
       const userEmail = empresa?.email || user?.email || "";
       const cpfCnpj = empresa?.cpf_cnpj || "";
-      const telefone = empresa?.telefone || "";
+      const telefone = cleanPhone(empresa?.telefone || "");
       
       // Validação robusta dos dados necessários
       const validation = validateForm(
@@ -152,7 +153,12 @@ export default function Assinatura() {
         'Assinatura'
       );
 
-      if (result && result.payment) {
+      console.log('🔍 Resultado completo:', result);
+      console.log('🔍 Result.data:', result?.data);
+      console.log('🔍 Result.success:', result?.success);
+
+      // O Asaas retorna o pagamento diretamente, não dentro de {success, data}
+      if (result && result.id && result.object === 'payment') {
         logger.userAction('subscription_created', 'ASSINATURA', { 
           planType: pendingPlanId, 
           paymentMethod: selectedPaymentMethod,
@@ -166,11 +172,20 @@ export default function Assinatura() {
         console.log('✅ Pagamento criado:', result);
         
         // Redirecionar para o link de pagamento do ASAAS
-        if (result.payment.invoiceUrl) {
-          window.open(result.payment.invoiceUrl, '_blank');
-          toast.success(`Pagamento ${pendingPlanId === 'monthly' ? 'Mensal' : 'Anual'} criado! Abra o link para pagar via PIX.`);
+        if (result.invoiceUrl) {
+          // Tentar abrir em nova aba, se falhar, redirecionar na mesma aba
+          const newWindow = window.open(result.invoiceUrl, '_blank');
+          
+          // Verificar se a janela foi bloqueada (mobile)
+          if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
+            // Se não conseguiu abrir nova aba, redirecionar na mesma aba
+            window.location.href = result.invoiceUrl;
+            toast.success(`Pagamento ${pendingPlanId === 'monthly' ? 'Mensal' : 'Anual'} criado! Redirecionando para pagamento...`);
+          } else {
+            toast.success(`Pagamento ${pendingPlanId === 'monthly' ? 'Mensal' : 'Anual'} criado! Abra o link para pagar via ${selectedPaymentMethod === 'PIX' ? 'PIX' : 'cartão'}.`);
+          }
         } else {
-          toast.success(`Pagamento ${pendingPlanId === 'monthly' ? 'Mensal' : 'Anual'} criado! Verifique seu email para o PIX.`);
+          toast.success(`Pagamento ${pendingPlanId === 'monthly' ? 'Mensal' : 'Anual'} criado! Verifique seu email para o ${selectedPaymentMethod === 'PIX' ? 'PIX' : 'pagamento'}.`);
         }
         
         // Aqui você pode redirecionar ou mostrar mais informações
@@ -231,30 +246,54 @@ export default function Assinatura() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100">
       {/* Header */}
       <div className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 sticky top-0 z-10 shadow-sm">
-        <div className="p-6 flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <SidebarTrigger className="text-gray-700 hover:bg-gray-100" />
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate("/")}
-              className="text-gray-700 hover:bg-gray-100"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Voltar
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                <Crown className="w-6 h-6 text-purple-600" />
-                Escolha seu Plano
-              </h1>
-              <p className="text-gray-600 text-sm mt-0.5">Desbloqueie todo o potencial do Ateliê Pro</p>
+        <div className="p-4 md:p-6">
+          {/* Mobile Layout */}
+          <div className="md:hidden">
+            <div className="flex items-center gap-3 mb-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate("/")}
+                className="text-gray-700 hover:bg-gray-100 p-2"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+              <div className="flex-1">
+                <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <Crown className="w-5 h-5 text-purple-600" />
+                  Escolha seu Plano
+                </h1>
+                <p className="text-gray-600 text-xs">Desbloqueie todo o potencial</p>
+              </div>
+            </div>
+          </div>
+          
+          {/* Desktop Layout */}
+          <div className="hidden md:flex justify-between items-center">
+            <div className="flex items-center gap-4">
+              <SidebarTrigger className="text-gray-700 hover:bg-gray-100" />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate("/")}
+                className="text-gray-700 hover:bg-gray-100"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Voltar
+              </Button>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                  <Crown className="w-6 h-6 text-purple-600" />
+                  Escolha seu Plano
+                </h1>
+                <p className="text-gray-600 text-sm mt-0.5">Desbloqueie todo o potencial do Ateliê Pro</p>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="p-8">
+      <div className="p-4 md:p-8">
         {/* Hero Section */}
         <div className="text-center mb-12">
           <h2 className="text-4xl font-bold text-gray-900 mb-4">
@@ -268,7 +307,7 @@ export default function Assinatura() {
 
         {/* Plans Grid */}
         <div className="max-w-6xl mx-auto">
-          <div className="grid gap-8 md:grid-cols-2">
+          <div className="grid gap-6 md:gap-8 grid-cols-1 md:grid-cols-2">
             {plans.map((plan) => {
               const colors = getColorClasses(plan.color);
               const IconComponent = plan.icon;
@@ -442,70 +481,182 @@ export default function Assinatura() {
 
       {/* Modal de Seleção de Forma de Pagamento */}
       <Dialog open={isPaymentModalOpen} onOpenChange={setIsPaymentModalOpen}>
-        <DialogContent className="sm:max-w-md max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-center text-purple-800 text-lg">
+        <DialogContent className="sm:max-w-md max-h-[95vh] overflow-y-auto">
+          <DialogHeader className="text-center pb-4">
+            <div className="mx-auto w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center mb-3">
+              <CreditCard className="w-6 h-6 text-white" />
+            </div>
+            <DialogTitle className="text-xl font-bold text-gray-900">
               Escolha a Forma de Pagamento
             </DialogTitle>
+            <p className="text-gray-600 text-sm mt-1">
+              Selecione como deseja pagar sua assinatura do Ateliê PRO
+            </p>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="grid grid-cols-1 gap-3">
+          
+          <div className="space-y-4 py-2">
+            {/* Resumo do Plano */}
+            <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-3 border border-purple-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-gray-900 text-sm">
+                    {pendingPlanId === 'yearly' ? 'Plano Anual' : 'Plano Mensal'}
+                  </h3>
+                  <p className="text-xs text-gray-600">
+                    {pendingPlanId === 'yearly' ? 'R$ 390,00/ano' : 'R$ 39,00/mês'}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <div className="text-xl font-bold text-purple-600">
+                    {pendingPlanId === 'yearly' ? 'R$ 390' : 'R$ 39'}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {pendingPlanId === 'yearly' ? 'por ano' : 'por mês'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Opções de Pagamento */}
+            <div className="space-y-2">
+              <h4 className="font-semibold text-gray-900 text-sm mb-3">Métodos de Pagamento</h4>
+              
+              {/* PIX */}
               <Button
                 variant={selectedPaymentMethod === 'PIX' ? 'default' : 'outline'}
                 onClick={() => setSelectedPaymentMethod('PIX')}
-                className={`h-16 flex flex-col items-center justify-center gap-1 p-3 ${
+                className={`w-full h-16 flex items-center justify-between p-3 transition-all duration-200 ${
                   selectedPaymentMethod === 'PIX' 
-                    ? 'bg-purple-600 hover:bg-purple-700 text-white' 
-                    : 'hover:bg-purple-50'
+                    ? 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-lg border-green-500' 
+                    : 'hover:bg-green-50 border-green-200 hover:border-green-300'
                 }`}
               >
-                <div className="text-2xl">📱</div>
-                <div className="font-semibold text-sm">PIX</div>
-                <div className="text-xs opacity-75">Pagamento instantâneo</div>
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                    selectedPaymentMethod === 'PIX' 
+                      ? 'bg-white/20' 
+                      : 'bg-green-100'
+                  }`}>
+                    <div className="text-xl">⚡</div>
+                  </div>
+                  <div className="text-left">
+                    <div className="font-semibold text-sm">PIX</div>
+                    <div className={`text-xs ${
+                      selectedPaymentMethod === 'PIX' 
+                        ? 'text-green-100' 
+                        : 'text-gray-600'
+                    }`}>
+                      Pagamento instantâneo • Aprovação imediata
+                    </div>
+                  </div>
+                </div>
+                {selectedPaymentMethod === 'PIX' && (
+                  <div className="w-5 h-5 bg-white rounded-full flex items-center justify-center">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  </div>
+                )}
               </Button>
               
+              {/* Cartão de Crédito */}
               <Button
                 variant={selectedPaymentMethod === 'CREDIT_CARD' ? 'default' : 'outline'}
                 onClick={() => setSelectedPaymentMethod('CREDIT_CARD')}
-                className={`h-16 flex flex-col items-center justify-center gap-1 p-3 ${
+                className={`w-full h-16 flex items-center justify-between p-3 transition-all duration-200 ${
                   selectedPaymentMethod === 'CREDIT_CARD' 
-                    ? 'bg-purple-600 hover:bg-purple-700 text-white' 
-                    : 'hover:bg-purple-50'
+                    ? 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg border-blue-500' 
+                    : 'hover:bg-blue-50 border-blue-200 hover:border-blue-300'
                 }`}
               >
-                <div className="text-2xl">💳</div>
-                <div className="font-semibold text-sm">Cartão</div>
-                <div className="text-xs opacity-75">Crédito ou débito</div>
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                    selectedPaymentMethod === 'CREDIT_CARD' 
+                      ? 'bg-white/20' 
+                      : 'bg-blue-100'
+                  }`}>
+                    <CreditCard className="w-5 h-5" />
+                  </div>
+                  <div className="text-left">
+                    <div className="font-semibold text-sm">Cartão de Crédito</div>
+                    <div className={`text-xs ${
+                      selectedPaymentMethod === 'CREDIT_CARD' 
+                        ? 'text-blue-100' 
+                        : 'text-gray-600'
+                    }`}>
+                      Visa, Mastercard, Elo • Parcelamento disponível
+                    </div>
+                  </div>
+                </div>
+                {selectedPaymentMethod === 'CREDIT_CARD' && (
+                  <div className="w-5 h-5 bg-white rounded-full flex items-center justify-center">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  </div>
+                )}
               </Button>
               
+              {/* Boleto Bancário */}
               <Button
                 variant={selectedPaymentMethod === 'BOLETO' ? 'default' : 'outline'}
                 onClick={() => setSelectedPaymentMethod('BOLETO')}
-                className={`h-16 flex flex-col items-center justify-center gap-1 p-3 ${
+                className={`w-full h-16 flex items-center justify-between p-3 transition-all duration-200 ${
                   selectedPaymentMethod === 'BOLETO' 
-                    ? 'bg-purple-600 hover:bg-purple-700 text-white' 
-                    : 'hover:bg-purple-50'
+                    ? 'bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg border-orange-500' 
+                    : 'hover:bg-orange-50 border-orange-200 hover:border-orange-300'
                 }`}
               >
-                <div className="text-2xl">📄</div>
-                <div className="font-semibold text-sm">Boleto</div>
-                <div className="text-xs opacity-75">Bancário</div>
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                    selectedPaymentMethod === 'BOLETO' 
+                      ? 'bg-white/20' 
+                      : 'bg-orange-100'
+                  }`}>
+                    <div className="text-xl">📄</div>
+                  </div>
+                  <div className="text-left">
+                    <div className="font-semibold text-sm">Boleto Bancário</div>
+                    <div className={`text-xs ${
+                      selectedPaymentMethod === 'BOLETO' 
+                        ? 'text-orange-100' 
+                        : 'text-gray-600'
+                    }`}>
+                      Pagamento em até 3 dias úteis • Vencimento em 3 dias
+                    </div>
+                  </div>
+                </div>
+                {selectedPaymentMethod === 'BOLETO' && (
+                  <div className="w-5 h-5 bg-white rounded-full flex items-center justify-center">
+                    <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                  </div>
+                )}
               </Button>
             </div>
+
+            {/* Informações de Segurança */}
+            <div className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+              <div className="flex items-start gap-2">
+                <div className="w-4 h-4 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
+                </div>
+                <div className="text-xs text-gray-700">
+                  <p className="font-medium mb-1">Pagamento 100% Seguro</p>
+                  <p>Seus dados são protegidos com criptografia SSL e processados por gateways de pagamento certificados.</p>
+                </div>
+              </div>
+            </div>
             
-            <div className="flex gap-3 justify-end pt-6 border-t">
+            {/* Botões de Ação */}
+            <div className="flex gap-2 justify-end pt-4 border-t border-gray-200">
               <Button 
                 variant="outline" 
                 onClick={() => setIsPaymentModalOpen(false)}
                 disabled={isLoading}
-                className="px-6"
+                className="px-6 h-10 font-medium text-sm"
               >
                 Cancelar
               </Button>
               <Button 
                 onClick={handleConfirmPayment}
                 disabled={isLoading}
-                className="bg-purple-600 hover:bg-purple-700 px-6"
+                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white px-6 h-10 font-medium shadow-lg text-sm"
               >
                 {isLoading ? (
                   <div className="flex items-center gap-2">
@@ -513,7 +664,10 @@ export default function Assinatura() {
                     Processando...
                   </div>
                 ) : (
-                  "Confirmar Pagamento"
+                  <div className="flex items-center gap-2">
+                    <CreditCard className="w-3 h-3" />
+                    Confirmar Pagamento
+                  </div>
                 )}
               </Button>
             </div>

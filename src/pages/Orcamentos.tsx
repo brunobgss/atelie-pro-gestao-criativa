@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -145,7 +146,18 @@ ${empresa?.nome || 'Ateliê'}`;
 
       console.log("Mensagem WhatsApp:", message);
       const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
-      window.open(whatsappUrl, '_blank');
+      
+      // Tentar abrir em nova aba, se falhar, abrir na mesma aba
+      const newWindow = window.open(whatsappUrl, '_blank');
+      
+      // Verificar se a nova janela foi bloqueada (comum no mobile)
+      if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
+        console.log("Nova janela bloqueada, redirecionando na mesma aba");
+        window.location.href = whatsappUrl;
+      } else {
+        console.log("Nova janela aberta com sucesso");
+        toast.success("Abrindo WhatsApp...");
+      }
     } catch (error) {
       console.error("Erro ao enviar WhatsApp:", error);
       
@@ -165,13 +177,26 @@ Atenciosamente,
 ${empresa?.nome || 'Ateliê'}`;
 
       const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
-      window.open(whatsappUrl, '_blank');
+      
+      // Tentar abrir em nova aba, se falhar, abrir na mesma aba
+      const newWindow = window.open(whatsappUrl, '_blank');
+      
+      // Verificar se a nova janela foi bloqueada (comum no mobile)
+      if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
+        console.log("Nova janela bloqueada (fallback), redirecionando na mesma aba");
+        window.location.href = whatsappUrl;
+      } else {
+        console.log("Nova janela aberta com sucesso (fallback)");
+        toast.success("Abrindo WhatsApp...");
+      }
     }
   };
 
   const handleEditQuote = (quoteId: string) => {
     navigate(`/orcamentos/editar/${quoteId}`);
   };
+
+  const [approvingQuote, setApprovingQuote] = useState<string | null>(null);
 
   const handleApproveQuote = async (quote: unknown) => {
     try {
@@ -184,6 +209,14 @@ ${empresa?.nome || 'Ateliê'}`;
         toast.error("Código do orçamento não encontrado");
         return;
       }
+
+      // Prevenir duplo clique
+      if (approvingQuote === quoteCode) {
+        console.log("Aprovação já em andamento para:", quoteCode);
+        return;
+      }
+
+      setApprovingQuote(quoteCode);
       
       const result = await approveQuote(quoteCode);
       if (result.ok) {
@@ -197,6 +230,8 @@ ${empresa?.nome || 'Ateliê'}`;
     } catch (error) {
       console.error("Erro ao aprovar orçamento:", error);
       toast.error("Erro ao aprovar orçamento");
+    } finally {
+      setApprovingQuote(null);
     }
   };
 
@@ -328,7 +363,7 @@ ${empresa?.nome || 'Ateliê'}`;
                       <Button
                         variant="outline"
                         size="sm"
-                        className="border-secondary text-secondary hover:bg-secondary/10"
+                        className="border-secondary text-secondary hover:bg-secondary/10 min-h-[40px] touch-manipulation"
                         onClick={() => openPublicView(quote.id)}
                       >
                         <Share2 className="w-4 h-4 mr-2" />
@@ -337,7 +372,7 @@ ${empresa?.nome || 'Ateliê'}`;
                       <Button
                         variant="outline"
                         size="sm"
-                        className="border-border"
+                        className="border-border min-h-[40px] touch-manipulation"
                         onClick={() => navigate(`/orcamentos/${quote.id}/impressao`)}
                       >
                         <Printer className="w-4 h-4 mr-2" />
@@ -346,11 +381,28 @@ ${empresa?.nome || 'Ateliê'}`;
                       <Button
                         variant="outline"
                         size="sm"
-                        className="border-green-600 text-green-600 hover:bg-green-600/10"
-                        onClick={() => openWhatsApp(quote)}
+                        className="border-green-600 text-green-600 hover:bg-green-600/10 min-h-[40px] touch-manipulation active:bg-green-600/20"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          console.log("Botão WhatsApp clicado no mobile");
+                          openWhatsApp(quote);
+                        }}
+                        onTouchStart={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          console.log("Touch start no botão WhatsApp");
+                        }}
+                        onTouchEnd={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          console.log("Touch end no botão WhatsApp");
+                          openWhatsApp(quote);
+                        }}
                       >
                         <MessageCircle className="w-4 h-4 mr-2" />
-                        Enviar WhatsApp
+                        <span className="hidden sm:inline">Enviar WhatsApp</span>
+                        <span className="sm:hidden">WhatsApp</span>
                       </Button>
                     </div>
                   </div>
@@ -371,9 +423,10 @@ ${empresa?.nome || 'Ateliê'}`;
                       size="sm"
                       className="border-green-600 text-green-600 hover:bg-green-600/10"
                       onClick={() => handleApproveQuote(quote)}
+                      disabled={approvingQuote === (quote.code || quote.id)}
                     >
                       <CheckCircle className="w-4 h-4 mr-2" />
-                      Aprovar
+                      {approvingQuote === (quote.code || quote.id) ? "Aprovando..." : "Aprovar"}
                     </Button>
                     <Button
                       variant="outline"

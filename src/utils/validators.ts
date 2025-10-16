@@ -21,6 +21,12 @@ export function validateEmail(email: string): ValidationResult {
   return { isValid: errors.length === 0, errors };
 }
 
+// Função para limpar telefone (remover caracteres não numéricos)
+export function cleanPhone(phone: string): string {
+  if (!phone) return '';
+  return phone.replace(/\D/g, '');
+}
+
 // Validação de telefone
 export function validatePhone(phone: string): ValidationResult {
   const errors: string[] = [];
@@ -31,26 +37,31 @@ export function validatePhone(phone: string): ValidationResult {
   }
   
   // Remove todos os caracteres não numéricos
-  const cleanPhone = phone.replace(/\D/g, '');
+  const cleanPhoneNumber = cleanPhone(phone);
   
-  if (cleanPhone.length < 10) {
+  if (cleanPhoneNumber.length < 10) {
     errors.push("Telefone deve ter pelo menos 10 dígitos");
   }
   
-  if (cleanPhone.length > 11) {
-    errors.push("Telefone deve ter no máximo 11 dígitos");
+  if (cleanPhoneNumber.length > 14) {
+    errors.push("Telefone deve ter no máximo 14 dígitos");
   }
   
   // Validação específica para telefones brasileiros
-  if (cleanPhone.length === 11 && !cleanPhone.startsWith('11')) {
+  if (cleanPhoneNumber.length === 11 && !cleanPhoneNumber.startsWith('11')) {
     // Telefone celular com DDD diferente de 11 (SP)
-    if (!cleanPhone.match(/^[1-9][1-9]9[0-9]{8}$/)) {
+    if (!cleanPhoneNumber.match(/^[1-9][1-9]9[0-9]{8}$/)) {
       errors.push("Formato de telefone celular inválido");
     }
-  } else if (cleanPhone.length === 10) {
+  } else if (cleanPhoneNumber.length === 10) {
     // Telefone fixo
-    if (!cleanPhone.match(/^[1-9][1-9][0-9]{8}$/)) {
+    if (!cleanPhoneNumber.match(/^[1-9][1-9][0-9]{8}$/)) {
       errors.push("Formato de telefone fixo inválido");
+    }
+  } else if (cleanPhoneNumber.length === 12 || cleanPhoneNumber.length === 13) {
+    // Telefone com código do país (+55)
+    if (!cleanPhoneNumber.startsWith('55')) {
+      errors.push("Código do país inválido para telefone brasileiro");
     }
   }
   

@@ -1,13 +1,15 @@
 // src/utils/trialPersistence.ts
 // Sistema robusto de persistência do trial
 
+import { Empresa } from "@/types/empresa";
+
 const STORAGE_KEY = 'atelie-pro-trial-end-date';
 const STORAGE_KEY_EMPRESA = 'atelie-pro-empresa-data';
 const STORAGE_KEY_USER = 'atelie-pro-user-id';
 
 export interface TrialData {
   trialEndDate: string;
-  empresaData: unknown;
+  empresaData: Empresa;
   userId: string;
 }
 
@@ -20,7 +22,7 @@ export function getTrialData(): TrialData | null {
     if (storedTrialDate && storedEmpresaData && storedUserId) {
       return {
         trialEndDate: storedTrialDate,
-        empresaData: JSON.parse(storedEmpresaData),
+        empresaData: JSON.parse(storedEmpresaData) as Empresa,
         userId: storedUserId
       };
     }
@@ -50,7 +52,6 @@ export function createNewTrial(userId: string): TrialData {
   const empresaData = {
     id: "temp-id",
     nome: "Empresa Temporária",
-    email: "temp@empresa.com",
     telefone: "",
     responsavel: "Usuário",
     trial_end_date: trialEndDate

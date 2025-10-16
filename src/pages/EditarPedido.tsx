@@ -6,10 +6,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { ArrowLeft, Save, Upload } from "lucide-react";
+import { ArrowLeft, Save, Upload, File } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { getOrderByCode, updateOrder } from "@/integrations/supabase/orders";
+import { uploadOrderFile } from "@/integrations/supabase/storage";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSync } from "@/contexts/SyncContext";
 import { useSyncOperations } from "@/hooks/useSyncOperations";
@@ -29,6 +30,8 @@ export default function EditarPedido() {
   const [paid, setPaid] = useState<number>(0);
   const [delivery, setDelivery] = useState("");
   const [status, setStatus] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [currentFileUrl, setCurrentFileUrl] = useState<string | null>(null);
 
   const { data: order, isLoading } = useQuery({
     queryKey: ["order", id],
@@ -45,6 +48,7 @@ export default function EditarPedido() {
       setPaid(order.paid || 0);
       setDelivery(order.delivery_date || "");
       setStatus(order.status || "");
+      setCurrentFileUrl(order.file_url || null);
     }
   }, [order]);
 
@@ -69,6 +73,18 @@ export default function EditarPedido() {
     }
 
     try {
+      let fileUrl = currentFileUrl;
+      
+      // Upload do arquivo se houver um novo
+      if (file) {
+        const uploadResult = await uploadOrderFile(file, id!);
+        if (uploadResult.ok) {
+          fileUrl = uploadResult.url;
+        } else {
+          toast.warning("Arquivo não foi enviado, mas o pedido será atualizado");
+        }
+      }
+
       // Atualizar pedido usando a nova função completa
       const result = await updateOrder(id!, {
         customer_name: client,
@@ -80,7 +96,8 @@ export default function EditarPedido() {
         paid: paid,
         delivery_date: delivery,
         status: status,
-        observations: order?.observations || ""
+        observations: order?.observations || "",
+        file_url: fileUrl
       });
       
       if (result.ok) {
@@ -182,6 +199,7 @@ export default function EditarPedido() {
                       <SelectItem value="camiseta">Camiseta</SelectItem>
                       <SelectItem value="uniforme">Uniforme</SelectItem>
                       <SelectItem value="personalizado">Personalizado</SelectItem>
+                      <SelectItem value="catalogo">Item do Catálogo</SelectItem>
                       <SelectItem value="outro">Outro</SelectItem>
                     </SelectContent>
                   </Select>
@@ -255,6 +273,35 @@ export default function EditarPedido() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="file">Arquivo / Arte</Label>
+                <div className="space-y-3">
+                  {currentFileUrl && (
+                    <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg border">
+                      <File className="w-4 h-4 text-gray-600" />
+                      <a
+                        href={currentFileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-blue-600 hover:underline"
+                      >
+                        Arquivo atual
+                      </a>
+                    </div>
+                  )}
+                  <Input
+                    id="file"
+                    type="file"
+                    accept="image/*,.pdf,.doc,.docx"
+                    onChange={(e) => setFile(e.target.files?.[0] || null)}
+                    className="border-input"
+                  />
+                  <p className="text-xs text-gray-500">
+                    Formatos aceitos: JPG, PNG, PDF, DOC, DOCX (máx. 10MB)
+                  </p>
+                </div>
               </div>
 
               <div className="flex gap-3 pt-4 border-t border-border">

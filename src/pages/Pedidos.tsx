@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Plus, Search, Filter, Package, Calendar, User, Copy, Edit, X } from "lucide-react";
+import { Plus, Search, Filter, Package, Calendar, User, Copy, Edit, X, FileText } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listOrders, updateOrderStatus } from "@/integrations/supabase/orders";
@@ -83,6 +83,180 @@ export default function Pedidos() {
     }
   };
 
+  const generateProductionOrderPDF = (orders: any[]) => {
+    // Filtrar todos os pedidos em aberto (não cancelados nem entregues)
+    const openOrders = orders.filter(order => 
+      order.status !== "Cancelado" && order.status !== "Entregue"
+    );
+
+    if (openOrders.length === 0) {
+      toast.warning("Nenhum pedido em aberto encontrado!");
+      return;
+    }
+
+    // Criar conteúdo do PDF - Lista simples
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Lista de Pedidos em Aberto</title>
+        <style>
+          @media print {
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; }
+            .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; }
+            .header h1 { font-size: 28px; color: #333; margin-bottom: 10px; }
+            .header p { color: #666; font-size: 16px; }
+            .order-item { 
+              border: 1px solid #ddd; 
+              margin-bottom: 15px; 
+              padding: 15px; 
+              border-radius: 8px;
+              background: #f9f9f9;
+            }
+            .order-header { 
+              font-weight: bold; 
+              font-size: 16px; 
+              color: #2563eb; 
+              margin-bottom: 10px;
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+            }
+            .order-details { 
+              display: grid; 
+              grid-template-columns: 1fr 1fr; 
+              gap: 10px; 
+              margin-bottom: 10px;
+            }
+            .detail-item { 
+              display: flex; 
+              flex-direction: column; 
+            }
+            .detail-label { 
+              font-size: 12px; 
+              color: #666; 
+              font-weight: bold; 
+              text-transform: uppercase;
+            }
+            .detail-value { 
+              font-size: 14px; 
+              color: #333; 
+              margin-top: 2px;
+            }
+            .order-description { 
+              margin-top: 10px; 
+              padding: 10px; 
+              background: white; 
+              border-radius: 4px; 
+              border-left: 4px solid #2563eb;
+            }
+            .status-badge {
+              padding: 4px 8px;
+              border-radius: 4px;
+              font-size: 12px;
+              font-weight: bold;
+            }
+            .status-pending { background: #fef3c7; color: #92400e; }
+            .status-production { background: #dbeafe; color: #1e40af; }
+            .status-ready { background: #d1fae5; color: #065f46; }
+            .status-waiting { background: #f3e8ff; color: #7c3aed; }
+            .footer { margin-top: 30px; text-align: center; font-size: 12px; color: #666; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>LISTA DE PEDIDOS EM ABERTO</h1>
+          <p>Data: ${new Date().toLocaleDateString('pt-BR')}</p>
+          <p>Total de Pedidos: ${openOrders.length}</p>
+        </div>
+        
+        ${openOrders.map((order, index) => {
+          // Extrair informações da descrição
+          const description = order.description || '';
+          const sizeMatch = description.match(/Tamanho:\s*([^|]+)/);
+          const colorMatch = description.match(/Cor:\s*([^|]+)/);
+          const size = sizeMatch ? sizeMatch[1].trim() : 'N/A';
+          const color = colorMatch ? colorMatch[1].trim() : 'N/A';
+          
+          // Determinar classe do status
+          const getStatusClass = (status) => {
+            switch (status) {
+              case "Aguardando aprovação": return "status-pending";
+              case "Em produção": return "status-production";
+              case "Pronto": return "status-ready";
+              case "Aguardando retirada": return "status-waiting";
+              default: return "status-pending";
+            }
+          };
+          
+          return `
+            <div class="order-item">
+              <div class="order-header">
+                <span>Pedido #${order.id}</span>
+                <span class="status-badge ${getStatusClass(order.status)}">${order.status}</span>
+              </div>
+              <div class="order-details">
+                <div class="detail-item">
+                  <span class="detail-label">Cliente</span>
+                  <span class="detail-value">${order.client}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Tipo</span>
+                  <span class="detail-value">${order.type}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Tamanho</span>
+                  <span class="detail-value">${size}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Cor</span>
+                  <span class="detail-value">${color}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Valor</span>
+                  <span class="detail-value">R$ ${order.value.toFixed(2)}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Entrega</span>
+                  <span class="detail-value">${order.delivery ? new Date(order.delivery).toLocaleDateString('pt-BR') : 'N/A'}</span>
+                </div>
+              </div>
+              <div class="order-description">
+                <strong>Descrição:</strong> ${description.replace(/\n/g, ' ')}
+              </div>
+            </div>
+          `;
+        }).join('')}
+        
+        <div class="footer">
+          <p>Gerado em ${new Date().toLocaleString('pt-BR')} - Ateliê Pro</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    // Abrir janela de impressão
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.focus();
+      
+      // Aguardar carregamento e imprimir
+      setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+      }, 500);
+      
+      toast.success("Lista de pedidos gerada com sucesso!");
+    } else {
+      toast.error("Erro ao abrir janela de impressão!");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
@@ -94,12 +268,22 @@ export default function Pedidos() {
               <p className="text-sm text-muted-foreground">Gerencie todos os pedidos do ateliê</p>
             </div>
           </div>
-          <Link to="/pedidos/novo">
-            <Button className="bg-primary hover:bg-primary/90">
-              <Plus className="w-4 h-4 mr-2" />
-              Novo Pedido
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => generateProductionOrderPDF(orders)}
+              className="border-blue-200 text-blue-600 hover:bg-blue-50"
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              Lista de Pedidos em Aberto
             </Button>
-          </Link>
+            <Link to="/pedidos/novo">
+              <Button className="bg-primary hover:bg-primary/90">
+                <Plus className="w-4 h-4 mr-2" />
+                Novo Pedido
+              </Button>
+            </Link>
+          </div>
         </div>
       </header>
 

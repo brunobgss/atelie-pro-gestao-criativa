@@ -155,8 +155,8 @@ async function createPayment(paymentData) {
     payload = {
       customer: customerId,
       billingType: paymentMethod,
-      value: 390.00,
-      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      value: 390.00, // R$ 390,00 anual
+      dueDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 365 dias
       description: 'Assinatura Anual - Ateliê Pro',
       externalReference: companyId || 'temp-company'
     };

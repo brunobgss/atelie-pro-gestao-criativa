@@ -202,13 +202,42 @@ export default function Clientes() {
     queryFn: async () => {
       try {
         console.log("🔍 Buscando clientes do banco de dados...");
+        
+        // Obter usuário logado
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          console.error("Usuário não logado");
+          return [];
+        }
+        
+        console.log("🔍 Usuário logado:", user.id);
+        
+        // Obter empresa_id do usuário logado
+        const { data: userEmpresa, error: userEmpresaError } = await supabase
+          .from("user_empresas")
+          .select("empresa_id")
+          .eq("user_id", user.id)
+          .single();
+        
+        console.log("🔍 Resultado user_empresas:", { userEmpresa, userEmpresaError });
+        
+        if (userEmpresaError || !userEmpresa?.empresa_id) {
+          console.error("Usuário não tem empresa associada:", userEmpresaError);
+          return [];
+        }
+        
+        console.log("🔍 Empresa ID encontrada:", userEmpresa.empresa_id);
+        
         const { data: customers, error: customersError } = await supabase
           .from("customers")
           .select("*")
+          .eq("empresa_id", userEmpresa.empresa_id)
           .order("name", { ascending: true });
         
+        console.log("🔍 Resultado consulta customers:", { customers, customersError });
+        
         if (customersError) {
-          console.warn("Erro ao buscar clientes do banco, usando dados de demonstração:", customersError.message);
+          console.warn("Erro ao buscar clientes do banco, usando dados de demonstração:", customersError);
           return [];
         }
         
@@ -222,18 +251,20 @@ export default function Clientes() {
         // Buscar histórico real de pedidos e orçamentos para cada cliente
         const clientsWithHistory = await Promise.all(
           customers.map(async (client) => {
-            // Buscar pedidos do cliente
+            // Buscar pedidos do cliente (filtrado por empresa)
             const { data: orders } = await supabase
               .from("atelie_orders")
               .select("code, value, paid, status, delivery_date, created_at")
               .eq("customer_name", client.name)
+              .eq("empresa_id", userEmpresa.empresa_id)
               .order("created_at", { ascending: false });
             
-            // Buscar orçamentos do cliente
+            // Buscar orçamentos do cliente (filtrado por empresa)
             const { data: quotes } = await supabase
               .from("atelie_quotes")
               .select("code, total_value, status, date, created_at")
               .eq("customer_name", client.name)
+              .eq("empresa_id", userEmpresa.empresa_id)
               .order("created_at", { ascending: false });
             
             // Calcular estatísticas reais
@@ -273,7 +304,13 @@ export default function Clientes() {
   });
 
   // Usar clientes reais se disponíveis, senão usar demonstração
+  console.log("🔍 Debug - realClients:", realClients);
+  console.log("🔍 Debug - realClients.length:", realClients.length);
+  console.log("🔍 Debug - demoClients.length:", demoClients.length);
+  
   const clients = realClients.length > 0 ? realClients : demoClients;
+  
+  console.log("🔍 Debug - clients final:", clients.length, "clientes");
 
   if (isLoading) {
     return (
@@ -377,7 +414,7 @@ export default function Clientes() {
                     }
                     
                     // Sincronização automática
-                    syncAfterCreate('customers', result.data);
+                    syncAfterCreate('customers', res.data);
                   }}
                 >
                   Salvar

@@ -9,25 +9,8 @@ export async function getCurrentEmpresaId(): Promise<string> {
     const { data: { user } } = await supabase.auth.getUser();
     
     if (!user) {
-      console.log("Usuário não logado, buscando primeira empresa disponível");
-      // Buscar primeira empresa disponível
-      const { data: empresas, error: empresasError } = await supabase
-        .from("empresas")
-        .select("id")
-        .limit(1)
-        .single();
-      
-      if (empresasError) {
-        console.error("Erro ao buscar empresa:", empresasError);
-        throw new Error("Erro ao buscar empresa");
-      }
-      
-      if (empresas?.id) {
-        console.log("Empresa encontrada:", empresas.id);
-        return empresas.id;
-      }
-      
-      throw new Error("Nenhuma empresa encontrada");
+      console.log("Usuário não logado - acesso negado");
+      throw new Error("Usuário não autenticado");
     }
 
     console.log("Usuário logado:", user.id);
@@ -40,25 +23,8 @@ export async function getCurrentEmpresaId(): Promise<string> {
       .single();
 
     if (error || !data) {
-      console.log("Usuário não tem empresa associada, buscando primeira empresa disponível");
-      // Buscar primeira empresa disponível
-      const { data: empresas, error: empresasError } = await supabase
-        .from("empresas")
-        .select("id")
-        .limit(1)
-        .single();
-      
-      if (empresasError) {
-        console.error("Erro ao buscar empresa:", empresasError);
-        throw new Error("Erro ao buscar empresa");
-      }
-      
-      if (empresas?.id) {
-        console.log("Empresa encontrada:", empresas.id);
-        return empresas.id;
-      }
-      
-      throw new Error("Nenhuma empresa encontrada");
+      console.log("Usuário não tem empresa associada - acesso negado");
+      throw new Error("Usuário não tem empresa associada");
     }
 
     console.log("Empresa do usuário encontrada:", data.empresa_id);

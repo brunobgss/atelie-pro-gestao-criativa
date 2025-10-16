@@ -7,27 +7,33 @@ export type InventoryRow = {
   unit: string;
   min_quantity: number;
   status: string;
+  empresa_id?: string;
 };
 
 export async function listInventory(): Promise<InventoryRow[]> {
   try {
+    // Obter empresa_id do usuário logado
+    const { data: userEmpresa } = await supabase
+      .from("user_empresas")
+      .select("empresa_id")
+      .eq("user_id", (await supabase.auth.getUser()).data.user?.id)
+      .single();
+    
+    if (!userEmpresa?.empresa_id) {
+      console.error("Usuário não tem empresa associada");
+      return [];
+    }
+    
     const { data, error } = await supabase
       .from("inventory_items")
-      .select("id, name, quantity, unit, min_quantity, status")
+      .select("id, name, quantity, unit, min_quantity, status, empresa_id")
+      .eq("empresa_id", userEmpresa.empresa_id)
       .order("name", { ascending: true });
     if (error) throw error;
     return (data ?? []) as InventoryRow[];
-  } catch {
-    return [
-      { id: "i1", name: "Linha Preta", quantity: 45, unit: "bobinas", min_quantity: 20, status: "ok" },
-      { id: "i2", name: "Linha Branca", quantity: 32, unit: "bobinas", min_quantity: 20, status: "ok" },
-      { id: "i3", name: "Linha Azul", quantity: 8, unit: "bobinas", min_quantity: 15, status: "low" },
-      { id: "i4", name: "Tecido Algodão", quantity: 150, unit: "metros", min_quantity: 50, status: "ok" },
-      { id: "i5", name: "Tecido Poliéster", quantity: 25, unit: "metros", min_quantity: 40, status: "low" },
-      { id: "i6", name: "Zíperes", quantity: 3, unit: "unidades", min_quantity: 20, status: "critical" },
-      { id: "i7", name: "Botões", quantity: 180, unit: "unidades", min_quantity: 100, status: "ok" },
-      { id: "i8", name: "Elástico", quantity: 12, unit: "metros", min_quantity: 15, status: "low" },
-    ];
+  } catch (error) {
+    console.error("Erro ao listar estoque:", error);
+    return [];
   }
 }
 

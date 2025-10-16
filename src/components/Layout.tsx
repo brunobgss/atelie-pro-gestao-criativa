@@ -46,18 +46,13 @@ export function Layout() {
         <div className="min-h-screen flex w-full bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100 relative">
           <AppSidebar />
           
-          {/* Overlay para mobile quando sidebar estiver aberto */}
-          {isMobile && sidebarOpen && (
-            <div 
-              className="fixed inset-0 bg-black/50 z-40 md:hidden"
-              onClick={() => setSidebarOpen(false)}
-            />
-          )}
-          
           <main className="flex-1 overflow-auto">
-            {/* Botão mobile para fechar menu */}
-            <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-sm border-b border-gray-200/50 p-2 md:hidden">
+            {/* Botão mobile para abrir/fechar menu */}
+            <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-200/50 p-3 md:hidden flex items-center justify-between">
               <MobileSidebarTrigger />
+              <div className="text-sm text-gray-600 font-medium">
+                Ateliê PRO
+              </div>
             </div>
             
             <div className="p-2 sm:p-3 md:p-6">

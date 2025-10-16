@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Calendar, CheckCircle2, Clock, Package, Upload, User, Play, Pause, CheckCircle, Truck, Printer, Edit, CreditCard } from "lucide-react";
+import { ArrowLeft, Calendar, CheckCircle2, Clock, Package, Upload, User, Play, Pause, CheckCircle, Truck, Printer, Edit, CreditCard, Users } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getOrderByCode, updateOrderStatus } from "@/integrations/supabase/orders";
 import { getReceitaByOrderCode } from "@/integrations/supabase/receitas";
@@ -224,6 +224,261 @@ export default function PedidoDetalhe() {
   };
 
   const paymentStatus = getPaymentStatus();
+
+  // Função para gerar Ficha Técnica para Funcionários (sem valores financeiros)
+  const generateEmployeeTechnicalSheet = () => {
+    console.log("=== GERANDO FICHA TÉCNICA PARA FUNCIONÁRIOS ===");
+    console.log("Order:", order);
+    
+    // Gerar HTML da ficha técnica
+    const technicalSheetHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Ficha Técnica - ${order.id}</title>
+          <meta charset="utf-8">
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { 
+              font-family: 'Arial', sans-serif; 
+              line-height: 1.6; 
+              color: #333; 
+              background: white; 
+              padding: 20px; 
+            }
+            .container { max-width: 800px; margin: 0 auto; }
+            .header { 
+              text-align: center; 
+              margin-bottom: 40px; 
+              border-bottom: 3px solid #059669; 
+              padding-bottom: 20px; 
+            }
+            .header h1 { font-size: 28px; font-weight: bold; margin: 0; margin-bottom: 10px; color: #059669; }
+            .header .subtitle { font-size: 16px; color: #6b7280; }
+            .section { 
+              margin-bottom: 30px; 
+              background: #f0fdf4;
+              padding: 20px;
+              border-radius: 8px;
+              border-left: 4px solid #059669;
+            }
+            .section h2 { 
+              font-size: 20px; 
+              font-weight: bold; 
+              margin-bottom: 15px; 
+              color: #059669; 
+            }
+            .grid { 
+              display: grid; 
+              grid-template-columns: 1fr 1fr; 
+              gap: 20px; 
+              margin-bottom: 20px; 
+            }
+            .item { 
+              display: flex; 
+              flex-direction: column; 
+            }
+            .label { 
+              font-size: 12px; 
+              color: #6b7280; 
+              font-weight: bold; 
+              text-transform: uppercase; 
+              margin-bottom: 5px; 
+            }
+            .value { 
+              font-size: 16px; 
+              color: #1f2937; 
+              font-weight: 500; 
+            }
+            .status-badge { 
+              display: inline-block; 
+              padding: 6px 12px; 
+              border-radius: 20px; 
+              font-size: 12px; 
+              font-weight: bold; 
+              background: #f3f4f6; 
+              color: #374151; 
+            }
+            .logo-section { 
+              text-align: center; 
+              margin: 20px 0; 
+              padding: 20px;
+              background: white;
+              border-radius: 8px;
+              border: 2px dashed #d1d5db;
+            }
+            .logo-section img { 
+              max-width: 300px; 
+              max-height: 200px; 
+              border: 2px solid #e5e7eb; 
+              border-radius: 8px; 
+              box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            }
+            .technical-specs { 
+              background: #fef3c7; 
+              padding: 20px; 
+              border-radius: 8px; 
+              border-left: 4px solid #f59e0b; 
+            }
+            .technical-specs h3 { 
+              margin-bottom: 15px; 
+              color: #92400e; 
+              font-size: 18px; 
+            }
+            .technical-specs ul { 
+              list-style: none; 
+              padding: 0; 
+            }
+            .technical-specs li { 
+              margin-bottom: 10px; 
+              display: flex; 
+              align-items: center; 
+              font-size: 14px;
+            }
+            .technical-specs li span { 
+              color: #059669; 
+              margin-right: 10px; 
+              font-weight: bold; 
+            }
+            .footer { 
+              margin-top: 40px; 
+              text-align: center; 
+              font-size: 12px; 
+              color: #6b7280; 
+              border-top: 1px solid #e5e7eb; 
+              padding-top: 20px; 
+            }
+            .employee-notice {
+              background: #dbeafe;
+              border: 2px solid #3b82f6;
+              border-radius: 8px;
+              padding: 15px;
+              margin-bottom: 20px;
+              text-align: center;
+            }
+            .employee-notice h3 {
+              color: #1e40af;
+              font-size: 16px;
+              margin-bottom: 5px;
+            }
+            .employee-notice p {
+              color: #1e40af;
+              font-size: 14px;
+            }
+            @media print {
+              body { padding: 0; }
+              .container { max-width: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>FICHA TÉCNICA DE PRODUÇÃO</h1>
+              <div class="subtitle">Código: ${order.id}</div>
+              <div class="subtitle">Data: ${new Date().toLocaleDateString('pt-BR')}</div>
+            </div>
+            
+            <div class="employee-notice">
+              <h3>📋 DOCUMENTO INTERNO PARA FUNCIONÁRIOS</h3>
+              <p>Esta ficha contém apenas informações técnicas necessárias para a produção</p>
+            </div>
+            
+            <div class="section">
+              <h2>📋 Informações do Pedido</h2>
+              <div class="grid">
+                <div class="item">
+                  <div class="label">Código</div>
+                  <div class="value">${order.id}</div>
+                </div>
+                <div class="item">
+                  <div class="label">Tipo</div>
+                  <div class="value">${order.type}</div>
+                </div>
+                <div class="item">
+                  <div class="label">Status</div>
+                  <div class="value">
+                    <span class="status-badge">${order.status}</span>
+                  </div>
+                </div>
+                <div class="item">
+                  <div class="label">Data de Entrega</div>
+                  <div class="value">${new Date(order.delivery).toLocaleDateString('pt-BR')}</div>
+                </div>
+              </div>
+            </div>
+            
+            <div class="section">
+              <h2>👤 Informações do Cliente</h2>
+              <div class="grid">
+                <div class="item">
+                  <div class="label">Nome</div>
+                  <div class="value">${order.client}</div>
+                </div>
+                <div class="item">
+                  <div class="label">Data de Entrega</div>
+                  <div class="value">${new Date(order.delivery).toLocaleDateString('pt-BR')}</div>
+                </div>
+              </div>
+            </div>
+            
+            ${order.file ? `
+            <div class="section">
+              <h2>🎨 Logo/Arte do Pedido</h2>
+              <div class="logo-section">
+                <img src="${order.file}" alt="Logo/Arte do Pedido" />
+                <p style="margin-top: 10px; font-size: 12px; color: #6b7280;">Arte anexada pelo cliente</p>
+              </div>
+            </div>
+            ` : ''}
+            
+            <div class="section">
+              <h2>📦 Especificações Técnicas</h2>
+              <div class="item">
+                <div class="label">Descrição Detalhada</div>
+                <div class="value">${order.description}</div>
+              </div>
+            </div>
+            
+            <div class="section">
+              <h2>⚙️ Instruções de Produção</h2>
+              <div class="technical-specs">
+                <h3>Checklist de Produção</h3>
+                <ul>
+                  <li><span>✓</span> Verificar especificações técnicas antes de iniciar</li>
+                  <li><span>✓</span> Confirmar materiais e insumos necessários</li>
+                  <li><span>✓</span> Seguir cronograma de produção estabelecido</li>
+                  <li><span>✓</span> Manter controle de qualidade durante o processo</li>
+                  <li><span>✓</span> Comunicar eventuais problemas ou atrasos</li>
+                  <li><span>✓</span> Finalizar com inspeção final de qualidade</li>
+                </ul>
+              </div>
+            </div>
+            
+            <div class="footer">
+              <p>Gerado em ${new Date().toLocaleString('pt-BR')} - Ateliê Pro</p>
+              <p><strong>Documento interno - Não contém informações financeiras</strong></p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+    
+    // Abrir nova janela com a ficha técnica
+    const newWindow = window.open('', '_blank');
+    if (newWindow) {
+      newWindow.document.write(technicalSheetHtml);
+      newWindow.document.close();
+      
+      // Aguardar carregamento e abrir diálogo de impressão
+      newWindow.onload = () => {
+        console.log("Ficha técnica carregada, abrindo diálogo de impressão...");
+        newWindow.print();
+      };
+    } else {
+      toast.error("Não foi possível abrir a janela. Verifique se os pop-ups estão bloqueados.");
+    }
+  };
 
   const steps: { key: OrderItem["status"]; label: string; icon: any; description: string }[] = [
     { key: "Aguardando aprovação", label: "Aguardando Aprovação", icon: Clock, description: "Pedido recebido, aguardando confirmação do cliente" },
@@ -496,6 +751,14 @@ export default function PedidoDetalhe() {
               >
                 <Printer className="w-4 h-4 mr-2" />
                 Gerar Ordem de Produção
+              </Button>
+              <Button
+                onClick={generateEmployeeTechnicalSheet}
+                variant="outline"
+                className="flex-1"
+              >
+                <Users className="w-4 h-4 mr-2" />
+                Ficha Técnica Funcionários
               </Button>
               <Dialog open={isStatusDialogOpen} onOpenChange={setIsStatusDialogOpen}>
                 <DialogTrigger asChild>

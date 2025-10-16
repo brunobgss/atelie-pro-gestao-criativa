@@ -23,6 +23,18 @@ export async function listReceitas(): Promise<ReceitaRow[]> {
   try {
     console.log("Buscando receitas...");
     
+    // Obter empresa_id do usuário logado
+    const { data: userEmpresa } = await supabase
+      .from("user_empresas")
+      .select("empresa_id")
+      .eq("user_id", (await supabase.auth.getUser()).data.user?.id)
+      .single();
+    
+    if (!userEmpresa?.empresa_id) {
+      console.error("Usuário não tem empresa associada");
+      return [];
+    }
+    
     // Verificar se o banco está funcionando
     const isDbWorking = await checkDatabaseHealth();
     
@@ -34,6 +46,7 @@ export async function listReceitas(): Promise<ReceitaRow[]> {
     const { data, error } = await supabase
       .from("atelie_receitas")
       .select("*")
+      .eq("empresa_id", userEmpresa.empresa_id)
       .order("payment_date", { ascending: false })
       .limit(100);
 
@@ -55,6 +68,18 @@ export async function getReceitaByOrderCode(orderCode: string): Promise<ReceitaR
   try {
     console.log("Buscando receita por código do pedido:", orderCode);
     
+    // Obter empresa_id do usuário logado
+    const { data: userEmpresa } = await supabase
+      .from("user_empresas")
+      .select("empresa_id")
+      .eq("user_id", (await supabase.auth.getUser()).data.user?.id)
+      .single();
+    
+    if (!userEmpresa?.empresa_id) {
+      console.error("Usuário não tem empresa associada");
+      return null;
+    }
+    
     // Verificar se o banco está funcionando
     const isDbWorking = await checkDatabaseHealth();
     
@@ -67,6 +92,7 @@ export async function getReceitaByOrderCode(orderCode: string): Promise<ReceitaR
       .from("atelie_receitas")
       .select("*")
       .eq("order_code", orderCode)
+      .eq("empresa_id", userEmpresa.empresa_id)
       .single();
 
     if (error) {

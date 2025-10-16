@@ -14,6 +14,9 @@ import { listInventory } from "@/integrations/supabase/inventory";
 import { useAuth } from "@/components/AuthProvider";
 import { toast } from "sonner";
 import { startStockAlerts, checkStockNow } from "@/utils/stockAlerts";
+import { LoadingCard, SkeletonCard } from "@/components/ui/loading";
+import { PageTransition, StaggeredAnimation, FadeIn } from "@/components/ui/page-transition";
+import { MobileCard, MobileGrid } from "@/components/ui/mobile-form";
 import React from "react";
 
 export default function Dashboard() {
@@ -24,32 +27,34 @@ export default function Dashboard() {
   React.useEffect(() => {
     startStockAlerts();
     return () => {
-      // Cleanup será feito pelo próprio sistema
+      // Cleanup sera feito pelo proprio sistema
     };
   }, []);
   
-  // Buscar dados reais das APIs
-  const { data: orders = [] } = useQuery({
+  // Buscar dados reais das APIs com loading states
+  const { data: orders = [], isLoading: ordersLoading } = useQuery({
     queryKey: ["orders"],
     queryFn: listOrders,
   });
 
-  const { data: quotes = [] } = useQuery({
+  const { data: quotes = [], isLoading: quotesLoading } = useQuery({
     queryKey: ["quotes"],
     queryFn: listQuotes,
   });
 
-  const { data: receitas = [] } = useQuery({
+  const { data: receitas = [], isLoading: receitasLoading } = useQuery({
     queryKey: ["receitas"],
     queryFn: listReceitas,
   });
 
-  const { data: inventory = [] } = useQuery({
+  const { data: inventory = [], isLoading: inventoryLoading } = useQuery({
     queryKey: ["inventory"],
     queryFn: listInventory,
   });
 
-  // Função para enviar WhatsApp
+  const isLoading = ordersLoading || quotesLoading || receitasLoading || inventoryLoading;
+
+  // Funcao para enviar WhatsApp
   const sendWhatsApp = (message: string) => {
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
@@ -89,7 +94,7 @@ Lembramos que seu pedido ${order.code} estava previsto para entrega em ${new Dat
 
 Por favor, entre em contato para agendarmos a entrega.
 
-_${empresa?.nome || 'Ateliê'}_`;
+_${empresa?.nome || 'Atelie'}_`;
           sendWhatsApp(message);
         }
       });
@@ -127,7 +132,7 @@ Lembramos sobre o pagamento do pedido ${order.code}.
 
 Por favor, entre em contato para quitar o saldo.
 
-_${empresa?.nome || 'Ateliê'}_`;
+_${empresa?.nome || 'Atelie'}_`;
           sendWhatsApp(message);
         }
       });
@@ -141,7 +146,7 @@ _${empresa?.nome || 'Ateliê'}_`;
         id: `stock-${item.id}`,
         type: "stock",
         priority: "high",
-        title: "Estoque Crítico",
+        title: "Estoque Critico",
         message: `${item.name} - ${item.quantity} ${item.unit}`,
         icon: Package,
         color: "red",
@@ -150,9 +155,9 @@ _${empresa?.nome || 'Ateliê'}_`;
 
 Item: ${item.name}
 Quantidade atual: ${item.quantity} ${item.unit}
-Status: CRÍTICO
+Status: CRITICO
 
-É necessário repor urgentemente este item!`;
+E necessario repor urgentemente este item!`;
           sendWhatsApp(message);
         }
       });
@@ -166,20 +171,20 @@ Status: CRÍTICO
         id: `quote-${quote.id}`,
         type: "quote",
         priority: "medium",
-        title: "Orçamento Pendente",
+        title: "Orcamento Pendente",
         message: `${quote.code} - ${quote.customer_name}`,
         icon: Calendar,
         color: "blue",
         action: () => {
           const message = `Olá ${quote.customer_name}!
 
-Seu orçamento ${quote.code} está pronto e aguardando aprovação.
+Seu orcamento ${quote.code} esta pronto e aguardando aprovacao.
 
 *VALOR TOTAL: R$ ${quote.total_value?.toFixed(2) || '0,00'}*
 
-Por favor, confirme se está de acordo ou entre em contato para ajustes.
+Por favor, confirme se esta de acordo ou entre em contato para ajustes.
 
-_${empresa?.nome || 'Ateliê'}_`;
+_${empresa?.nome || 'Atelie'}_`;
           sendWhatsApp(message);
         }
       });
@@ -205,7 +210,7 @@ _${empresa?.nome || 'Ateliê'}_`;
         id: `urgent-${order.id}`,
         type: "urgent",
         priority: "high",
-        title: "Prazo Próximo",
+        title: "Prazo Proximo",
         message: `${order.code} - ${diffDays} dias restantes`,
         icon: Clock,
         color: "orange",
@@ -216,9 +221,9 @@ Seu pedido ${order.code} tem entrega prevista para ${deliveryDate.toLocaleDateSt
 
 *STATUS ATUAL: ${order.status}*
 
-Em caso de dúvidas sobre o andamento, entre em contato conosco!
+Em caso de duvidas sobre o andamento, entre em contato conosco!
 
-_${empresa?.nome || 'Ateliê'}_`;
+_${empresa?.nome || 'Atelie'}_`;
           sendWhatsApp(message);
         }
       });
@@ -233,205 +238,251 @@ _${empresa?.nome || 'Ateliê'}_`;
   const intelligentAlerts = getIntelligentAlerts();
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100">
+    <PageTransition className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100">
       {/* Header */}
-      <div className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 sticky top-0 z-10 shadow-sm">
-        <div className="p-6 flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <MobileSidebarTrigger />
-            <SidebarTrigger className="text-gray-700 hover:bg-gray-100 hidden md:flex" />
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-              <p className="text-gray-600 text-sm mt-0.5">Visão geral do seu negócio</p>
+      <FadeIn className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 sticky top-0 z-10 shadow-sm">
+        <div className="p-4 md:p-6">
+          {/* Mobile Layout */}
+          <div className="md:hidden">
+            <div className="flex items-center justify-between mb-4">
+              <MobileSidebarTrigger />
+              <div className="text-center flex-1">
+                <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
+                <p className="text-gray-600 text-xs">Visao geral do seu negocio</p>
+              </div>
+              <div className="w-12"></div> {/* Spacer */}
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => navigate("/orcamentos/novo")} 
+                variant="outline" 
+                size="sm"
+                className="flex-1 bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                <span className="text-xs">Orcamento</span>
+              </Button>
+              <Button 
+                onClick={() => navigate("/pedidos/novo")} 
+                size="sm"
+                className="flex-1 bg-gray-900 text-white hover:bg-gray-800 shadow-lg"
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                <span className="text-xs">Pedido</span>
+              </Button>
             </div>
           </div>
-          <div className="flex gap-3">
-            <Button 
-              onClick={() => navigate("/orcamentos/novo")} 
-              variant="outline" 
-              size="lg"
-              className="bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Novo Orçamento
-            </Button>
-            <Button 
-              onClick={() => navigate("/pedidos/novo")} 
-              size="lg"
-              className="bg-gray-900 text-white hover:bg-gray-800 shadow-lg"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Novo Pedido
-            </Button>
+          
+          {/* Desktop Layout */}
+          <div className="hidden md:flex justify-between items-center">
+            <div className="flex items-center gap-4">
+              <SidebarTrigger className="text-gray-700 hover:bg-gray-100" />
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+                <p className="text-gray-600 text-sm mt-0.5">Visao geral do seu negocio</p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <Button 
+                onClick={() => navigate("/orcamentos/novo")} 
+                variant="outline" 
+                size="lg"
+                className="bg-white border-gray-200 text-gray-700 hover:bg-gray-50"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Novo Orcamento
+              </Button>
+              <Button 
+                onClick={() => navigate("/pedidos/novo")} 
+                size="lg"
+                className="bg-gray-900 text-white hover:bg-gray-800 shadow-lg"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Novo Pedido
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="p-8 space-y-6">
+      <div className="p-4 md:p-8 space-y-4 md:space-y-6">
         {/* Banner de Trial */}
         <TrialBannerSmall />
         
         {/* Stats Cards */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          <Card className="bg-white border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-200">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Pedidos em Andamento
-              </CardTitle>
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Package className="h-5 w-5 text-primary" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-4xl font-bold text-foreground">{orders.length}</div>
-              <div className="flex items-center gap-1 mt-2">
-                <TrendingUp className="w-3 h-3 text-secondary" />
-                <p className="text-xs text-secondary font-medium">
-                  {orders.filter(o => o.status === "Em produção").length} em produção
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+        <div className="grid gap-4 md:gap-6 grid-cols-2 md:grid-cols-2 lg:grid-cols-4">
+          {isLoading ? (
+            <>
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+            </>
+          ) : (
+            <>
+              <Card className="bg-white border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-200 animate-scale-in">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Pedidos em Andamento
+                  </CardTitle>
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Package className="h-5 w-5 text-primary" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-4xl font-bold text-foreground">{orders.length}</div>
+                  <div className="flex items-center gap-1 mt-2">
+                    <TrendingUp className="w-3 h-3 text-secondary" />
+                    <p className="text-xs text-secondary font-medium">
+                      {orders.filter(o => o.status === "Em produção").length} em produção
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
 
-          <Card className="bg-white border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-200">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Em Produção
-              </CardTitle>
-              <div className="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center">
-                <Clock className="h-5 w-5 text-secondary" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-4xl font-bold text-foreground">
-                {orders.filter(o => o.status === "Em produção").length}
-              </div>
-              <div className="flex items-center gap-1 mt-2">
-                <p className="text-xs text-muted-foreground">
-                  {orders.filter(o => {
-                    if (!o.delivery_date) return false;
-                    const deliveryDate = new Date(o.delivery_date);
-                    const today = new Date();
-                    const diffTime = deliveryDate.getTime() - today.getTime();
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                    return diffDays <= 3 && diffDays >= 0;
-                  }).length} com prazo próximo
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+              <Card className="bg-white border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-200 animate-scale-in">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Em Producao
+                  </CardTitle>
+                  <div className="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center">
+                    <Clock className="h-5 w-5 text-secondary" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-4xl font-bold text-foreground">
+                    {orders.filter(o => o.status === "Em produção").length}
+                  </div>
+                  <div className="flex items-center gap-1 mt-2">
+                    <p className="text-xs text-muted-foreground">
+                      {orders.filter(o => {
+                        if (!o.delivery_date) return false;
+                        const deliveryDate = new Date(o.delivery_date);
+                        const today = new Date();
+                        const diffTime = deliveryDate.getTime() - today.getTime();
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                        return diffDays <= 3 && diffDays >= 0;
+                      }).length} com prazo proximo
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
 
-          <Card className="bg-white border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-200">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Concluídos Hoje
-              </CardTitle>
-              <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center">
-                <CheckCircle className="h-5 w-5 text-accent" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-4xl font-bold text-foreground">
-                {orders.filter(o => o.status === "Pronto").length}
-              </div>
-              <div className="flex items-center gap-1 mt-2">
-                <p className="text-xs text-muted-foreground">
-                  {orders.filter(o => o.status === "Aguardando retirada").length} aguardando retirada
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+              <Card className="bg-white border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-200 animate-scale-in">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Concluidos Hoje
+                  </CardTitle>
+                  <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center">
+                    <CheckCircle className="h-5 w-5 text-accent" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-4xl font-bold text-foreground">
+                    {orders.filter(o => o.status === "Pronto").length}
+                  </div>
+                  <div className="flex items-center gap-1 mt-2">
+                    <p className="text-xs text-muted-foreground">
+                      {orders.filter(o => o.status === "Aguardando retirada").length} aguardando retirada
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
 
-          <Card className="bg-white border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-200">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Receita do Mês
-              </CardTitle>
-              <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                <TrendingUp className="h-5 w-5 text-primary" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-4xl font-bold text-foreground">
-                R$ {orders.reduce((sum, order) => sum + (Number(order.value) || 0), 0).toLocaleString('pt-BR')}
-              </div>
-              <div className="flex items-center gap-1 mt-2">
-                <TrendingUp className="w-3 h-3 text-secondary" />
-                <p className="text-xs text-secondary font-medium">
-                  R$ {orders.reduce((sum, order) => sum + (Number(order.paid) || 0), 0).toLocaleString('pt-BR')} recebido
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+              <Card className="bg-white border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-200 animate-scale-in">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Receita do Mes
+                  </CardTitle>
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <TrendingUp className="h-5 w-5 text-primary" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-4xl font-bold text-foreground">
+                    R$ {orders.reduce((sum, order) => sum + (Number(order.value) || 0), 0).toLocaleString('pt-BR')}
+                  </div>
+                  <div className="flex items-center gap-1 mt-2">
+                    <TrendingUp className="w-3 h-3 text-secondary" />
+                    <p className="text-xs text-secondary font-medium">
+                      R$ {orders.reduce((sum, order) => sum + (Number(order.paid) || 0), 0).toLocaleString('pt-BR')} recebido
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
         </div>
 
-        {/* Ações Rápidas */}
-        <Card className="bg-white border border-gray-200/50 shadow-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MessageCircle className="w-5 h-5 text-purple-600" />
-              Ações Rápidas
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <Button 
-                onClick={() => navigate("/calculadora")} 
-                variant="outline" 
-                className="h-20 flex flex-col gap-2 bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:from-blue-100 hover:to-blue-200"
-              >
-                <Calculator className="w-6 h-6 text-blue-600" />
-                <span className="text-blue-700 font-medium">Calculadora de Preços</span>
-              </Button>
-              
-              <Button 
-                onClick={() => navigate("/catalogo")} 
-                variant="outline" 
-                className="h-20 flex flex-col gap-2 bg-gradient-to-br from-green-50 to-green-100 border-green-200 hover:from-green-100 hover:to-green-200"
-              >
-                <BookOpen className="w-6 h-6 text-green-600" />
-                <span className="text-green-700 font-medium">Catálogo de Produtos</span>
-              </Button>
-              
-              <Button 
-                onClick={() => {
-                  const message = `Olá!
+        {/* Acoes Rapidass */}
+        <FadeIn>
+          <Card className="bg-white border border-gray-200/50 shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MessageCircle className="w-5 h-5 text-purple-600" />
+                Ações Rápidas
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <MobileGrid cols={2} className="gap-4">
+                <MobileCard 
+                  onClick={() => navigate("/calculadora")}
+                  interactive
+                  className="h-20 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:from-blue-100 hover:to-blue-200 animate-fade-in-up"
+                >
+                  <Calculator className="w-6 h-6 text-blue-600" />
+                  <span className="text-blue-700 font-medium text-sm text-center">Calculadora de Preços</span>
+                </MobileCard>
+                
+                <MobileCard 
+                  onClick={() => navigate("/catalogo")}
+                  interactive
+                  className="h-20 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-green-50 to-green-100 border-green-200 hover:from-green-100 hover:to-green-200 animate-fade-in-up"
+                >
+                  <BookOpen className="w-6 h-6 text-green-600" />
+                  <span className="text-green-700 font-medium text-sm text-center">Catálogo de Produtos</span>
+                </MobileCard>
+                
+                <MobileCard 
+                  onClick={() => {
+                    const message = `Olá!
 
-Sou do ${empresa?.nome || 'Ateliê'} e gostaria de saber como posso ajudar você hoje!
+Sou do ${empresa?.nome || 'Atelie'} e gostaria de saber como posso ajudar voce hoje!
 
-*NOSSOS SERVIÇOS:*
+*NOSSOS SERVICOS:*
 • Bordados computadorizados
 • Uniformes personalizados  
 • Camisetas estampadas
 • Produtos personalizados
 
-*Entre em contato conosco para um orçamento personalizado!*
+*Entre em contato conosco para um orcamento personalizado!*
 
-_${empresa?.nome || 'Ateliê'} - Qualidade e criatividade em cada peça_`;
-                  const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
-                  window.open(whatsappUrl, '_blank');
-                }}
-                variant="outline" 
-                className="h-20 flex flex-col gap-2 bg-gradient-to-br from-green-50 to-green-100 border-green-200 hover:from-green-100 hover:to-green-200"
-              >
-                <MessageCircle className="w-6 h-6 text-green-600" />
-                <span className="text-green-700 font-medium">Template WhatsApp</span>
-              </Button>
-              
-              <Button 
-                onClick={() => navigate("/relatorios")} 
-                variant="outline" 
-                className="h-20 flex flex-col gap-2 bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 hover:from-purple-100 hover:to-purple-200"
-              >
-                <TrendingUp className="w-6 h-6 text-purple-600" />
-                <span className="text-purple-700 font-medium">Relatórios</span>
-              </Button>
-            </div>
+_${empresa?.nome || 'Atelie'} - Qualidade e criatividade em cada peca_`;
+                    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+                    window.open(whatsappUrl, '_blank');
+                  }}
+                  interactive
+                  className="h-20 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-green-50 to-green-100 border-green-200 hover:from-green-100 hover:to-green-200 animate-fade-in-up"
+                >
+                  <MessageCircle className="w-6 h-6 text-green-600" />
+                  <span className="text-green-700 font-medium text-sm text-center">Template WhatsApp</span>
+                </MobileCard>
+                
+                <MobileCard 
+                  onClick={() => navigate("/relatorios")}
+                  interactive
+                  className="h-20 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 hover:from-purple-100 hover:to-purple-200 animate-fade-in-up"
+                >
+                  <TrendingUp className="w-6 h-6 text-purple-600" />
+                  <span className="text-purple-700 font-medium text-sm text-center">Relatórios</span>
+                </MobileCard>
+              </MobileGrid>
           </CardContent>
         </Card>
+        </FadeIn>
 
         {/* Centro de Alertas Inteligentes */}
-        <Card className="bg-white/95 backdrop-blur border-0 shadow-lg">
+        <FadeIn>
+          <Card className="bg-white/95 backdrop-blur border-0 shadow-lg">
           <CardHeader className="border-b border-border/50">
             <div className="flex items-center justify-between">
               <CardTitle className="text-xl flex items-center gap-2">
@@ -511,7 +562,7 @@ _${empresa?.nome || 'Ateliê'} - Qualidade e criatividade em cada peça_`;
                                   'bg-blue-100 text-blue-700 border-blue-300'
                                 }
                               >
-                                {alert.priority === 'high' ? 'Alta' : alert.priority === 'medium' ? 'Média' : 'Baixa'}
+                                {alert.priority === 'high' ? 'Alta' : alert.priority === 'medium' ? 'Media' : 'Baixa'}
                               </Badge>
                             </div>
                             <p className="text-sm opacity-80">{alert.message}</p>
@@ -536,11 +587,13 @@ _${empresa?.nome || 'Ateliê'} - Qualidade e criatividade em cada peça_`;
                     </div>
                   );
                 })}
-            </div>
+              </div>
             )}
           </CardContent>
         </Card>
+        </FadeIn>
       </div>
-    </div>
+      </FadeIn>
+    </PageTransition>
   );
 }

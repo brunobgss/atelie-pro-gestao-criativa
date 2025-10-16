@@ -114,6 +114,22 @@ export default function CalculadoraPrecos() {
     }
   };
 
+  // Novo: Cálculo de tempo baseado na quantidade
+  const getTotalWorkHours = () => {
+    if (productType === "personalizado") {
+      // Para produtos personalizados, multiplicar horas por quantidade
+      return workHours * quantity;
+    }
+    return workHours;
+  };
+
+  // Novo: Cálculo de tempo com setup
+  const getTotalTimeWithSetup = () => {
+    const totalHours = getTotalWorkHours();
+    const setupHours = setupCost / hourlyRate; // Converter setup em horas
+    return totalHours + setupHours;
+  };
+
   const materialsCost = materials.reduce((total, material) => 
     total + (material.quantity * material.unitPrice), 0);
 
@@ -591,6 +607,24 @@ _Orçamento gerado pela Calculadora Profissional_
                     <span className="text-gray-600">Materiais:</span>
                     <span className="font-medium">R$ {totalMaterialsCost.toFixed(2)}</span>
                   </div>
+                  {productType === "personalizado" && quantity > 1 && (
+                    <>
+                      <div className="flex justify-between text-sm transition-all duration-200 hover:bg-white/50 p-2 rounded">
+                        <span className="text-gray-600">Tempo por unidade:</span>
+                        <span className="font-medium">{workHours}h</span>
+                      </div>
+                      <div className="flex justify-between text-sm transition-all duration-200 hover:bg-white/50 p-2 rounded">
+                        <span className="text-gray-600">Tempo total ({quantity} unidades):</span>
+                        <span className="font-medium text-blue-600">{getTotalWorkHours().toFixed(1)}h</span>
+                      </div>
+                      {setupCost > 0 && (
+                        <div className="flex justify-between text-sm transition-all duration-200 hover:bg-white/50 p-2 rounded">
+                          <span className="text-gray-600">Tempo total + setup:</span>
+                          <span className="font-medium text-purple-600">{getTotalTimeWithSetup().toFixed(1)}h</span>
+                        </div>
+                      )}
+                    </>
+                  )}
                   <Separator />
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Subtotal:</span>

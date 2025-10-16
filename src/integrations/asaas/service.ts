@@ -128,10 +128,12 @@ class ASAASService {
   }
 
   // Gerar URL de checkout para plano mensal
-  async createMonthlySubscription(userEmail: string, userName: string, companyId?: string) {
+  async createMonthlySubscription(userEmail: string, userName: string, companyId?: string, cpfCnpj?: string, telefone?: string, paymentMethod?: string) {
     const customerData = {
       name: userName,
       email: userEmail,
+      phone: telefone,
+      cpfCnpj: cpfCnpj
     };
 
     // Criar cliente primeiro
@@ -140,21 +142,24 @@ class ASAASService {
       return customerResult;
     }
 
-    // Criar assinatura usando nossa API intermediária
-    const subscriptionData = {
+    // Criar pagamento usando nossa API intermediária
+    const paymentData = {
       customerId: customerResult.customer.id,
       planType: 'monthly',
-      companyId: companyId
+      companyId: companyId,
+      paymentMethod: paymentMethod || 'PIX'
     };
 
-    return await this.makeRequest('createSubscription', subscriptionData);
+    return await this.makeRequest('createPayment', paymentData);
   }
 
   // Gerar URL de checkout para plano anual
-  async createYearlySubscription(userEmail: string, userName: string, companyId?: string) {
+  async createYearlySubscription(userEmail: string, userName: string, companyId?: string, cpfCnpj?: string, telefone?: string, paymentMethod?: string) {
     const customerData = {
       name: userName,
       email: userEmail,
+      phone: telefone,
+      cpfCnpj: cpfCnpj
     };
 
     // Criar cliente primeiro
@@ -163,14 +168,15 @@ class ASAASService {
       return customerResult;
     }
 
-    // Criar assinatura usando nossa API intermediária
-    const subscriptionData = {
+    // Criar pagamento usando nossa API intermediária
+    const paymentData = {
       customerId: customerResult.customer.id,
       planType: 'yearly',
-      companyId: companyId
+      companyId: companyId,
+      paymentMethod: paymentMethod || 'PIX'
     };
 
-    return await this.makeRequest('createSubscription', subscriptionData);
+    return await this.makeRequest('createPayment', paymentData);
   }
 }
 

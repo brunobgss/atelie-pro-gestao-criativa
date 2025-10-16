@@ -3,18 +3,7 @@ import { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getTrialData, saveTrialData, createNewTrial, clearTrialData } from "@/utils/trialPersistence";
-
-interface Empresa {
-  id: string;
-  nome: string;
-  email: string;
-  telefone?: string;
-  responsavel?: string;
-  cpf_cnpj?: string;
-  trial_end_date?: string;
-  created_at?: string;
-  updated_at?: string;
-}
+import { Empresa } from "@/types/empresa";
 
 interface AuthContextType {
   user: User | null;
@@ -41,21 +30,63 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const trialData = getTrialData();
       if (!empresa && trialData && trialData.userId === userId && trialData.empresaData.nome !== "Empresa Temporária") {
         // Log apenas uma vez por sessão
-        if (!window.dataRestored) {
+        if (!(window as any).dataRestored) {
           console.log("🔄 Restaurando dados perdidos do localStorage");
-          window.dataRestored = true;
+          (window as any).dataRestored = true;
         }
         setEmpresa(trialData.empresaData);
       }
     };
 
-    // Verificar sessão inicial
+    // Função otimizada para carregar empresa
+    const loadEmpresa = async (userId: string) => {
+      try {
+        const { data: userEmpresa, error } = await supabase
+          .from("user_empresas")
+          .select(`
+            empresa_id,
+            empresas (
+              id,
+              nome,
+              telefone,
+              responsavel,
+              cpf_cnpj,
+              trial_end_date,
+              created_at,
+              updated_at
+            )
+          `)
+          .eq("user_id", userId)
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .single();
+
+        if (error) {
+          console.error("Erro ao carregar empresa:", error);
+          return;
+        }
+
+        if (userEmpresa?.empresas && mounted) {
+          setEmpresa(userEmpresa.empresas as unknown as Empresa);
+        }
+      } catch (error) {
+        console.error("Erro ao carregar empresa:", error);
+      }
+    };
+
+    // Verificar sessão inicial - versão simplificada
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!mounted) return;
       
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchEmpresa(session.user.id);
+        // Carregar empresa de forma assíncrona
+        loadEmpresa(session.user.id).finally(() => {
+          if (mounted) {
+            setLoading(false);
+          }
+        });
+        restoreDataIfNeeded(session.user.id);
         
         // Verificar dados a cada 5 minutos para evitar perda
         intervalId = setInterval(() => {
@@ -70,12 +101,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Escutar mudanças de autenticação
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         if (!mounted) return;
         
         setUser(session?.user ?? null);
         if (session?.user) {
-          await fetchEmpresa(session.user.id);
+          // Carregar empresa de forma assíncrona
+          loadEmpresa(session.user.id).finally(() => {
+            if (mounted) {
+              setLoading(false);
+            }
+          });
           
           // Reiniciar verificação periódica
           if (intervalId) clearInterval(intervalId);
@@ -83,7 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (mounted && session?.user) {
               restoreDataIfNeeded(session.user.id);
             }
-          }, 15000);
+          }, 300000); // 5 minutos
         } else {
           setEmpresa(null);
           setLoading(false);
@@ -113,7 +149,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           empresas (
             id,
             nome,
-            email,
             telefone,
             responsavel,
             cpf_cnpj,
@@ -127,7 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as { data: unknown; error: unknown };
 
       if (error) {
-        console.warn("⚠️ Erro ao buscar empresa do Supabase:", error.message);
+        console.warn("⚠️ Erro ao buscar empresa do Supabase:", (error as any).message);
         
         // Tentar recuperar dados persistidos
         const trialData = getTrialData();
@@ -147,17 +182,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      if (data?.empresas) {
-        setEmpresa(data.empresas);
+      if ((data as any)?.empresas) {
+        setEmpresa((data as any).empresas as unknown as Empresa);
         // Salvar dados no localStorage para persistência
         saveTrialData({
           userId: userId,
-          empresaData: data.empresas,
-          trialEndDate: data.empresas.trial_end_date || ''
+          empresaData: (data as any).empresas as unknown as Empresa,
+          trialEndDate: (data as any).empresas.trial_end_date || ''
         });
         // Log apenas na primeira vez ou em caso de mudança
-        if (!empresa || empresa.id !== data.empresas.id) {
-          console.log("✅ Dados da empresa carregados:", data.empresas.nome);
+        if (!empresa || empresa.id !== (data as any).empresas.id) {
+          console.log("✅ Dados da empresa carregados:", (data as any).empresas.nome);
         }
       } else {
         // Tentar recuperar dados persistidos
@@ -175,9 +210,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch (error: unknown) {
       // Log apenas uma vez por sessão para evitar spam
-      if (!window.authErrorLogged) {
-        console.warn("Erro ao buscar empresa, usando dados persistidos:", error.message);
-        window.authErrorLogged = true;
+      if (!(window as any).authErrorLogged) {
+        console.warn("Erro ao buscar empresa, usando dados persistidos:", (error as any).message);
+        (window as any).authErrorLogged = true;
       }
       
       // Tentar recuperar dados persistidos
@@ -187,9 +222,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Usar dados persistidos
         setEmpresa(trialData.empresaData);
         // Log apenas uma vez por sessão
-        if (!window.localStorageUsed) {
+        if (!(window as any).localStorageUsed) {
           console.log("Usando dados persistidos do localStorage (catch)");
-          window.localStorageUsed = true;
+          (window as any).localStorageUsed = true;
         }
       } else {
         // NÃO criar novo trial - manter estado atual

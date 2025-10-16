@@ -7,10 +7,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Package, Plus, Edit, Trash2, Copy, Search, Filter } from "lucide-react";
+import { Package, Plus, Edit, Trash2, Copy, Search, Filter, Clock } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { toast } from "sonner";
-import { getProducts } from "@/integrations/supabase/inventory";
+import { getProducts, createProduct, updateProduct, deleteProduct } from "@/integrations/supabase/products";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSync } from "@/contexts/SyncContext";
 import { useSyncOperations } from "@/hooks/useSyncOperations";
@@ -24,8 +24,8 @@ interface Product {
   name: string;
   category: string;
   description: string;
-  basePrice: number;
-  estimatedTime: number;
+  unit_price: number;
+  work_hours: number;
   materials: string[];
   image?: string;
   createdAt: string;
@@ -43,10 +43,11 @@ export default function CatalogoProdutos() {
     name: "",
     category: "",
     description: "",
-    basePrice: 0,
-    estimatedTime: 0,
+    unit_price: 0,
+    work_hours: 0,
     materials: ""
   });
+  const [testQuantity, setTestQuantity] = useState(1);
 
   const categories = ["all", "Uniforme", "Personalizado", "Bordado", "Estampado"];
 
@@ -66,8 +67,8 @@ export default function CatalogoProdutos() {
               name: product.name || 'Produto sem nome',
               category: product.type || 'outros',
               description: `Produto ${product.type || 'indefinido'} - R$ ${(product.unit_price || 0).toFixed(2)}`,
-              basePrice: product.unit_price || 0,
-              estimatedTime: product.work_hours || 0,
+              unit_price: product.unit_price || 0,
+              work_hours: product.work_hours || 0,
               materials: Array.isArray(product.materials) 
                 ? product.materials.map((mat: unknown) => {
                     if (typeof mat === 'string') return mat;
@@ -84,8 +85,8 @@ export default function CatalogoProdutos() {
               name: 'Produto com erro',
               category: 'outros',
               description: 'Erro ao carregar produto',
-              basePrice: 0,
-              estimatedTime: 0,
+              unit_price: 0,
+              work_hours: 0,
               materials: [],
               createdAt: new Date().toISOString()
             };
@@ -110,7 +111,7 @@ export default function CatalogoProdutos() {
     return matchesSearch && matchesCategory;
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Validação robusta
@@ -118,18 +119,18 @@ export default function CatalogoProdutos() {
       { 
         name: formData.name, 
         category: formData.category, 
-        basePrice: formData.basePrice, 
+        unit_price: formData.unit_price, 
         materials: formData.materials,
         description: formData.description,
-        estimatedTime: formData.estimatedTime
+        work_hours: formData.work_hours
       },
       {
         name: validateName,
         category: (value) => value ? { isValid: true, errors: [] } : { isValid: false, errors: ['Categoria é obrigatória'] },
-        basePrice: validateMoney,
+        unit_price: validateMoney,
         materials: (value) => value ? { isValid: true, errors: [] } : { isValid: false, errors: ['Materiais são obrigatórios'] },
         description: (value) => value ? validateDescription(value, 1000) : { isValid: true, errors: [] },
-        estimatedTime: (value) => value ? { isValid: true, errors: [] } : { isValid: true, errors: [] }
+        work_hours: (value) => value ? { isValid: true, errors: [] } : { isValid: true, errors: [] }
       }
     );
     
@@ -138,43 +139,67 @@ export default function CatalogoProdutos() {
       return;
     }
     
-    // Medir performance da operação
-    performanceMonitor.measureSync(
-      editingProduct ? 'updateProduct' : 'createProduct',
-      () => {
-        if (editingProduct) {
-          // Editar produto existente
-          setProducts(products.map(p => 
-            p.id === editingProduct.id 
-              ? { ...p, ...formData, materials: formData.materials.split(",").map(m => m.trim()) }
-              : p
-          ));
-          logger.userAction('product_updated', 'CATALOGO_PRODUTOS', { 
-            productId: editingProduct.id, 
-            name: formData.name, 
-            category: formData.category 
-          });
-          toast.success("Produto atualizado com sucesso!");
-        } else {
-          // Criar novo produto
-          const newProduct: Product = {
-            id: Date.now().toString(),
-            ...formData,
-            materials: formData.materials.split(",").map(m => m.trim()),
-            createdAt: new Date().toISOString().split('T')[0]
-          };
-          setProducts([...products, newProduct]);
-          logger.userAction('product_created', 'CATALOGO_PRODUTOS', { 
-            productId: newProduct.id, 
-            name: formData.name, 
-            category: formData.category,
-            basePrice: formData.basePrice
-          });
-          toast.success("Produto adicionado com sucesso!");
-        }
-      },
-      'CatalogoProdutos'
-    );
+    try {
+      // Medir performance da operação
+      const result = await performanceMonitor.measure(
+        editingProduct ? 'updateProduct' : 'createProduct',
+        async () => {
+          if (editingProduct) {
+            // Editar produto existente
+            return await updateProduct(editingProduct.id, {
+              name: formData.name,
+              type: formData.category,
+              materials: formData.materials.split(",").map(m => m.trim()),
+              work_hours: formData.work_hours,
+              unit_price: formData.unit_price,
+              profit_margin: 0 // Pode ser calculado depois
+            });
+          } else {
+            // Criar novo produto
+            return await createProduct({
+              name: formData.name,
+              type: formData.category,
+              materials: formData.materials.split(",").map(m => m.trim()),
+              work_hours: formData.work_hours,
+              unit_price: formData.unit_price,
+              profit_margin: 0 // Pode ser calculado depois
+            });
+          }
+        },
+        'CatalogoProdutos'
+      );
+      
+      if (!result.ok) {
+        toast.error(result.error || "Erro ao salvar produto");
+        return;
+      }
+      
+      // Log de sucesso
+      if (editingProduct) {
+        logger.userAction('product_updated', 'CATALOGO_PRODUTOS', { 
+          productId: editingProduct.id, 
+          name: formData.name, 
+          category: formData.category 
+        });
+        toast.success("Produto atualizado com sucesso!");
+      } else {
+        logger.userAction('product_created', 'CATALOGO_PRODUTOS', { 
+          productId: result.id, 
+          name: formData.name, 
+          category: formData.category,
+          unit_price: formData.unit_price
+        });
+        toast.success("Produto adicionado com sucesso!");
+      }
+      
+      // Invalidar cache e recarregar dados
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      refetch();
+      
+    } catch (error) {
+      console.error("Erro ao salvar produto:", error);
+      toast.error("Erro ao salvar produto");
+    }
     
     setIsDialogOpen(false);
     setEditingProduct(null);
@@ -182,8 +207,8 @@ export default function CatalogoProdutos() {
       name: "",
       category: "",
       description: "",
-      basePrice: 0,
-      estimatedTime: 0,
+      unit_price: 0,
+      work_hours: 0,
       materials: ""
     });
   };
@@ -194,27 +219,53 @@ export default function CatalogoProdutos() {
       name: product.name,
       category: product.category,
       description: product.description,
-      basePrice: product.basePrice,
-      estimatedTime: product.estimatedTime,
+      unit_price: product.unit_price,
+      work_hours: product.work_hours,
       materials: product.materials.join(", ")
     });
     setIsDialogOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    setProducts(products.filter(p => p.id !== id));
-    toast.success("Produto removido com sucesso!");
+  const handleDelete = async (id: string) => {
+    try {
+      const result = await deleteProduct(id);
+      if (!result.ok) {
+        toast.error(result.error || "Erro ao deletar produto");
+        return;
+      }
+      
+      toast.success("Produto removido com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      refetch();
+    } catch (error) {
+      console.error("Erro ao deletar produto:", error);
+      toast.error("Erro ao deletar produto");
+    }
   };
 
-  const handleDuplicate = (product: Product) => {
-    const duplicatedProduct: Product = {
-      ...product,
-      id: Date.now().toString(),
-      name: `${product.name} (Cópia)`,
-      createdAt: new Date().toISOString().split('T')[0]
-    };
-    setProducts([...products, duplicatedProduct]);
-    toast.success("Produto duplicado com sucesso!");
+  const handleDuplicate = async (product: Product) => {
+    try {
+      const result = await createProduct({
+        name: `${product.name} (Cópia)`,
+        type: product.category,
+        materials: product.materials,
+        work_hours: product.work_hours,
+        unit_price: product.unit_price,
+        profit_margin: 0
+      });
+      
+      if (!result.ok) {
+        toast.error(result.error || "Erro ao duplicar produto");
+        return;
+      }
+      
+      toast.success("Produto duplicado com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      refetch();
+    } catch (error) {
+      console.error("Erro ao duplicar produto:", error);
+      toast.error("Erro ao duplicar produto");
+    }
   };
 
   const createQuoteFromProduct = (product: Product) => {
@@ -225,8 +276,8 @@ export default function CatalogoProdutos() {
 📋 *Categoria:* ${product.category}
 📝 *Descrição:* ${product.description}
 
-💰 *Preço Base:* R$ ${product.basePrice.toFixed(2)}
-⏱️ *Tempo Estimado:* ${product.estimatedTime}h
+💰 *Preço Base:* R$ ${product.unit_price.toFixed(2)}
+⏱️ *Tempo Estimado:* ${product.work_hours}h
 📦 *Materiais:* ${product.materials.join(", ")}
 
 ✅ *Prazo: A combinar*
@@ -318,8 +369,8 @@ _Orçamento gerado pelo Ateliê Pro_
                     <Input
                       type="number"
                       step="0.01"
-                      value={formData.basePrice}
-                      onChange={(e) => setFormData({...formData, basePrice: Number(e.target.value)})}
+                      value={formData.unit_price}
+                      onChange={(e) => setFormData({...formData, unit_price: Number(e.target.value)})}
                       placeholder="0.00"
                       required
                     />
@@ -331,8 +382,8 @@ _Orçamento gerado pelo Ateliê Pro_
                     <Input
                       type="number"
                       step="0.5"
-                      value={formData.estimatedTime}
-                      onChange={(e) => setFormData({...formData, estimatedTime: Number(e.target.value)})}
+                      value={formData.work_hours}
+                      onChange={(e) => setFormData({...formData, work_hours: Number(e.target.value)})}
                       placeholder="0"
                     />
                   </div>
@@ -349,6 +400,40 @@ _Orçamento gerado pelo Ateliê Pro_
                     required
                   />
                 </div>
+
+                {/* Seção de Cálculo de Tempo */}
+                {formData.work_hours > 0 && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 space-y-3 max-h-48 overflow-y-auto">
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-blue-600" />
+                      <h3 className="font-medium text-blue-900 text-sm">Cálculo de Tempo por Quantidade</h3>
+                    </div>
+                    <p className="text-xs text-blue-700">
+                      Este produto leva <strong>{formData.work_hours}h</strong> por unidade.
+                    </p>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="testQuantity" className="text-xs font-medium text-blue-800">
+                          Teste quantidade:
+                        </Label>
+                        <Input
+                          id="testQuantity"
+                          type="number"
+                          min="1"
+                          value={testQuantity}
+                          onChange={(e) => setTestQuantity(Number(e.target.value))}
+                          className="w-16 h-7 text-xs"
+                        />
+                      </div>
+                      <div className="text-xs text-blue-800">
+                        <strong>{formData.work_hours}h × {testQuantity} = {formData.work_hours * testQuantity}h totais</strong>
+                      </div>
+                    </div>
+                    <p className="text-xs text-blue-600">
+                      💡 <strong>Fórmula:</strong> Tempo por unidade × Quantidade = Tempo total
+                    </p>
+                  </div>
+                )}
                 
                 <div className="flex gap-2 pt-4">
                   <Button type="submit" className="flex-1">
@@ -464,13 +549,13 @@ _Orçamento gerado pelo Ateliê Pro_
                   <div>
                     <span className="font-medium text-gray-700">Preço:</span>
                     <div className="text-lg font-bold text-green-600">
-                      R$ {product.basePrice.toFixed(2)}
+                      R$ {(product.unit_price || 0).toFixed(2)}
                     </div>
                   </div>
                   <div>
                     <span className="font-medium text-gray-700">Tempo:</span>
                     <div className="text-lg font-bold text-blue-600">
-                      {product.estimatedTime}h
+                      {product.work_hours || 0}h
                     </div>
                   </div>
                 </div>

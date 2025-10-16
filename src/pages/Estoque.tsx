@@ -267,12 +267,24 @@ export default function Estoque() {
                     const result = await performanceMonitor.measure(
                       'createInventoryItem',
                       async () => {
+                        // Obter empresa_id do usuário logado
+                        const { data: userEmpresa } = await supabase
+                          .from("user_empresas")
+                          .select("empresa_id")
+                          .eq("user_id", (await supabase.auth.getUser()).data.user?.id)
+                          .single();
+                        
+                        if (!userEmpresa?.empresa_id) {
+                          throw new Error("Usuário não tem empresa associada");
+                        }
+                        
                         const { error } = await supabase.from("inventory_items").insert({ 
                           name, 
                           unit, 
                           quantity, 
                           min_quantity: min, 
-                          status: quantity <= 0 ? "critical" : quantity < min ? "low" : "ok" 
+                          status: quantity <= 0 ? "critical" : quantity < min ? "low" : "ok",
+                          empresa_id: userEmpresa.empresa_id
                         });
                         if (error) throw error;
                         return { success: true };

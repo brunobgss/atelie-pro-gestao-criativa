@@ -44,7 +44,8 @@ export default async function handler(req, res) {
       
       case 'PAYMENT_RECEIVED':
         console.log('💰 Pagamento recebido:', webhookData.payment.id);
-        // Aqui você pode ativar a assinatura do usuário
+        // Ativar premium do usuário
+        await activatePremium(webhookData.payment);
         break;
       
       case 'PAYMENT_OVERDUE':
@@ -75,5 +76,61 @@ export default async function handler(req, res) {
       error: 'Erro interno do servidor',
       message: error.message
     });
+  }
+}
+
+// Função para ativar premium do usuário
+async function activatePremium(payment) {
+  try {
+    console.log('🔄 Ativando premium para pagamento:', payment.id);
+    
+    // Verificar se a API Key do Supabase está configurada
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
+      console.error('❌ Variáveis do Supabase não configuradas');
+      return;
+    }
+
+    const { createClient } = require('@supabase/supabase-js');
+    const supabase = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_ANON_KEY
+    );
+
+    // Calcular data de expiração baseada no valor do pagamento
+    let expirationDate;
+    if (payment.value === 39.00) {
+      // Plano mensal - 30 dias
+      expirationDate = new Date();
+      expirationDate.setDate(expirationDate.getDate() + 30);
+    } else if (payment.value === 390.00) {
+      // Plano anual - 365 dias (R$ 390,00 anual)
+      expirationDate = new Date();
+      expirationDate.setDate(expirationDate.getDate() + 365);
+    } else {
+      console.error('❌ Valor de pagamento não reconhecido:', payment.value);
+      return;
+    }
+
+    // Atualizar empresa como premium
+    const { data, error } = await supabase
+      .from('empresas')
+      .update({
+        is_premium: true,
+        status: 'active',
+        asaas_subscription_id: payment.id,
+        current_period_end: expirationDate.toISOString(),
+        plan_type: payment.value === 39.00 ? 'monthly' : 'yearly',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', payment.externalReference);
+
+    if (error) {
+      console.error('❌ Erro ao ativar premium:', error);
+    } else {
+      console.log('✅ Premium ativado com sucesso para empresa:', payment.externalReference);
+    }
+
+  } catch (error) {
+    console.error('❌ Erro na função activatePremium:', error);
   }
 }

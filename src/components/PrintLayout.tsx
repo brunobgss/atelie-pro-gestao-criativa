@@ -528,22 +528,6 @@ export default function PrintLayout({ title, children, onPrint, onDownload }: Pr
 
   return (
     <div className="print-layout">
-      <div className="print-actions mb-6 flex justify-center gap-4">
-        <button
-          onClick={handlePrint}
-          className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 button-hover animate-glow"
-        >
-          <span className="mr-2">🖨️</span>
-          Imprimir
-        </button>
-        <button
-          onClick={handleDownload}
-          className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 button-hover animate-glow"
-        >
-          <span className="mr-2">📄</span>
-          Baixar PDF
-        </button>
-      </div>
       <div className="print-preview border border-white/20 rounded-2xl p-8 bg-white/90 backdrop-blur-sm shadow-2xl animate-scale-in">
         {children}
       </div>
