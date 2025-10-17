@@ -13,6 +13,8 @@ import { toast } from "sonner";
 import { createOrder, generateOrderCode } from "@/integrations/supabase/orders";
 import { uploadOrderFile } from "@/integrations/supabase/storage";
 import { getProducts } from "@/integrations/supabase/products";
+import { getMedidasByCliente } from "@/integrations/supabase/medidas";
+import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useSync } from "@/contexts/SyncContext";
 import { useSyncOperations } from "@/hooks/useSyncOperations";
@@ -32,6 +34,12 @@ export default function NovoPedido() {
     queryKey: ["products"],
     queryFn: getProducts,
   });
+  
+  // Estados para medidas
+  const [selectedMedida, setSelectedMedida] = useState<string>("");
+  const [medidas, setMedidas] = useState<any[]>([]);
+  const [buscandoMedidas, setBuscandoMedidas] = useState<boolean>(false);
+  
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [quantity, setQuantity] = useState<number>(1);
   const [color, setColor] = useState<string>("");
@@ -79,6 +87,42 @@ export default function NovoPedido() {
       }
     }
   }, []);
+
+  // Função para buscar medidas do cliente com debounce
+  const buscarMedidasCliente = async (nomeCliente: string) => {
+    if (!nomeCliente || nomeCliente.length < 3) {
+      setMedidas([]);
+      setBuscandoMedidas(false);
+      return;
+    }
+
+    setBuscandoMedidas(true);
+
+    try {
+      console.log("Buscando medidas para cliente:", nomeCliente);
+      
+      // Buscar medidas que contenham o nome do cliente
+      const { data: medidasEncontradas, error } = await supabase
+        .from('atelie_medidas')
+        .select('*')
+        .ilike('cliente_nome', `%${nomeCliente}%`)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error("Erro ao buscar medidas:", error);
+        setMedidas([]);
+        return;
+      }
+
+      console.log("Medidas encontradas:", medidasEncontradas?.length || 0);
+      setMedidas(medidasEncontradas || []);
+    } catch (error) {
+      console.error("Erro ao buscar medidas:", error);
+      setMedidas([]);
+    } finally {
+      setBuscandoMedidas(false);
+    }
+  };
 
   const addKitSize = () => {
     setKitItems([...kitItems, { size: "", quantity: 0 }]);
@@ -327,6 +371,7 @@ export default function NovoPedido() {
                     placeholder="Nome do cliente"
                     required
                     className="border-input"
+                    onChange={(e) => buscarMedidasCliente(e.target.value)}
                   />
                 </div>
 
@@ -386,6 +431,59 @@ export default function NovoPedido() {
                         })()}
                       </div>
                     )}
+                  </div>
+                )}
+              </div>
+
+              {/* Seletor de Medidas */}
+              <div className="space-y-2">
+                <Label htmlFor="medidas">Medidas do Cliente</Label>
+                {buscandoMedidas ? (
+                  <div className="flex items-center gap-2 p-3 bg-blue-50 rounded border border-blue-200">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                    <span className="text-sm text-blue-600">Buscando medidas...</span>
+                  </div>
+                ) : medidas.length > 0 ? (
+                  <Select value={selectedMedida} onValueChange={setSelectedMedida}>
+                    <SelectTrigger className="border-input">
+                      <SelectValue placeholder="Selecione as medidas do cliente" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {medidas.map((medida) => (
+                        <SelectItem key={medida.id} value={medida.id}>
+                          {medida.tipo_peca.toUpperCase()} - {medida.cliente_nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="text-sm text-gray-500 p-3 bg-gray-50 rounded border border-gray-200">
+                    Nenhuma medida encontrada para este cliente. 
+                    <br />
+                    <span className="text-xs">Cadastre medidas na página "Medidas" primeiro.</span>
+                  </div>
+                )}
+                {selectedMedida && medidas.length > 0 && (
+                  <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded border border-blue-200">
+                    {(() => {
+                      const medida = medidas.find(m => m.id === selectedMedida);
+                      return medida ? (
+                        <div>
+                          <p className="font-medium text-blue-800 mb-2">Medidas Selecionadas:</p>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            {medida.busto && <span><strong>Busto:</strong> {medida.busto}cm</span>}
+                            {medida.cintura && <span><strong>Cintura:</strong> {medida.cintura}cm</span>}
+                            {medida.quadril && <span><strong>Quadril:</strong> {medida.quadril}cm</span>}
+                            {medida.ombro && <span><strong>Ombro:</strong> {medida.ombro}cm</span>}
+                            {medida.coxa && <span><strong>Coxa:</strong> {medida.coxa}cm</span>}
+                            {medida.comprimento && <span><strong>Comprimento:</strong> {medida.comprimento}cm</span>}
+                          </div>
+                          {medida.observacoes && (
+                            <p className="mt-2 text-xs"><strong>Observações:</strong> {medida.observacoes}</p>
+                          )}
+                        </div>
+                      ) : null;
+                    })()}
                   </div>
                 )}
               </div>

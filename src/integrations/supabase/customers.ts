@@ -126,4 +126,35 @@ export async function deleteCustomer(id: string): Promise<{ ok: boolean; error?:
   }
 }
 
+export async function getCustomers(): Promise<CustomerRow[]> {
+  try {
+    console.log("🔍 Buscando clientes...");
+    
+    // Obter empresa_id do usuário logado
+    const empresa_id = await getCurrentEmpresaId();
+    
+    if (!empresa_id) {
+      console.error("❌ Erro ao obter empresa do usuário");
+      return [];
+    }
+    
+    const { data, error } = await supabase
+      .from("customers")
+      .select("*")
+      .eq("empresa_id", empresa_id)
+      .order("name", { ascending: true });
+
+    if (error) {
+      console.error("❌ Erro ao buscar clientes:", error);
+      throw error;
+    }
+
+    console.log("✅ Clientes encontrados:", data?.length || 0);
+    return data || [];
+  } catch (error) {
+    console.error("❌ Erro ao buscar clientes:", error);
+    throw error;
+  }
+}
+
 

@@ -28,7 +28,7 @@ export async function listReceitas(): Promise<ReceitaRow[]> {
       .from("user_empresas")
       .select("empresa_id")
       .eq("user_id", (await supabase.auth.getUser()).data.user?.id)
-      .single();
+      .maybeSingle();
     
     if (!userEmpresa?.empresa_id) {
       console.error("Usuário não tem empresa associada");
@@ -73,7 +73,7 @@ export async function getReceitaByOrderCode(orderCode: string): Promise<ReceitaR
       .from("user_empresas")
       .select("empresa_id")
       .eq("user_id", (await supabase.auth.getUser()).data.user?.id)
-      .single();
+      .maybeSingle();
     
     if (!userEmpresa?.empresa_id) {
       console.error("Usuário não tem empresa associada");
@@ -93,7 +93,7 @@ export async function getReceitaByOrderCode(orderCode: string): Promise<ReceitaR
       .select("*")
       .eq("order_code", orderCode)
       .eq("empresa_id", userEmpresa.empresa_id)
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error("Erro ao buscar receita:", error);
@@ -137,7 +137,7 @@ export async function createReceita(input: {
         status: input.status ?? "Pago"
       })
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error("Erro ao criar receita:", error);
@@ -176,7 +176,7 @@ export async function updateReceita(
       .update(updateData)
       .eq("id", id)
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error("Erro ao atualizar receita:", error);
@@ -227,7 +227,7 @@ export async function updatePaymentStatus(
       .from("atelie_orders")
       .select("id, value, paid")
       .eq("code", orderCode)
-      .single();
+      .maybeSingle();
 
     if (orderError || !order) {
       console.error("Erro ao buscar pedido:", orderError);

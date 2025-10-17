@@ -12,7 +12,9 @@ import { ArrowLeft, Calendar, CheckCircle2, Clock, Package, Upload, User, Play, 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getOrderByCode, updateOrderStatus } from "@/integrations/supabase/orders";
 import { getReceitaByOrderCode } from "@/integrations/supabase/receitas";
+import { getMedidas } from "@/integrations/supabase/medidas";
 import { useSync } from "@/contexts/SyncContext";
+import { useAuth } from "@/components/AuthProvider";
 import { toast } from "sonner";
 import { ORDER_STATUS_OPTIONS } from "@/utils/statusConstants";
 
@@ -187,6 +189,14 @@ export default function PedidoDetalhe() {
     enabled: Boolean(code),
     refetchOnWindowFocus: false,
     staleTime: 0, // Sempre buscar dados frescos
+  });
+
+  // Buscar medidas do cliente
+  const { empresa } = useAuth();
+  const { data: medidas = [] } = useQuery({
+    queryKey: ["medidas", empresa?.id],
+    queryFn: () => getMedidas(empresa?.id || ''),
+    enabled: !!empresa?.id && !!orderDb?.customer_name,
   });
   
   const order = useMemo(() => {
@@ -421,6 +431,60 @@ export default function PedidoDetalhe() {
                 </div>
               </div>
             </div>
+            
+            ${(() => {
+              // Filtrar medidas do cliente atual
+              const medidasCliente = medidas.filter(medida => 
+                medida.cliente_nome.toLowerCase().includes(order.client.toLowerCase())
+              );
+              
+              if (medidasCliente.length === 0) return '';
+              
+              return `
+                <div class="section">
+                  <h2>📏 Medidas do Cliente</h2>
+                  ${medidasCliente.map(medida => `
+                    <div style="margin-bottom: 20px; padding: 15px; background: white; border-radius: 8px; border: 1px solid #e5e7eb;">
+                      <h3 style="font-size: 16px; font-weight: bold; color: #059669; margin-bottom: 10px;">
+                        ${medida.tipo_peca.toUpperCase()}
+                      </h3>
+                      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 14px;">
+                        ${medida.busto ? `<div><strong>Busto:</strong> ${medida.busto}cm</div>` : ''}
+                        ${medida.cintura ? `<div><strong>Cintura:</strong> ${medida.cintura}cm</div>` : ''}
+                        ${medida.quadril ? `<div><strong>Quadril:</strong> ${medida.quadril}cm</div>` : ''}
+                        ${medida.ombro ? `<div><strong>Ombro:</strong> ${medida.ombro}cm</div>` : ''}
+                        ${medida.largura_costas ? `<div><strong>Larg. Costas:</strong> ${medida.largura_costas}cm</div>` : ''}
+                        ${medida.cava_manga ? `<div><strong>Cava Manga:</strong> ${medida.cava_manga}cm</div>` : ''}
+                        ${medida.grossura_braco ? `<div><strong>Gross. Braço:</strong> ${medida.grossura_braco}cm</div>` : ''}
+                        ${medida.comprimento_manga ? `<div><strong>Comp. Manga:</strong> ${medida.comprimento_manga}cm</div>` : ''}
+                        ${medida.cana_braco ? `<div><strong>Cana Braço:</strong> ${medida.cana_braco}cm</div>` : ''}
+                        ${medida.alca ? `<div><strong>Alça:</strong> ${medida.alca}cm</div>` : ''}
+                        ${medida.pescoco ? `<div><strong>Pescoço:</strong> ${medida.pescoco}cm</div>` : ''}
+                        ${medida.comprimento ? `<div><strong>Comprimento:</strong> ${medida.comprimento}cm</div>` : ''}
+                        ${medida.coxa ? `<div><strong>Coxa:</strong> ${medida.coxa}cm</div>` : ''}
+                        ${medida.tornozelo ? `<div><strong>Tornozelo:</strong> ${medida.tornozelo}cm</div>` : ''}
+                        ${medida.comprimento_calca ? `<div><strong>Comp. Calça:</strong> ${medida.comprimento_calca}cm</div>` : ''}
+                      </div>
+                      ${medida.detalhes_superior ? `
+                        <div style="margin-top: 10px; padding: 8px; background: #f3f4f6; border-radius: 4px;">
+                          <strong>Detalhes Superiores:</strong> ${medida.detalhes_superior}
+                        </div>
+                      ` : ''}
+                      ${medida.detalhes_inferior ? `
+                        <div style="margin-top: 10px; padding: 8px; background: #f3f4f6; border-radius: 4px;">
+                          <strong>Detalhes Inferiores:</strong> ${medida.detalhes_inferior}
+                        </div>
+                      ` : ''}
+                      ${medida.observacoes ? `
+                        <div style="margin-top: 10px; padding: 8px; background: #fef3c7; border-radius: 4px;">
+                          <strong>Observações:</strong> ${medida.observacoes}
+                        </div>
+                      ` : ''}
+                    </div>
+                  `).join('')}
+                </div>
+              `;
+            })()}
             
             ${order.file ? `
             <div class="section">
@@ -680,6 +744,151 @@ export default function PedidoDetalhe() {
                   <div className="text-sm text-muted-foreground">Nenhum arquivo enviado</div>
                 )}
               </div>
+
+              {/* Seção de Medidas do Cliente */}
+              {medidas.filter(medida => 
+                medida.cliente_nome.toLowerCase().includes(order.client.toLowerCase())
+              ).length > 0 && (
+                <div className="space-y-3 border-t pt-4">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 text-primary" />
+                    <p className="text-sm font-medium text-foreground">Medidas do Cliente</p>
+                  </div>
+                  <div className="space-y-3">
+                    {medidas
+                      .filter(medida => 
+                        medida.cliente_nome.toLowerCase().includes(order.client.toLowerCase())
+                      )
+                      .map((medida) => (
+                        <div key={medida.id} className="p-3 bg-muted/50 rounded-lg border">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="text-sm font-semibold text-primary">
+                              {medida.tipo_peca.toUpperCase()}
+                            </h4>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(medida.created_at).toLocaleDateString('pt-BR')}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+                            {medida.busto && (
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Busto:</span>
+                                <span className="font-medium">{medida.busto}cm</span>
+                              </div>
+                            )}
+                            {medida.cintura && (
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Cintura:</span>
+                                <span className="font-medium">{medida.cintura}cm</span>
+                              </div>
+                            )}
+                            {medida.quadril && (
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Quadril:</span>
+                                <span className="font-medium">{medida.quadril}cm</span>
+                              </div>
+                            )}
+                            {medida.ombro && (
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Ombro:</span>
+                                <span className="font-medium">{medida.ombro}cm</span>
+                              </div>
+                            )}
+                            {medida.largura_costas && (
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Larg. Costas:</span>
+                                <span className="font-medium">{medida.largura_costas}cm</span>
+                              </div>
+                            )}
+                            {medida.cava_manga && (
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Cava Manga:</span>
+                                <span className="font-medium">{medida.cava_manga}cm</span>
+                              </div>
+                            )}
+                            {medida.grossura_braco && (
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Gross. Braço:</span>
+                                <span className="font-medium">{medida.grossura_braco}cm</span>
+                              </div>
+                            )}
+                            {medida.comprimento_manga && (
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Comp. Manga:</span>
+                                <span className="font-medium">{medida.comprimento_manga}cm</span>
+                              </div>
+                            )}
+                            {medida.cana_braco && (
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Cana Braço:</span>
+                                <span className="font-medium">{medida.cana_braco}cm</span>
+                              </div>
+                            )}
+                            {medida.alca && (
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Alça:</span>
+                                <span className="font-medium">{medida.alca}cm</span>
+                              </div>
+                            )}
+                            {medida.pescoco && (
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Pescoço:</span>
+                                <span className="font-medium">{medida.pescoco}cm</span>
+                              </div>
+                            )}
+                            {medida.comprimento && (
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Comprimento:</span>
+                                <span className="font-medium">{medida.comprimento}cm</span>
+                              </div>
+                            )}
+                            {medida.coxa && (
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Coxa:</span>
+                                <span className="font-medium">{medida.coxa}cm</span>
+                              </div>
+                            )}
+                            {medida.tornozelo && (
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Tornozelo:</span>
+                                <span className="font-medium">{medida.tornozelo}cm</span>
+                              </div>
+                            )}
+                            {medida.comprimento_calca && (
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">Comp. Calça:</span>
+                                <span className="font-medium">{medida.comprimento_calca}cm</span>
+                              </div>
+                            )}
+                          </div>
+                          
+                          {(medida.detalhes_superior || medida.detalhes_inferior || medida.observacoes) && (
+                            <div className="mt-3 space-y-2">
+                              {medida.detalhes_superior && (
+                                <div className="p-2 bg-blue-50 rounded text-xs">
+                                  <strong className="text-blue-800">Detalhes Superiores:</strong>
+                                  <span className="text-blue-700 ml-1">{medida.detalhes_superior}</span>
+                                </div>
+                              )}
+                              {medida.detalhes_inferior && (
+                                <div className="p-2 bg-blue-50 rounded text-xs">
+                                  <strong className="text-blue-800">Detalhes Inferiores:</strong>
+                                  <span className="text-blue-700 ml-1">{medida.detalhes_inferior}</span>
+                                </div>
+                              )}
+                              {medida.observacoes && (
+                                <div className="p-2 bg-yellow-50 rounded text-xs">
+                                  <strong className="text-yellow-800">Observações:</strong>
+                                  <span className="text-yellow-700 ml-1">{medida.observacoes}</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 

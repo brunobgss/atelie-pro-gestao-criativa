@@ -33,6 +33,7 @@ import Assinatura from "./pages/Assinatura";
 import MinhaConta from "./pages/MinhaConta";
 import Agenda from "./pages/Agenda";
 import OrdemProducao from "./pages/OrdemProducao";
+import MedidasClientes from "./pages/MedidasClientes";
 
 // QueryClient fora do componente para evitar re-criação
 // Cache buster: 2024-12-19 - Corrigindo Dashboard not defined
@@ -83,6 +84,7 @@ function App() {
                   <Route path="assinatura" element={<Assinatura />} />
                   <Route path="minha-conta" element={<MinhaConta />} />
                   <Route path="agenda" element={<Agenda />} />
+                  <Route path="medidas" element={<MedidasClientes />} />
                 </Route>
               </Routes>
             </BrowserRouter>

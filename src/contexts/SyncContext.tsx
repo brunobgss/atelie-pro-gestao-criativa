@@ -24,6 +24,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
       queryClient.invalidateQueries({ queryKey: ['receitas'] });
       queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['medidas'] });
       
       // Forçar refetch imediato
       queryClient.refetchQueries({ queryKey: ['orders'] });
@@ -32,6 +33,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       queryClient.refetchQueries({ queryKey: ['inventory'] });
       queryClient.refetchQueries({ queryKey: ['receitas'] });
       queryClient.refetchQueries({ queryKey: ['products'] });
+      queryClient.refetchQueries({ queryKey: ['medidas'] });
     }, 10000); // 10 segundos
 
     return () => clearInterval(interval);
@@ -58,7 +60,8 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       'inventory_items': ['quotes', 'orders'],
       'receitas': ['orders', 'dashboard'],
       'empresas': ['dashboard', 'minha-conta'],
-      'products': ['quotes', 'orders', 'catalogo']
+      'products': ['quotes', 'orders', 'catalogo'],
+      'medidas': ['customers', 'orders', 'quotes']
     };
 
     const related = relatedResources[resource] || [];
