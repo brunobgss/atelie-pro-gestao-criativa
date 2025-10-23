@@ -37,17 +37,52 @@ export async function checkPaymentExpiration(empresaId: string): Promise<Payment
       };
     }
 
-    // Se não é premium, bloquear acesso
+    // Se não é premium, verificar se está no período de trial
     if (!empresa.is_premium) {
-      console.log('❌ Usuário não tem premium ativo');
+      console.log('🔍 Usuário não é premium - verificando período de trial');
+      
+      // Se não tem trial_end_date, permitir acesso (usuário novo)
+      if (!empresa.trial_end_date) {
+        console.log('✅ Usuário novo - permitindo acesso');
+        return {
+          isPremium: false,
+          isExpired: false,
+          daysRemaining: 7, // Assumir 7 dias para usuário novo
+          planType: null,
+          expirationDate: null,
+          nextPaymentDue: null,
+          shouldBlockAccess: false
+        };
+      }
+      
+      // Verificar se o trial expirou
+      const trialEndDate = new Date(empresa.trial_end_date);
+      const now = new Date();
+      const isTrialExpired = now > trialEndDate;
+      const daysRemaining = isTrialExpired ? 0 : Math.ceil((trialEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (isTrialExpired) {
+        console.log('❌ Trial expirado');
+        return {
+          isPremium: false,
+          isExpired: true,
+          daysRemaining: 0,
+          planType: null,
+          expirationDate: trialEndDate.toISOString(),
+          nextPaymentDue: null,
+          shouldBlockAccess: true
+        };
+      }
+      
+      console.log(`✅ Trial ativo - ${daysRemaining} dias restantes`);
       return {
         isPremium: false,
-        isExpired: true,
-        daysRemaining: 0,
+        isExpired: false,
+        daysRemaining,
         planType: null,
-        expirationDate: null,
+        expirationDate: trialEndDate.toISOString(),
         nextPaymentDue: null,
-        shouldBlockAccess: true
+        shouldBlockAccess: false
       };
     }
 
