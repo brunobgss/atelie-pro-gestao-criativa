@@ -16,6 +16,14 @@ export function useTrialProtection() {
       return;
     }
 
+    console.log("🔍 Dados da empresa recebidos:", {
+      id: empresa.id,
+      nome: empresa.nome,
+      is_premium: empresa.is_premium,
+      status: empresa.status,
+      trial_end_date: empresa.trial_end_date
+    });
+
     // Verificar expiração de pagamento (inclui verificação de premium e trial)
     const checkExpiration = async () => {
       try {

@@ -41,6 +41,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Função otimizada para carregar empresa
     const loadEmpresa = async (userId: string) => {
       try {
+        console.log("🔄 Carregando dados da empresa para usuário:", userId);
+        
         const { data: userEmpresa, error } = await supabase
           .from("user_empresas")
           .select(`
@@ -64,15 +66,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .single();
 
         if (error) {
-          console.error("Erro ao carregar empresa:", error);
+          console.error("❌ Erro ao carregar empresa:", error);
           return;
         }
 
         if (userEmpresa?.empresas && mounted) {
+          console.log("✅ Dados da empresa carregados:", {
+            nome: userEmpresa.empresas.nome,
+            is_premium: userEmpresa.empresas.is_premium,
+            status: userEmpresa.empresas.status,
+            trial_end_date: userEmpresa.empresas.trial_end_date
+          });
           setEmpresa(userEmpresa.empresas as unknown as Empresa);
+        } else {
+          console.log("⚠️ Nenhuma empresa encontrada para o usuário");
         }
       } catch (error) {
-        console.error("Erro ao carregar empresa:", error);
+        console.error("❌ Erro ao carregar empresa:", error);
       }
     };
 
@@ -155,7 +165,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             responsavel,
             cpf_cnpj,
             trial_end_date,
-            created_at
+            is_premium,
+            status,
+            created_at,
+            updated_at
           )
         `)
         .eq("user_id", userId)
