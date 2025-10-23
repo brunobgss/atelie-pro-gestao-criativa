@@ -9,18 +9,21 @@ interface TrialProtectedRouteProps {
 }
 
 export function TrialProtectedRoute({ children, allowedPaths = ["/assinatura", "/minha-conta"] }: TrialProtectedRouteProps) {
-  const { isTrialExpired } = useTrialProtection();
+  const { isTrialExpired, trialEndDate, isLoading } = useTrialProtection();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (isTrialExpired) {
+    // Só verificar se temos dados completos do trial e não está carregando
+    if (!isLoading && trialEndDate && isTrialExpired) {
       const currentPath = window.location.pathname;
       const isAllowed = allowedPaths.some(path => currentPath.startsWith(path));
       
       console.log("🚫 Trial expirado - verificando acesso:", {
         currentPath,
         isAllowed,
-        isTrialExpired
+        isTrialExpired,
+        trialEndDate,
+        isLoading
       });
       
       if (!isAllowed) {
@@ -28,10 +31,22 @@ export function TrialProtectedRoute({ children, allowedPaths = ["/assinatura", "
         navigate("/assinatura", { replace: true });
       }
     }
-  }, [isTrialExpired, navigate, allowedPaths]);
+  }, [isTrialExpired, trialEndDate, isLoading, navigate, allowedPaths]);
 
-  // Se o trial expirou e não está em uma rota permitida, mostrar tela de bloqueio
-  if (isTrialExpired) {
+  // Mostrar loading se ainda está carregando dados do trial
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center p-8">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-purple-600 mx-auto mb-4"></div>
+          <p className="text-purple-600 font-medium">Carregando dados do trial...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Só mostrar tela de bloqueio se temos certeza de que o trial expirou
+  if (trialEndDate && isTrialExpired) {
     const currentPath = window.location.pathname;
     const isAllowed = allowedPaths.some(path => currentPath.startsWith(path));
     

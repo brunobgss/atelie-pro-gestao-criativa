@@ -15,13 +15,10 @@ export function useTrialProtection() {
       return;
     }
 
+    // Se não há data de fim do trial, aguardar mais tempo para carregamento
     if (!empresa?.trial_end_date) {
-      // Se não há data de fim do trial, considerar como expirado por segurança
-      console.log("⚠️ Trial end date não encontrado - considerando como expirado");
-      setIsTrialExpired(true);
-      if (location.pathname !== "/assinatura" && location.pathname !== "/minha-conta") {
-        navigate("/assinatura", { replace: true });
-      }
+      console.log("⏳ Trial end date não encontrado - aguardando carregamento completo...");
+      // Não definir como expirado imediatamente, aguardar carregamento
       return;
     }
 
@@ -50,6 +47,7 @@ export function useTrialProtection() {
     trialEndDate: empresa?.trial_end_date,
     daysRemaining: empresa?.trial_end_date 
       ? Math.ceil((new Date(empresa.trial_end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
-      : 7
+      : null, // Retornar null em vez de 7 para indicar que não temos dados
+    isLoading: !empresa || !empresa.trial_end_date // Adicionar flag de carregamento
   };
 }
