@@ -142,6 +142,11 @@ async function createPayment(paymentData) {
   // Configurar dados do pagamento baseado no plano
   let payload;
   
+  // URLs de callback para redirecionamento após pagamento
+  const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:8080';
+  const successUrl = `${baseUrl}/assinatura-sucesso`;
+  const callbackUrl = `${baseUrl}/api/webhooks/asaas`;
+  
   if (planType === 'monthly') {
     payload = {
       customer: customerId,
@@ -149,7 +154,9 @@ async function createPayment(paymentData) {
       value: 39.00,
       dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       description: 'Assinatura Mensal - Ateliê Pro',
-      externalReference: companyId || 'temp-company'
+      externalReference: companyId || 'temp-company',
+      callbackUrl: callbackUrl,
+      successUrl: successUrl
     };
   } else if (planType === 'yearly') {
     payload = {
@@ -158,7 +165,9 @@ async function createPayment(paymentData) {
       value: 390.00, // R$ 390,00 anual
       dueDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 365 dias
       description: 'Assinatura Anual - Ateliê Pro',
-      externalReference: companyId || 'temp-company'
+      externalReference: companyId || 'temp-company',
+      callbackUrl: callbackUrl,
+      successUrl: successUrl
     };
   } else {
     throw new Error('Tipo de plano inválido. Use: monthly ou yearly');

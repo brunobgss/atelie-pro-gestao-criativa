@@ -21,6 +21,12 @@ export function TrialBannerSmall({ onClose }: TrialBannerProps) {
   const navigate = useNavigate();
   const { empresa } = useAuth();
 
+  // PRIMEIRO: Verificar se o usuário tem premium ativo
+  if (empresa?.is_premium === true) {
+    console.log("✅ Usuário premium detectado - ocultando banner de trial");
+    return null;
+  }
+
   useEffect(() => {
     // Sempre usar dados do Supabase quando disponíveis
     if (!empresa?.trial_end_date) {

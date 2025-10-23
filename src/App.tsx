@@ -30,10 +30,15 @@ import CalculadoraPrecos from "./pages/CalculadoraPrecos";
 import Relatorios from "./pages/Relatorios";
 import ControleFinanceiro from "./pages/ControleFinanceiro";
 import Assinatura from "./pages/Assinatura";
+import AssinaturaSucesso from "./pages/AssinaturaSucesso";
+import VerificarPagamento from "./pages/VerificarPagamento";
 import MinhaConta from "./pages/MinhaConta";
 import Agenda from "./pages/Agenda";
 import OrdemProducao from "./pages/OrdemProducao";
 import MedidasClientes from "./pages/MedidasClientes";
+import Ajuda from "./pages/Ajuda";
+import Documentacao from "./pages/Documentacao";
+import FAQ from "./pages/FAQ";
 
 // QueryClient fora do componente para evitar re-criação
 // Cache buster: 2024-12-19 - Corrigindo Dashboard not defined
@@ -63,6 +68,8 @@ function App() {
                 <Route path="/cadastro" element={<Cadastro />} />
                 <Route path="/orcamento/:id" element={<OrcamentoPublico />} />
                 <Route path="/orcamentos/:id/impressao" element={<OrcamentoImpressaoNovo />} />
+                <Route path="/assinatura-sucesso" element={<AssinaturaSucesso />} />
+                <Route path="/verificar-pagamento" element={<VerificarPagamento />} />
                 
                 {/* Rotas protegidas com Layout */}
                 <Route path="/" element={<Layout />}>
@@ -85,6 +92,9 @@ function App() {
                   <Route path="minha-conta" element={<MinhaConta />} />
                   <Route path="agenda" element={<Agenda />} />
                   <Route path="medidas" element={<MedidasClientes />} />
+                  <Route path="ajuda" element={<Ajuda />} />
+                  <Route path="documentacao" element={<Documentacao />} />
+                  <Route path="faq" element={<FAQ />} />
                 </Route>
               </Routes>
             </BrowserRouter>

@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Check, Crown, Zap, Star, ArrowLeft, CreditCard } from "lucide-react";
+import { Check, Crown, Zap, Star, ArrowLeft, CreditCard, CheckCircle, User, MessageCircle, Mail } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -77,6 +77,52 @@ export default function Assinatura() {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [pendingPlanId, setPendingPlanId] = useState<string | null>(null);
 
+  // Verificar se o usuário já tem assinatura ativa
+  const isPremium = empresa?.is_premium === true;
+  
+  // Detectar o plano baseado no valor pago (se disponível) ou usar padrão
+  const detectPlan = () => {
+    // Verificar se há informações de pagamento no localStorage
+    const paymentInfo = localStorage.getItem('lastPaymentInfo');
+    
+    if (paymentInfo) {
+      try {
+        const payment = JSON.parse(paymentInfo);
+        if (payment.value === 39.00) {
+          return {
+            type: 'monthly',
+            name: 'Mensal',
+            price: 'R$ 39,00',
+            period: 'mês'
+          };
+        } else if (payment.value === 390.00) {
+          return {
+            type: 'yearly',
+            name: 'Anual',
+            price: 'R$ 390,00',
+            period: 'ano'
+          };
+        }
+      } catch (e) {
+        console.log('Erro ao parsear informações de pagamento:', e);
+      }
+    }
+    
+    // Se não houver informações, assumir mensal como padrão
+    return {
+      type: 'monthly',
+      name: 'Mensal',
+      price: 'R$ 39,00',
+      period: 'mês'
+    };
+  };
+  
+  const planInfo = detectPlan();
+  const currentPlan = planInfo.type;
+  const planName = planInfo.name;
+  const planPrice = planInfo.price;
+  const planPeriod = planInfo.period;
+
   const handleSubscribe = async (planId: string) => {
     // Verificar se tem CPF/CNPJ e telefone salvos
     console.log('🔍 Dados da empresa:', empresa);
@@ -92,6 +138,14 @@ export default function Assinatura() {
       toast.error("Complete seus dados de CPF/CNPJ e telefone no cadastro primeiro!");
       return;
     }
+    
+    // Salvar informações do plano no localStorage para detecção posterior
+    const planData = {
+      planId,
+      value: planId === 'monthly' ? 39.00 : 390.00,
+      timestamp: new Date().toISOString()
+    };
+    localStorage.setItem('lastPaymentInfo', JSON.stringify(planData));
     
     // Abrir modal para escolher forma de pagamento
     setPendingPlanId(planId);
@@ -242,6 +296,188 @@ export default function Assinatura() {
     }
   };
 
+  // Se o usuário já tem premium, mostrar página de gerenciamento
+  if (isPremium) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100">
+        {/* Header */}
+        <div className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 sticky top-0 z-10 shadow-sm">
+          <div className="p-4 md:p-6">
+            {/* Mobile Layout */}
+            <div className="md:hidden">
+              <div className="flex items-center gap-3 mb-4">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigate("/")}
+                  className="text-gray-700 hover:bg-gray-100 p-2"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </Button>
+                <div className="flex-1">
+                  <h1 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                    <Crown className="w-5 h-5 text-green-600" />
+                    Minha Assinatura
+                  </h1>
+                  <p className="text-gray-600 text-xs">Gerencie sua conta premium</p>
+                </div>
+              </div>
+            </div>
+            
+            {/* Desktop Layout */}
+            <div className="hidden md:flex justify-between items-center">
+              <div className="flex items-center gap-4">
+                <SidebarTrigger className="text-gray-700 hover:bg-gray-100" />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigate("/")}
+                  className="text-gray-700 hover:bg-gray-100"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Voltar
+                </Button>
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                    <Crown className="w-6 h-6 text-green-600" />
+                    Minha Assinatura
+                  </h1>
+                  <p className="text-gray-600 text-sm mt-0.5">Gerencie sua conta premium do Ateliê Pro</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-4 md:p-8 max-w-4xl mx-auto">
+          {/* Status da Assinatura */}
+          <Card className="mb-6 bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-green-800">
+                <CheckCircle className="w-6 h-6" />
+                Assinatura Ativa
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <p className="text-sm text-gray-600">Plano Atual</p>
+                  <p className="text-xl font-bold text-green-800">{planName}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Valor</p>
+                  <p className="text-xl font-bold text-green-800">{planPrice}/{planPeriod}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Status</p>
+                  <Badge className="bg-green-100 text-green-800 border-green-200">
+                    <CheckCircle className="w-3 h-3 mr-1" />
+                    Ativo
+                  </Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Recursos Premium */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Star className="w-5 h-5 text-purple-600" />
+                Recursos Premium Ativos
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[
+                  "Gestão completa de pedidos",
+                  "Calculadora de preços profissional",
+                  "Catálogo de produtos",
+                  "Relatórios financeiros",
+                  "Integração WhatsApp",
+                  "Suporte prioritário",
+                  "Recursos premium",
+                  "Relatórios detalhados",
+                  "Backup premium"
+                ].map((feature, index) => (
+                  <div key={index} className="flex items-center gap-3">
+                    <Check className="w-5 h-5 text-green-600 flex-shrink-0" />
+                    <span className="text-gray-700">{feature}</span>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Ações */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Gerenciar Assinatura</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={() => navigate("/minha-conta")}
+                >
+                  <User className="w-4 h-4 mr-2" />
+                  Ver Dados da Conta
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={() => window.open('https://www.asaas.com', '_blank')}
+                >
+                  <CreditCard className="w-4 h-4 mr-2" />
+                  Portal de Pagamentos
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Suporte</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={() => window.open('mailto:suporte@ateliepro.online', '_blank')}
+                >
+                  <Mail className="w-4 h-4 mr-2" />
+                  Contatar Suporte
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={() => window.open('https://wa.me/5535998498798', '_blank')}
+                >
+                  <MessageCircle className="w-4 h-4 mr-2" />
+                  WhatsApp Suporte
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Informações Importantes */}
+          <Card className="mt-6 bg-blue-50 border-blue-200">
+            <CardHeader>
+              <CardTitle className="text-blue-800">Informações Importantes</CardTitle>
+            </CardHeader>
+            <CardContent className="text-blue-700 space-y-2">
+              <p>• Sua assinatura é renovada automaticamente</p>
+              <p>• Você pode cancelar a qualquer momento sem taxas</p>
+              <p>• Suporte prioritário disponível para assinantes</p>
+              <p>• Backup automático dos seus dados</p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // Página original para usuários sem assinatura
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100">
       {/* Header */}
@@ -669,6 +905,23 @@ export default function Assinatura() {
                     Confirmar Pagamento
                   </div>
                 )}
+              </Button>
+            </div>
+            
+            {/* Link para verificar pagamento */}
+            <div className="text-center pt-4 border-t border-gray-200 mt-4">
+              <p className="text-xs text-gray-600 mb-2">
+                Já fez o pagamento mas não foi ativado?
+              </p>
+              <Button 
+                variant="link" 
+                onClick={() => {
+                  setIsPaymentModalOpen(false);
+                  navigate("/verificar-pagamento");
+                }}
+                className="text-blue-600 hover:text-blue-700 text-sm"
+              >
+                Verificar Status do Pagamento
               </Button>
             </div>
           </div>

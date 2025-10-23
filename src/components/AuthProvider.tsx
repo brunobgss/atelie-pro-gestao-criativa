@@ -52,12 +52,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               responsavel,
               cpf_cnpj,
               trial_end_date,
+              is_premium,
+              status,
               created_at,
               updated_at
             )
           `)
           .eq("user_id", userId)
-          .order("created_at", { ascending: true })
+          .order("created_at", { ascending: false })
           .limit(1)
           .single();
 

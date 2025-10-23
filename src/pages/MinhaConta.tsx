@@ -153,6 +153,11 @@ export default function MinhaConta() {
   };
 
   const getTrialStatus = () => {
+    // PRIMEIRO: Verificar se o usuário tem premium ativo
+    if (empresa?.is_premium === true) {
+      return { status: "premium", days: 0 };
+    }
+    
     if (!empresa?.trial_end_date) return { status: "unknown", days: 0 };
     
     const trialEnd = new Date(empresa.trial_end_date);
@@ -195,9 +200,13 @@ export default function MinhaConta() {
           <CardContent>
             <div className="flex items-center justify-between">
               <div>
-                <p className="font-medium">Período de Teste</p>
+                <p className="font-medium">
+                  {trialStatus.status === "premium" ? "Assinatura Premium" : "Período de Teste"}
+                </p>
                 <p className="text-sm text-muted-foreground">
-                  {trialStatus.status === "expired" 
+                  {trialStatus.status === "premium" 
+                    ? "Sua assinatura está ativa e você tem acesso a todos os recursos premium"
+                    : trialStatus.status === "expired" 
                     ? "Período de teste expirado" 
                     : trialStatus.status === "expiring"
                     ? `${trialStatus.days} dias restantes`
@@ -206,10 +215,13 @@ export default function MinhaConta() {
                 </p>
               </div>
               <Badge 
-                variant={trialStatus.status === "expired" ? "destructive" : 
+                variant={trialStatus.status === "premium" ? "default" :
+                        trialStatus.status === "expired" ? "destructive" : 
                         trialStatus.status === "expiring" ? "secondary" : "default"}
+                className={trialStatus.status === "premium" ? "bg-green-100 text-green-800 border-green-200" : ""}
               >
-                {trialStatus.status === "expired" ? "Expirado" :
+                {trialStatus.status === "premium" ? "Ativo" :
+                 trialStatus.status === "expired" ? "Expirado" :
                  trialStatus.status === "expiring" ? "Expirando" : "Ativo"}
               </Badge>
             </div>
@@ -220,6 +232,17 @@ export default function MinhaConta() {
                   className="w-full"
                 >
                   Renovar Assinatura
+                </Button>
+              </div>
+            )}
+            {trialStatus.status === "premium" && (
+              <div className="mt-4">
+                <Button 
+                  onClick={() => navigate("/assinatura")}
+                  variant="outline"
+                  className="w-full"
+                >
+                  Gerenciar Assinatura
                 </Button>
               </div>
             )}

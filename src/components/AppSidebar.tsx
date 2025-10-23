@@ -1,4 +1,4 @@
-import { LayoutDashboard, Package, Calendar, FileText, Users, Archive, LogOut, Calculator, BookOpen, BarChart3, Crown, DollarSign, User, Ruler } from "lucide-react";
+import { LayoutDashboard, Package, Calendar, FileText, Users, Archive, LogOut, Calculator, BookOpen, BarChart3, Crown, DollarSign, User, Ruler, HelpCircle } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import logoAteliePro from "@/assets/logo-atelie-pro.png";
 import {
@@ -27,6 +27,7 @@ const menuItems = [
   { title: "Assinatura", url: "/assinatura", icon: Crown },
   { title: "Clientes", url: "/clientes", icon: Users },
   { title: "Estoque", url: "/estoque", icon: Archive },
+  { title: "Ajuda", url: "/ajuda", icon: HelpCircle },
   { title: "Minha Conta", url: "/minha-conta", icon: User },
 ];
 

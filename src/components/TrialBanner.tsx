@@ -21,6 +21,12 @@ export function TrialBanner({ onClose }: TrialBannerProps) {
   const navigate = useNavigate();
   const { empresa } = useAuth();
 
+  // PRIMEIRO: Verificar se o usuário tem premium ativo
+  if (empresa?.is_premium === true) {
+    console.log("✅ Usuário premium detectado - ocultando banner de trial");
+    return null;
+  }
+
   useEffect(() => {
     if (!empresa?.trial_end_date) {
       // Se não há data de fim do trial, usar 7 dias a partir de agora

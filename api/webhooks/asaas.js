@@ -48,6 +48,12 @@ export default async function handler(req, res) {
         await activatePremium(webhookData.payment);
         break;
       
+      case 'PAYMENT_CONFIRMED':
+        console.log('✅ Pagamento confirmado:', webhookData.payment.id);
+        // Ativar premium do usuário (backup para PAYMENT_RECEIVED)
+        await activatePremium(webhookData.payment);
+        break;
+      
       case 'PAYMENT_OVERDUE':
         console.log('⚠️ Pagamento em atraso:', webhookData.payment.id);
         // Aqui você pode notificar o usuário sobre o atraso
@@ -83,10 +89,14 @@ export default async function handler(req, res) {
 async function activatePremium(payment) {
   try {
     console.log('🔄 Ativando premium para pagamento:', payment.id);
+    console.log('🔄 External Reference:', payment.externalReference);
+    console.log('🔄 Payment Value:', payment.value);
     
     // Verificar se a API Key do Supabase está configurada
     if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
       console.error('❌ Variáveis do Supabase não configuradas');
+      console.error('❌ SUPABASE_URL:', process.env.SUPABASE_URL ? 'SIM' : 'NÃO');
+      console.error('❌ SUPABASE_ANON_KEY:', process.env.SUPABASE_ANON_KEY ? 'SIM' : 'NÃO');
       return;
     }
 
@@ -111,6 +121,27 @@ async function activatePremium(payment) {
       return;
     }
 
+    console.log('🔄 Data de expiração calculada:', expirationDate.toISOString());
+
+    // Primeiro, verificar se a empresa existe
+    const { data: empresaData, error: empresaError } = await supabase
+      .from('empresas')
+      .select('id, nome')
+      .eq('id', payment.externalReference)
+      .single();
+
+    if (empresaError) {
+      console.error('❌ Erro ao buscar empresa:', empresaError);
+      return;
+    }
+
+    if (!empresaData) {
+      console.error('❌ Empresa não encontrada:', payment.externalReference);
+      return;
+    }
+
+    console.log('✅ Empresa encontrada:', empresaData.nome);
+
     // Atualizar empresa como premium
     const { data, error } = await supabase
       .from('empresas')
@@ -126,11 +157,14 @@ async function activatePremium(payment) {
 
     if (error) {
       console.error('❌ Erro ao ativar premium:', error);
+      console.error('❌ Detalhes do erro:', error.message);
     } else {
       console.log('✅ Premium ativado com sucesso para empresa:', payment.externalReference);
+      console.log('✅ Dados atualizados:', data);
     }
 
   } catch (error) {
     console.error('❌ Erro na função activatePremium:', error);
+    console.error('❌ Stack trace:', error.stack);
   }
 }

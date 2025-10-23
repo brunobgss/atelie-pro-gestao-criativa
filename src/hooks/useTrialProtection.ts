@@ -15,7 +15,14 @@ export function useTrialProtection() {
       return;
     }
 
-    if (!empresa?.trial_end_date) {
+    // PRIMEIRO: Verificar se o usuário tem premium ativo
+    if (empresa.is_premium === true) {
+      console.log("✅ Usuário premium detectado - ignorando verificação de trial");
+      setIsTrialExpired(false);
+      return;
+    }
+
+    if (!empresa.trial_end_date) {
       // Se não há data de fim do trial, considerar como expirado por segurança
       console.log("⚠️ Trial end date não encontrado - considerando como expirado");
       setIsTrialExpired(true);
@@ -33,6 +40,7 @@ export function useTrialProtection() {
       trialEndDate: empresa.trial_end_date,
       now: now.toISOString(),
       isExpired,
+      isPremium: empresa.is_premium,
       currentPath: location.pathname
     });
 
@@ -43,7 +51,7 @@ export function useTrialProtection() {
       console.log("🚫 Trial expirado - redirecionando para assinatura");
       navigate("/assinatura", { replace: true });
     }
-  }, [empresa?.trial_end_date, location.pathname, navigate, isTrialExpired, empresa]);
+  }, [empresa?.trial_end_date, empresa?.is_premium, location.pathname, navigate, isTrialExpired, empresa]);
 
   return {
     isTrialExpired,

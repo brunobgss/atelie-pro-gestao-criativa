@@ -89,3 +89,4 @@ WHERE table_name = 'atelie_products'
 ORDER BY ordinal_position;
 
 
+
