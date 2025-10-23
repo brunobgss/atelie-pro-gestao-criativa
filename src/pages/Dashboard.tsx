@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { MobileSidebarTrigger } from "@/components/MobileSidebarTrigger";
 import { TrialBannerSmall } from "@/components/TrialBannerSmall";
+import { PaymentExpirationWarning } from "@/components/PaymentExpirationWarning";
 import { useQuery } from "@tanstack/react-query";
 import { listOrders } from "@/integrations/supabase/orders";
 import { listQuotes } from "@/integrations/supabase/quotes";
@@ -307,6 +308,9 @@ _${empresa?.nome || 'Atelie'}_`;
       <div className="p-4 md:p-8 space-y-4 md:space-y-6">
         {/* Banner de Trial */}
         <TrialBannerSmall />
+        
+        {/* Aviso de Vencimento de Pagamento */}
+        <PaymentExpirationWarning />
         
         {/* Stats Cards */}
         <div className="grid gap-4 md:gap-6 grid-cols-2 md:grid-cols-2 lg:grid-cols-4">

@@ -51,7 +51,7 @@ export default async function handler(req, res) {
           result = await createCustomer(data);
           break;
         case 'createPayment':
-          result = await createPayment(data);
+          result = await createSubscription(data);
           break;
         default:
           console.error('❌ Ação não reconhecida:', action);
@@ -128,9 +128,9 @@ async function createCustomer(customerData) {
   return data;
 }
 
-// Função para criar pagamento único (link de pagamento)
-async function createPayment(paymentData) {
-  console.log('🔄 Criando pagamento ASAAS:', paymentData);
+// Função para criar assinatura recorrente
+async function createSubscription(paymentData) {
+  console.log('🔄 Criando assinatura recorrente ASAAS:', paymentData);
 
   const { customerId, planType, companyId, paymentMethod = 'PIX' } = paymentData;
 
@@ -139,7 +139,7 @@ async function createPayment(paymentData) {
     throw new Error('Dados obrigatórios: customerId, planType');
   }
 
-  // Configurar dados do pagamento baseado no plano
+  // Configurar dados da assinatura baseado no plano
   let payload;
   
   // URLs de callback para redirecionamento após pagamento
@@ -152,9 +152,10 @@ async function createPayment(paymentData) {
       customer: customerId,
       billingType: paymentMethod,
       value: 39.00,
-      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       description: 'Assinatura Mensal - Ateliê Pro',
       externalReference: companyId || 'temp-company',
+      cycle: 'MONTHLY', // Cobrança mensal recorrente
+      nextDueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       callbackUrl: callbackUrl,
       successUrl: successUrl
     };
@@ -163,9 +164,10 @@ async function createPayment(paymentData) {
       customer: customerId,
       billingType: paymentMethod,
       value: 390.00, // R$ 390,00 anual
-      dueDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 365 dias
       description: 'Assinatura Anual - Ateliê Pro',
       externalReference: companyId || 'temp-company',
+      cycle: 'YEARLY', // Cobrança anual recorrente
+      nextDueDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       callbackUrl: callbackUrl,
       successUrl: successUrl
     };
@@ -176,7 +178,7 @@ async function createPayment(paymentData) {
   console.log('📤 Payload para ASAAS:', payload);
   console.log('🔑 API Key presente:', process.env.VITE_ASAAS_API_KEY ? 'SIM' : 'NÃO');
 
-  const response = await fetch('https://www.asaas.com/api/v3/payments', {
+  const response = await fetch('https://www.asaas.com/api/v3/subscriptions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -198,6 +200,6 @@ async function createPayment(paymentData) {
     throw new Error(`ASAAS Error: ${data.message || 'Erro ao criar pagamento'}`);
   }
 
-  console.log('✅ Pagamento criado com sucesso:', data);
+  console.log('✅ Assinatura criada com sucesso:', data);
   return data;
 }

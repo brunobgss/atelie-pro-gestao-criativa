@@ -56,12 +56,28 @@ export default async function handler(req, res) {
       
       case 'PAYMENT_OVERDUE':
         console.log('⚠️ Pagamento em atraso:', webhookData.payment.id);
-        // Aqui você pode notificar o usuário sobre o atraso
+        // Desativar premium quando pagamento está em atraso
+        await deactivatePremiumForOverdue(webhookData.payment);
         break;
       
       case 'PAYMENT_DELETED':
         console.log('🗑️ Pagamento deletado:', webhookData.payment.id);
-        // Aqui você pode cancelar a assinatura
+        // Desativar premium quando pagamento é deletado
+        await deactivatePremiumForDeleted(webhookData.payment);
+        break;
+
+      case 'SUBSCRIPTION_CREATED':
+        console.log('🔄 Assinatura criada:', webhookData.subscription.id);
+        break;
+
+      case 'SUBSCRIPTION_UPDATED':
+        console.log('🔄 Assinatura atualizada:', webhookData.subscription.id);
+        break;
+
+      case 'SUBSCRIPTION_DELETED':
+        console.log('🗑️ Assinatura deletada:', webhookData.subscription.id);
+        // Desativar premium quando assinatura é cancelada
+        await deactivatePremiumForSubscriptionDeleted(webhookData.subscription);
         break;
       
       default:
@@ -106,22 +122,27 @@ async function activatePremium(payment) {
       process.env.SUPABASE_ANON_KEY
     );
 
-    // Calcular data de expiração baseada no valor do pagamento
+    // Calcular data de expiração e tipo de plano baseado no valor do pagamento
     let expirationDate;
+    let planType;
+    
     if (payment.value === 39.00) {
       // Plano mensal - 30 dias
       expirationDate = new Date();
       expirationDate.setDate(expirationDate.getDate() + 30);
+      planType = 'monthly';
     } else if (payment.value === 390.00) {
       // Plano anual - 365 dias (R$ 390,00 anual)
       expirationDate = new Date();
       expirationDate.setDate(expirationDate.getDate() + 365);
+      planType = 'yearly';
     } else {
       console.error('❌ Valor de pagamento não reconhecido:', payment.value);
       return;
     }
 
     console.log('🔄 Data de expiração calculada:', expirationDate.toISOString());
+    console.log('🔄 Tipo de plano:', planType);
 
     // Primeiro, verificar se a empresa existe
     const { data: empresaData, error: empresaError } = await supabase
@@ -148,9 +169,7 @@ async function activatePremium(payment) {
       .update({
         is_premium: true,
         status: 'active',
-        asaas_subscription_id: payment.id,
-        current_period_end: expirationDate.toISOString(),
-        plan_type: payment.value === 39.00 ? 'monthly' : 'yearly',
+        trial_end_date: expirationDate.toISOString(), // Usar trial_end_date como data de expiração
         updated_at: new Date().toISOString()
       })
       .eq('id', payment.externalReference);
@@ -166,5 +185,95 @@ async function activatePremium(payment) {
   } catch (error) {
     console.error('❌ Erro na função activatePremium:', error);
     console.error('❌ Stack trace:', error.stack);
+  }
+}
+
+// Função para desativar premium quando pagamento está em atraso
+async function deactivatePremiumForOverdue(payment) {
+  try {
+    console.log('⚠️ Desativando premium por pagamento em atraso:', payment.id);
+    
+    const { createClient } = require('@supabase/supabase-js');
+    const supabase = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_ANON_KEY
+    );
+
+    const { error } = await supabase
+      .from('empresas')
+      .update({
+        is_premium: false,
+        status: 'overdue',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', payment.externalReference);
+
+    if (error) {
+      console.error('❌ Erro ao desativar premium por atraso:', error);
+    } else {
+      console.log('✅ Premium desativado por atraso para empresa:', payment.externalReference);
+    }
+  } catch (error) {
+    console.error('❌ Erro ao desativar premium por atraso:', error);
+  }
+}
+
+// Função para desativar premium quando pagamento é deletado
+async function deactivatePremiumForDeleted(payment) {
+  try {
+    console.log('🗑️ Desativando premium por pagamento deletado:', payment.id);
+    
+    const { createClient } = require('@supabase/supabase-js');
+    const supabase = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_ANON_KEY
+    );
+
+    const { error } = await supabase
+      .from('empresas')
+      .update({
+        is_premium: false,
+        status: 'cancelled',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', payment.externalReference);
+
+    if (error) {
+      console.error('❌ Erro ao desativar premium por pagamento deletado:', error);
+    } else {
+      console.log('✅ Premium desativado por pagamento deletado para empresa:', payment.externalReference);
+    }
+  } catch (error) {
+    console.error('❌ Erro ao desativar premium por pagamento deletado:', error);
+  }
+}
+
+// Função para desativar premium quando assinatura é cancelada
+async function deactivatePremiumForSubscriptionDeleted(subscription) {
+  try {
+    console.log('🗑️ Desativando premium por assinatura cancelada:', subscription.id);
+    
+    const { createClient } = require('@supabase/supabase-js');
+    const supabase = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_ANON_KEY
+    );
+
+    const { error } = await supabase
+      .from('empresas')
+      .update({
+        is_premium: false,
+        status: 'cancelled',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', subscription.externalReference);
+
+    if (error) {
+      console.error('❌ Erro ao desativar premium por assinatura cancelada:', error);
+    } else {
+      console.log('✅ Premium desativado por assinatura cancelada para empresa:', subscription.externalReference);
+    }
+  } catch (error) {
+    console.error('❌ Erro ao desativar premium por assinatura cancelada:', error);
   }
 }

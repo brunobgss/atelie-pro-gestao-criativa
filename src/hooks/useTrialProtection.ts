@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/components/AuthProvider";
+import { checkPaymentExpiration } from "@/utils/paymentExpiration";
 
 export function useTrialProtection() {
   const { empresa } = useAuth();
@@ -15,49 +16,59 @@ export function useTrialProtection() {
       return;
     }
 
-    // PRIMEIRO: Verificar se o usuário tem premium ativo
-    if (empresa.is_premium === true) {
-      console.log("✅ Usuário premium detectado - ignorando verificação de trial");
-      setIsTrialExpired(false);
-      return;
-    }
+    // Verificar expiração de pagamento (inclui verificação de premium e trial)
+    const checkExpiration = async () => {
+      try {
+        const paymentStatus = await checkPaymentExpiration(empresa.id);
+        
+        console.log("🔍 Status de pagamento:", {
+          isPremium: paymentStatus.isPremium,
+          isExpired: paymentStatus.isExpired,
+          daysRemaining: paymentStatus.daysRemaining,
+          planType: paymentStatus.planType,
+          shouldBlockAccess: paymentStatus.shouldBlockAccess,
+          currentPath: location.pathname
+        });
 
-    if (!empresa.trial_end_date) {
-      // Se não há data de fim do trial, considerar como expirado por segurança
-      console.log("⚠️ Trial end date não encontrado - considerando como expirado");
-      setIsTrialExpired(true);
-      if (location.pathname !== "/assinatura" && location.pathname !== "/minha-conta") {
-        navigate("/assinatura", { replace: true });
+        setIsTrialExpired(paymentStatus.shouldBlockAccess);
+
+        // Se deve bloquear acesso e não está na página de assinatura, redirecionar
+        if (paymentStatus.shouldBlockAccess && 
+            location.pathname !== "/assinatura" && 
+            location.pathname !== "/minha-conta" &&
+            location.pathname !== "/verificar-pagamento" &&
+            location.pathname !== "/ajuda" &&
+            location.pathname !== "/documentacao" &&
+            location.pathname !== "/faq") {
+          console.log("🚫 Acesso bloqueado - redirecionando para assinatura");
+          navigate("/assinatura", { replace: true });
+        }
+
+        // Se está próximo do vencimento, mostrar aviso
+        if (paymentStatus.nextPaymentDue && paymentStatus.daysRemaining <= 3) {
+          console.log(`⚠️ Pagamento vence em ${paymentStatus.daysRemaining} dias`);
+        }
+
+      } catch (error) {
+        console.error("❌ Erro ao verificar expiração de pagamento:", error);
+        // Em caso de erro, bloquear acesso por segurança
+        setIsTrialExpired(true);
+        if (location.pathname !== "/assinatura" && location.pathname !== "/minha-conta") {
+          navigate("/assinatura", { replace: true });
+        }
       }
-      return;
-    }
+    };
 
-    const trialEnd = new Date(empresa.trial_end_date);
-    const now = new Date();
-    const isExpired = now > trialEnd;
-
-    console.log("🔍 Verificando trial:", {
-      trialEndDate: empresa.trial_end_date,
-      now: now.toISOString(),
-      isExpired,
-      isPremium: empresa.is_premium,
-      currentPath: location.pathname
-    });
-
-    setIsTrialExpired(isExpired);
-
-    // Se o trial expirou e não está na página de assinatura, redirecionar IMEDIATAMENTE
-    if (isExpired && location.pathname !== "/assinatura" && location.pathname !== "/minha-conta") {
-      console.log("🚫 Trial expirado - redirecionando para assinatura");
-      navigate("/assinatura", { replace: true });
-    }
-  }, [empresa?.trial_end_date, empresa?.is_premium, location.pathname, navigate, isTrialExpired, empresa]);
+    checkExpiration();
+  }, [empresa?.id, location.pathname, navigate, empresa]);
 
   return {
     isTrialExpired,
     trialEndDate: empresa?.trial_end_date,
     daysRemaining: empresa?.trial_end_date 
       ? Math.ceil((new Date(empresa.trial_end_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
-      : 7
+      : 7,
+    isPremium: empresa?.is_premium || false,
+    planType: empresa?.plan_type || null
   };
 }
