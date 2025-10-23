@@ -73,6 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       async (event, session) => {
         if (!mounted) return;
         
+        console.log("🔄 Auth state change:", event, session?.user?.id);
         setUser(session?.user ?? null);
         if (session?.user) {
           await fetchEmpresa(session.user.id);
@@ -101,6 +102,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchEmpresa = useCallback(async (userId: string) => {
     try {
+      console.log("🔍 Buscando dados da empresa para usuário:", userId);
+      
       // Timeout aumentado para 15 segundos para melhor conectividade
       const timeoutPromise = new Promise((_, reject) => 
         setTimeout(() => reject(new Error('Timeout')), 15000)
@@ -157,7 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
         // Log apenas na primeira vez ou em caso de mudança
         if (!empresa || empresa.id !== data.empresas.id) {
-          console.log("✅ Dados da empresa carregados:", data.empresas.nome);
+          console.log("✅ Dados da empresa carregados:", data.empresas.nome, "Trial end date:", data.empresas.trial_end_date);
         }
       } else {
         // Tentar recuperar dados persistidos
