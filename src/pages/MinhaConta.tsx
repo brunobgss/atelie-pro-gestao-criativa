@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,12 +7,14 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { useQueryClient } from "@tanstack/react-query";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useSync } from "@/contexts/SyncContext";
 import { validateName, validateEmail, validatePhone, validateCpfCnpj, validateForm } from "@/utils/validators";
 import { errorHandler } from "@/utils/errorHandler";
 import { logger } from "@/utils/logger";
 import { performanceMonitor } from "@/utils/performanceMonitor";
+import { supabase } from "@/integrations/supabase/client";
 import { 
   User, 
   Mail, 
@@ -24,32 +26,121 @@ import {
   LogOut,
   Edit,
   Save,
-  X
+  X,
+  Flag
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { toast } from "sonner";
+import { useInternationalization } from "@/contexts/InternationalizationContext";
+import { Country, COUNTRIES, AVAILABLE_COUNTRIES } from "@/types/internationalization";
 
 export default function MinhaConta() {
   const navigate = useNavigate();
-  const { empresa, user, logout } = useAuth();
+  const { empresa, user, logout, refreshEmpresa } = useAuth();
   const queryClient = useQueryClient();
   const { invalidateRelated } = useSync();
+  const { refreshCountry } = useInternationalization();
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState({
-    nome: empresa?.nome || "",
-    email: empresa?.email || "",
-    telefone: empresa?.telefone || "",
-    endereco: empresa?.endereco || "",
-    responsavel: empresa?.responsavel || "",
-    cpf_cnpj: empresa?.cpf_cnpj || "",
+  const [shouldReload, setShouldReload] = useState(false);
+
+  // Buscar email do usuário (primeiro tenta profiles, depois empresas)
+  const { data: userProfile } = useQuery({
+    queryKey: ["userProfile", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      
+      try {
+        // Primeiro tenta buscar na tabela profiles
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("email")
+          .eq("user_id", user.id)
+          .single();
+        
+        if (error && error.code === 'PGRST116') {
+          // Perfil não existe, usar email da empresa
+          console.log("Perfil não encontrado, usando email da empresa");
+          return { email: empresa?.email || user.email || "" };
+        }
+        
+        if (error) {
+          console.warn("Erro ao buscar perfil do usuário:", error);
+          return { email: empresa?.email || user.email || "" };
+        }
+        
+        return data;
+      } catch (error) {
+        console.warn("Erro geral ao buscar perfil:", error);
+        return { email: empresa?.email || user.email || "" };
+      }
+    },
+    enabled: !!user?.id,
   });
+
+  const [formData, setFormData] = useState({
+    nome: "",
+    email: "",
+    telefone: "",
+    endereco: "",
+    responsavel: "",
+    cpf_cnpj: "",
+    country: "BR",
+  });
+
+  // Atualizar formData quando empresa e userProfile carregarem
+  useEffect(() => {
+    if (empresa) {
+      setFormData(prev => ({
+        ...prev,
+        nome: empresa.nome || "",
+        telefone: empresa.telefone || "",
+        endereco: empresa.endereco || "",
+        responsavel: empresa.responsavel || "",
+        cpf_cnpj: empresa.cpf_cnpj || "",
+        country: empresa.country || "BR",
+      }));
+    }
+  }, [empresa]);
+
+  // Atualizar email quando userProfile carregar
+  useEffect(() => {
+    if (userProfile?.email) {
+      setFormData(prev => ({
+        ...prev,
+        email: userProfile.email
+      }));
+    }
+  }, [userProfile?.email]);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
     }));
+    if (field === 'country' && value !== empresa?.country) {
+      setShouldReload(true);
+    }
   };
+
+
+  // Atualizar contexto quando o país for alterado
+  useEffect(() => {
+    if (shouldReload) {
+      toast.info("País alterado! Aplicando mudanças...", { duration: 1500 });
+      const timer = setTimeout(() => {
+        // Invalidar cache da empresa para forçar reload
+        invalidateRelated('empresas');
+        queryClient.refetchQueries({ queryKey: ['empresa'] });
+        
+        // Atualizar contexto de internacionalização
+        refreshCountry();
+        
+        setShouldReload(false);
+        toast.success("Mudanças aplicadas com sucesso!");
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [shouldReload, refreshCountry, invalidateRelated, queryClient]);
 
   const handleSave = async () => {
     // Validação robusta
@@ -90,14 +181,54 @@ export default function MinhaConta() {
             .from("empresas")
             .update({
               nome: formData.nome,
-              email: formData.email,
               telefone: formData.telefone,
-              // endereco: formData.endereco, // Campo removido - coluna não existe na tabela
               responsavel: formData.responsavel,
               cpf_cnpj: formData.cpf_cnpj,
+              country: formData.country,
               updated_at: new Date().toISOString()
             })
             .eq("id", empresa?.id);
+
+          if (error) {
+            throw error;
+          }
+
+          // Atualizar email no perfil do usuário (se a tabela existir)
+          if (formData.email && user?.id) {
+            try {
+              const { error: profileError } = await supabase
+                .from("profiles")
+                .update({
+                  email: formData.email,
+                  updated_at: new Date().toISOString()
+                })
+                .eq("user_id", user.id);
+
+              if (profileError) {
+                console.warn("Erro ao atualizar email no perfil:", profileError);
+                // Se a tabela não existir, atualizar na empresa
+                const { error: empresaEmailError } = await supabase
+                  .from("empresas")
+                  .update({ email: formData.email })
+                  .eq("id", empresa?.id);
+                
+                if (empresaEmailError) {
+                  console.warn("Erro ao atualizar email na empresa:", empresaEmailError);
+                }
+              }
+            } catch (error) {
+              console.warn("Erro ao tentar atualizar perfil:", error);
+              // Fallback: atualizar email na empresa
+              const { error: empresaEmailError } = await supabase
+                .from("empresas")
+                .update({ email: formData.email })
+                .eq("id", empresa?.id);
+              
+              if (empresaEmailError) {
+                console.warn("Erro ao atualizar email na empresa:", empresaEmailError);
+              }
+            }
+          }
 
           if (error) {
             throw error;
@@ -120,6 +251,15 @@ export default function MinhaConta() {
       invalidateRelated('empresas');
       // Refetch automático
       queryClient.refetchQueries({ queryKey: ["empresa"] });
+      
+      // Recarregar dados da empresa no AuthProvider
+      try {
+        await refreshEmpresa();
+        console.log("✅ Dados da empresa recarregados com sucesso");
+      } catch (error) {
+        console.warn("⚠️ Erro ao recarregar empresa:", error);
+        // Não falhar o processo por causa disso
+      }
     } catch (error: unknown) {
       const appError = errorHandler.handleSupabaseError(error, 'updateCompanyData');
       logger.error('Falha ao atualizar dados da empresa', 'MINHA_CONTA', { 
@@ -367,6 +507,45 @@ export default function MinhaConta() {
                   />
                 ) : (
                   <p className="text-sm font-medium">{formData.cpf_cnpj || "Não informado"}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="country">
+                  País <span className="text-red-500">*</span>
+                  {shouldReload && (
+                    <span className="ml-2 text-sm text-blue-600 font-medium">
+                      (Aplicando mudanças...)
+                    </span>
+                  )}
+                </Label>
+                {isEditing ? (
+                  <Select value={formData.country} onValueChange={(value) => handleInputChange("country", value)}>
+                    <SelectTrigger className={shouldReload ? "border-blue-500 bg-blue-50" : ""}>
+                      <SelectValue placeholder="Selecione seu país" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {AVAILABLE_COUNTRIES.map((country) => {
+                        const config = COUNTRIES[country];
+                        return (
+                          <SelectItem key={country} value={country}>
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">{config.flag}</span>
+                              <span>{config.name}</span>
+                              <span className="text-muted-foreground text-sm">
+                                ({config.currencySymbol})
+                              </span>
+                            </div>
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">{COUNTRIES[formData.country as Country]?.flag}</span>
+                    <p className="text-sm font-medium">{COUNTRIES[formData.country as Country]?.name}</p>
+                  </div>
                 )}
               </div>
             </div>

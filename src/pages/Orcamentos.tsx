@@ -2,6 +2,9 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Plus, FileText, Calendar, DollarSign, Share2, Printer, MessageCircle, Edit, CheckCircle, Trash2 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
@@ -9,6 +12,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listQuotes, deleteQuote, approveQuote, getQuoteByCode } from "@/integrations/supabase/quotes";
 import { toast } from "sonner";
 import { useAuth } from "@/components/AuthProvider";
+import { useInternationalization } from "@/contexts/InternationalizationContext";
 import { useSync } from "@/contexts/SyncContext";
 import { useSyncOperations } from "@/hooks/useSyncOperations";
 
@@ -18,6 +22,12 @@ export default function Orcamentos() {
   const queryClient = useQueryClient();
   const { invalidateRelated } = useSync();
   const { syncAfterCreate, syncAfterUpdate, syncAfterDelete } = useSyncOperations();
+  const { formatCurrency } = useInternationalization();
+  
+  // Estados para modal do WhatsApp
+  const [whatsappModalOpen, setWhatsappModalOpen] = useState(false);
+  const [customMessage, setCustomMessage] = useState("");
+  const [selectedQuote, setSelectedQuote] = useState<any>(null);
   
   const { data: quotes = [], isLoading, error, refetch } = useQuery({
     queryKey: ["quotes"],
@@ -102,28 +112,24 @@ export default function Orcamentos() {
     window.open(url, "_blank");
   };
 
-  const openWhatsApp = async (quote: unknown) => {
+  const generateDefaultMessage = async (quote: any) => {
     try {
-      console.log("Iniciando envio WhatsApp para orçamento:", quote.id);
-      
       // Buscar dados completos do orçamento
       const quoteData = await getQuoteByCode(quote.id);
-      console.log("Dados do orçamento:", quoteData);
-      
       const { items } = quoteData;
       
       // Montar lista de produtos
       let productsList = "";
       if (items && items.length > 0) {
         productsList = items.map(item => 
-          `• ${item.description} - Qtd: ${item.quantity} - R$ ${Number(item.unit_value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+          `• ${item.description} - Qtd: ${item.quantity} - ${formatCurrency(Number(item.unit_value || 0))}`
         ).join('\n');
       } else {
         // Se não há itens, usar a descrição do orçamento
         productsList = `• ${quote.description || 'Produto não especificado'}`;
       }
 
-      const message = `*ORÇAMENTO ${empresa?.nome || 'ATELIÊ'}*
+      return `*ORÇAMENTO ${empresa?.nome || 'ATELIÊ'}*
 
 Olá *${quote.client}*!
 
@@ -132,7 +138,7 @@ Seu orçamento está pronto!
 *Produtos:*
 ${productsList}
 
-*Valor Total: R$ ${Number(quote.total_value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}*
+*Valor Total: ${formatCurrency(Number(quote.total_value || 0))}*
 
 *Próximos passos:*
 1. Confirme se está de acordo
@@ -143,53 +149,29 @@ Para aprovar ou fazer alterações, responda esta mensagem!
 
 Atenciosamente,
 ${empresa?.nome || 'Ateliê'}`;
-
-      console.log("Mensagem WhatsApp:", message);
-      const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
-      
-      // Tentar abrir em nova aba, se falhar, abrir na mesma aba
-      const newWindow = window.open(whatsappUrl, '_blank');
-      
-      // Verificar se a nova janela foi bloqueada (comum no mobile)
-      if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
-        console.log("Nova janela bloqueada, redirecionando na mesma aba");
-        window.location.href = whatsappUrl;
-      } else {
-        console.log("Nova janela aberta com sucesso");
-        toast.success("Abrindo WhatsApp...");
-      }
     } catch (error) {
-      console.error("Erro ao enviar WhatsApp:", error);
-      
-      // Fallback simples se não conseguir carregar os dados
-      const message = `*ORÇAMENTO ${empresa?.nome || 'ATELIÊ'}*
-
-Olá *${quote.client}*!
-
-Seu orçamento está pronto!
-
-*Descrição:* ${quote.description}
-*Valor Total: R$ ${Number(quote.total_value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}*
-
-Para mais detalhes e aprovação, responda esta mensagem!
-
-Atenciosamente,
-${empresa?.nome || 'Ateliê'}`;
-
-      const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
-      
-      // Tentar abrir em nova aba, se falhar, abrir na mesma aba
-      const newWindow = window.open(whatsappUrl, '_blank');
-      
-      // Verificar se a nova janela foi bloqueada (comum no mobile)
-      if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
-        console.log("Nova janela bloqueada (fallback), redirecionando na mesma aba");
-        window.location.href = whatsappUrl;
-      } else {
-        console.log("Nova janela aberta com sucesso (fallback)");
-        toast.success("Abrindo WhatsApp...");
-      }
+      console.error("Erro ao gerar mensagem:", error);
+      return `Olá ${quote.client}! Seu orçamento está pronto. Total: ${formatCurrency(Number(quote.total_value || 0))}`;
     }
+  };
+
+  const openWhatsApp = async (quote: any) => {
+    try {
+      console.log("Abrindo modal WhatsApp para orçamento:", quote.id);
+      setSelectedQuote(quote);
+      const defaultMessage = await generateDefaultMessage(quote);
+      setCustomMessage(defaultMessage);
+      setWhatsappModalOpen(true);
+    } catch (error) {
+      console.error("Erro ao abrir modal WhatsApp:", error);
+      toast.error("Erro ao abrir modal do WhatsApp");
+    }
+  };
+
+  const sendWhatsAppMessage = () => {
+    const message = encodeURIComponent(customMessage);
+    window.open(`https://wa.me/?text=${message}`, "_blank");
+    setWhatsappModalOpen(false);
   };
 
   const handleEditQuote = (quoteId: string) => {
@@ -343,7 +325,7 @@ ${empresa?.nome || 'Ateliê'}`;
                         <div>
                           <p className="text-xs text-muted-foreground">Valor</p>
                           <p className="text-sm font-medium text-foreground">
-                            R$ {Number(quote.total_value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            {formatCurrency(Number(quote.total_value || 0))}
                           </p>
                         </div>
                       </div>
@@ -443,6 +425,60 @@ ${empresa?.nome || 'Ateliê'}`;
             </Card>
           ))}
         </div>
+
+        {/* Modal do WhatsApp */}
+        <Dialog open={whatsappModalOpen} onOpenChange={setWhatsappModalOpen}>
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Personalizar Mensagem do WhatsApp</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              {selectedQuote && (
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <p className="text-sm text-gray-600">Orçamento:</p>
+                  <p className="font-medium">{selectedQuote.id} - {selectedQuote.client}</p>
+                  <p className="text-sm text-gray-500">
+                    Valor: {formatCurrency(Number(selectedQuote.total_value || 0))}
+                  </p>
+                </div>
+              )}
+              
+              <div className="space-y-2">
+                <Label htmlFor="whatsapp-message">Mensagem</Label>
+                <Textarea
+                  id="whatsapp-message"
+                  value={customMessage}
+                  onChange={(e) => setCustomMessage(e.target.value)}
+                  placeholder="Digite sua mensagem personalizada..."
+                  rows={8}
+                  className="resize-none"
+                />
+              </div>
+              
+              <div className="flex gap-2 justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setWhatsappModalOpen(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={() => selectedQuote && generateDefaultMessage(selectedQuote).then(setCustomMessage)}
+                  variant="outline"
+                >
+                  Usar Modelo Padrão
+                </Button>
+                <Button
+                  onClick={sendWhatsAppMessage}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  <MessageCircle className="w-4 h-4 mr-2" />
+                  Enviar WhatsApp
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

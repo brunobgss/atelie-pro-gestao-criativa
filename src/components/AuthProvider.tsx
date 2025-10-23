@@ -10,6 +10,7 @@ interface AuthContextType {
   empresa: Empresa | null;
   loading: boolean;
   signOut: () => Promise<void>;
+  refreshEmpresa: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -50,9 +51,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             empresas (
               id,
               nome,
+              email,
               telefone,
               responsavel,
               cpf_cnpj,
+              country,
               trial_end_date,
               is_premium,
               status,
@@ -164,9 +167,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           empresas (
             id,
             nome,
+            email,
             telefone,
             responsavel,
             cpf_cnpj,
+            country,
             trial_end_date,
             is_premium,
             status,
@@ -255,6 +260,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const refreshEmpresa = useCallback(async () => {
+    if (user?.id) {
+      console.log("🔄 Recarregando dados da empresa...");
+      try {
+        const { data: userEmpresa, error } = await supabase
+          .from("user_empresas")
+          .select(`
+            empresa_id,
+            empresas (
+              id,
+              nome,
+              email,
+              telefone,
+              responsavel,
+              cpf_cnpj,
+              country,
+              trial_end_date,
+              is_premium,
+              status,
+              created_at,
+              updated_at
+            )
+          `)
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single();
+
+        if (error) {
+          console.error("❌ Erro ao recarregar empresa:", error);
+          return;
+        }
+
+        if (userEmpresa?.empresas) {
+          console.log("✅ Dados da empresa recarregados:", userEmpresa.empresas);
+          setEmpresa(userEmpresa.empresas as unknown as Empresa);
+        }
+      } catch (error) {
+        console.error("❌ Erro ao recarregar empresa:", error);
+      }
+    }
+  }, [user?.id]);
+
   const signOut = async () => {
     try {
       // Limpar dados locais IMEDIATAMENTE
@@ -288,6 +336,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     empresa,
     loading,
     signOut,
+    refreshEmpresa,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

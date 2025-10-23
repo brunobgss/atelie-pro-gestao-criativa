@@ -768,16 +768,18 @@ export default function MedidasClientes() {
                       <User className="w-5 h-5 text-blue-600" />
                       {medida.cliente_nome}
                     </CardTitle>
-                    <CardDescription className="flex items-center gap-4 mt-2">
-                      <Badge variant="outline" className="flex items-center gap-1">
-                        <Scissors className="w-3 h-3" />
-                        {medida.tipo_peca.toUpperCase()}
-                      </Badge>
+                    <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <Badge variant="outline" className="flex items-center gap-1">
+                          <Scissors className="w-3 h-3" />
+                          {medida.tipo_peca.toUpperCase()}
+                        </Badge>
+                      </div>
                       <span className="flex items-center gap-1 text-sm text-gray-500">
                         <Calendar className="w-3 h-3" />
                         {new Date(medida.created_at).toLocaleDateString('pt-BR')}
                       </span>
-                    </CardDescription>
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     <Button

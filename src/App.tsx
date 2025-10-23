@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AuthProvider } from "./components/AuthProvider";
 import { SyncProvider } from "./contexts/SyncContext";
+import { InternationalizationProvider } from "./contexts/InternationalizationContext";
 import { Layout } from "./components/Layout";
 
 // Páginas públicas
@@ -60,45 +61,47 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AuthProvider>
-          <SyncProvider>
-            <BrowserRouter>
-              <Routes>
-                {/* Rotas públicas */}
-                <Route path="/login" element={<Login />} />
-                <Route path="/cadastro" element={<Cadastro />} />
-                <Route path="/orcamento/:id" element={<OrcamentoPublico />} />
-                <Route path="/orcamentos/:id/impressao" element={<OrcamentoImpressaoNovo />} />
-                <Route path="/assinatura-sucesso" element={<AssinaturaSucesso />} />
-                <Route path="/verificar-pagamento" element={<VerificarPagamento />} />
-                
-                {/* Rotas protegidas com Layout */}
-                <Route path="/" element={<Layout />}>
-                  <Route index element={<Dashboard />} />
-                  <Route path="pedidos" element={<Pedidos />} />
-                  <Route path="pedidos/novo" element={<NovoPedido />} />
-                  <Route path="pedidos/editar/:id" element={<EditarPedido />} />
-                  <Route path="pedidos/:id/producao" element={<OrdemProducao />} />
-                  <Route path="pedidos/:id" element={<PedidoDetalhe />} />
-                  <Route path="orcamentos" element={<Orcamentos />} />
-                  <Route path="orcamentos/novo" element={<NovoOrcamento />} />
-                  <Route path="orcamentos/editar/:id" element={<EditarOrcamento />} />
-                  <Route path="clientes" element={<Clientes />} />
-                  <Route path="estoque" element={<Estoque />} />
-                  <Route path="catalogo" element={<CatalogoProdutos />} />
-                  <Route path="calculadora" element={<CalculadoraPrecos />} />
-                  <Route path="relatorios" element={<Relatorios />} />
-                  <Route path="financeiro" element={<ControleFinanceiro />} />
-                  <Route path="assinatura" element={<Assinatura />} />
-                  <Route path="minha-conta" element={<MinhaConta />} />
-                  <Route path="agenda" element={<Agenda />} />
-                  <Route path="medidas" element={<MedidasClientes />} />
-                  <Route path="ajuda" element={<Ajuda />} />
-                  <Route path="documentacao" element={<Documentacao />} />
-                  <Route path="faq" element={<FAQ />} />
-                </Route>
-              </Routes>
-            </BrowserRouter>
-          </SyncProvider>
+          <InternationalizationProvider>
+            <SyncProvider>
+              <BrowserRouter>
+                <Routes>
+                  {/* Rotas públicas */}
+                  <Route path="/login" element={<Login />} />
+                  <Route path="/cadastro" element={<Cadastro />} />
+                  <Route path="/orcamento/:id" element={<OrcamentoPublico />} />
+                  <Route path="/orcamentos/:id/impressao" element={<OrcamentoImpressaoNovo />} />
+                  <Route path="/assinatura-sucesso" element={<AssinaturaSucesso />} />
+                  <Route path="/verificar-pagamento" element={<VerificarPagamento />} />
+                  
+                  {/* Rotas protegidas com Layout */}
+                  <Route path="/" element={<Layout />}>
+                    <Route index element={<Dashboard />} />
+                    <Route path="pedidos" element={<Pedidos />} />
+                    <Route path="pedidos/novo" element={<NovoPedido />} />
+                    <Route path="pedidos/editar/:id" element={<EditarPedido />} />
+                    <Route path="pedidos/:id/producao" element={<OrdemProducao />} />
+                    <Route path="pedidos/:id" element={<PedidoDetalhe />} />
+                    <Route path="orcamentos" element={<Orcamentos />} />
+                    <Route path="orcamentos/novo" element={<NovoOrcamento />} />
+                    <Route path="orcamentos/editar/:id" element={<EditarOrcamento />} />
+                    <Route path="clientes" element={<Clientes />} />
+                    <Route path="estoque" element={<Estoque />} />
+                    <Route path="catalogo" element={<CatalogoProdutos />} />
+                    <Route path="calculadora" element={<CalculadoraPrecos />} />
+                    <Route path="relatorios" element={<Relatorios />} />
+                    <Route path="financeiro" element={<ControleFinanceiro />} />
+                    <Route path="assinatura" element={<Assinatura />} />
+                    <Route path="minha-conta" element={<MinhaConta />} />
+                    <Route path="agenda" element={<Agenda />} />
+                    <Route path="medidas" element={<MedidasClientes />} />
+                    <Route path="ajuda" element={<Ajuda />} />
+                    <Route path="documentacao" element={<Documentacao />} />
+                    <Route path="faq" element={<FAQ />} />
+                  </Route>
+                </Routes>
+              </BrowserRouter>
+            </SyncProvider>
+          </InternationalizationProvider>
         </AuthProvider>
       </TooltipProvider>
       <Toaster />

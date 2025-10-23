@@ -11,6 +11,7 @@ import { Calculator, Zap, Clock, Package, Save, FileText, Shirt, Coffee, Crown, 
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
+import { useInternationalization } from "@/contexts/InternationalizationContext";
 import { saveProduct } from "@/integrations/supabase/inventory";
 
 interface Material {
@@ -29,6 +30,7 @@ interface ProductTemplate {
 
 export default function CalculadoraPrecos() {
   const navigate = useNavigate();
+  const { formatCurrency } = useInternationalization();
   const [productType, setProductType] = useState<"bordado" | "camiseta" | "caneca" | "bone" | "uniforme" | "personalizado">("bordado");
   
   // Bordado
@@ -162,20 +164,20 @@ ${quantity > 1 ? `📊 *Quantidade:* ${quantity} unidades` : ""}
 
 💰 *Detalhamento de Custos:*
 ${productType === "bordado" && calculationMode === "pontos" 
-  ? `• Bordado: ${points.toLocaleString()} pontos × R$ ${pricePerThousandPoints.toFixed(2)}/mil = R$ ${productionCost.toFixed(2)}`
-  : `• Mão de obra: ${workHours}h × R$ ${hourlyRate.toFixed(2)}/h = R$ ${(workHours * hourlyRate).toFixed(2)}`}
-${productType === "personalizado" && setupCost > 0 ? `• Custo de setup: R$ ${setupCost.toFixed(2)}` : ""}
-${productType === "personalizado" && unitCost > 0 ? `• Custo unitário: R$ ${unitCost.toFixed(2)} × ${quantity} = R$ ${(unitCost * quantity).toFixed(2)}` : ""}
+  ? `• Bordado: ${points.toLocaleString()} pontos × ${formatCurrency(pricePerThousandPoints)}/mil = ${formatCurrency(productionCost)}`
+  : `• Mão de obra: ${workHours}h × ${formatCurrency(hourlyRate)}/h = ${formatCurrency(workHours * hourlyRate)}`}
+${productType === "personalizado" && setupCost > 0 ? `• Custo de setup: ${formatCurrency(setupCost)}` : ""}
+${productType === "personalizado" && unitCost > 0 ? `• Custo unitário: ${formatCurrency(unitCost)} × ${quantity} = ${formatCurrency(unitCost * quantity)}` : ""}
 
 📦 *Materiais e Insumos:*
-${materials.map(m => `• ${m.name}: ${m.quantity} × R$ ${m.unitPrice.toFixed(2)} = R$ ${(m.quantity * m.unitPrice).toFixed(2)}`).join('\n')}
-• *Total materiais:* R$ ${totalMaterialsCost.toFixed(2)}
+${materials.map(m => `• ${m.name}: ${m.quantity} × ${formatCurrency(m.unitPrice)} = ${formatCurrency(m.quantity * m.unitPrice)}`).join('\n')}
+• *Total materiais:* ${formatCurrency(totalMaterialsCost)}
 
 📊 *Resumo Financeiro:*
-• Subtotal: R$ ${subtotal.toFixed(2)}
-• Margem de lucro (${profitMargin}%): R$ ${profitAmount.toFixed(2)}
-• *VALOR TOTAL: R$ ${finalPrice.toFixed(2)}*
-${quantity > 1 ? `• *Valor unitário: R$ ${unitPrice.toFixed(2)}*` : ""}
+• Subtotal: ${formatCurrency(subtotal)}
+• Margem de lucro (${profitMargin}%): ${formatCurrency(profitAmount)}
+• *VALOR TOTAL: ${formatCurrency(finalPrice)}*
+${quantity > 1 ? `• *Valor unitário: ${formatCurrency(unitPrice)}*` : ""}
 
 ✅ *Condições:*
 • Prazo de entrega: A combinar
@@ -372,7 +374,7 @@ _Orçamento gerado pela Calculadora Profissional_
                               />
                             </div>
                             <div>
-                              <Label htmlFor="pricePerThousand">Preço por 1000 pontos (R$)</Label>
+                              <Label htmlFor="pricePerThousand">Preço por 1000 pontos</Label>
                               <Input
                                 id="pricePerThousand"
                                 type="number"
@@ -397,7 +399,7 @@ _Orçamento gerado pela Calculadora Profissional_
                               />
                             </div>
                             <div>
-                              <Label htmlFor="hourlyRate">Valor por Hora (R$)</Label>
+                              <Label htmlFor="hourlyRate">Valor por Hora</Label>
                               <Input
                                 id="hourlyRate"
                                 type="number"
@@ -425,7 +427,7 @@ _Orçamento gerado pela Calculadora Profissional_
                           />
                         </div>
                         <div>
-                          <Label htmlFor="unitCost">Custo Unitário (R$)</Label>
+                          <Label htmlFor="unitCost">Custo Unitário</Label>
                           <Input
                             id="unitCost"
                             type="number"
@@ -436,7 +438,7 @@ _Orçamento gerado pela Calculadora Profissional_
                           />
                         </div>
                         <div>
-                          <Label htmlFor="setupCost">Custo de Setup (R$)</Label>
+                          <Label htmlFor="setupCost">Custo de Setup</Label>
                           <Input
                             id="setupCost"
                             type="number"
@@ -474,7 +476,7 @@ _Orçamento gerado pela Calculadora Profissional_
                           />
                         </div>
                         <div>
-                          <Label htmlFor="hourlyRate">Valor por Hora (R$)</Label>
+                          <Label htmlFor="hourlyRate">Valor por Hora</Label>
                           <Input
                             id="hourlyRate"
                             type="number"
@@ -503,7 +505,7 @@ _Orçamento gerado pela Calculadora Profissional_
                     <div className="grid grid-cols-4 gap-3 text-sm font-medium text-gray-600 mb-2">
                       <div>Nome do Material</div>
                       <div>Quantidade</div>
-                      <div>Preço Unitário (R$)</div>
+                      <div>Preço Unitário</div>
                       <div>Ação</div>
                     </div>
                     
@@ -542,7 +544,7 @@ _Orçamento gerado pela Calculadora Profissional_
                           <div className="flex-1">
                             <span className="font-medium">{material.name}</span>
                             <span className="text-sm text-gray-600 ml-2">
-                              {material.quantity} × R$ {material.unitPrice.toFixed(2)} = R$ {(material.quantity * material.unitPrice).toFixed(2)}
+                              {material.quantity} × {formatCurrency(material.unitPrice)} = {formatCurrency(material.quantity * material.unitPrice)}
                             </span>
                           </div>
                           <Button
@@ -601,11 +603,11 @@ _Orçamento gerado pela Calculadora Profissional_
                 <div className="space-y-3">
                   <div className="flex justify-between text-sm transition-all duration-200 hover:bg-white/50 p-2 rounded">
                     <span className="text-gray-600">Custo de produção:</span>
-                    <span className="font-medium">R$ {productionCost.toFixed(2)}</span>
+                    <span className="font-medium">{formatCurrency(productionCost)}</span>
                   </div>
                   <div className="flex justify-between text-sm transition-all duration-200 hover:bg-white/50 p-2 rounded">
                     <span className="text-gray-600">Materiais:</span>
-                    <span className="font-medium">R$ {totalMaterialsCost.toFixed(2)}</span>
+                    <span className="font-medium">{formatCurrency(totalMaterialsCost)}</span>
                   </div>
                   {productType === "personalizado" && quantity > 1 && (
                     <>
@@ -628,21 +630,21 @@ _Orçamento gerado pela Calculadora Profissional_
                   <Separator />
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Subtotal:</span>
-                    <span className="font-medium">R$ {subtotal.toFixed(2)}</span>
+                    <span className="font-medium">{formatCurrency(subtotal)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Lucro ({profitMargin}%):</span>
-                    <span className="font-medium text-green-600">R$ {profitAmount.toFixed(2)}</span>
+                    <span className="font-medium text-green-600">{formatCurrency(profitAmount)}</span>
                   </div>
                   <Separator />
                   <div className="flex justify-between text-lg font-bold bg-white/70 p-3 rounded-lg shadow-soft">
                     <span className="text-gray-900">Valor Total:</span>
-                    <span className="text-purple-600 text-gradient-purple animate-pulse-soft">R$ {finalPrice.toFixed(2)}</span>
+                    <span className="text-purple-600 text-gradient-purple animate-pulse-soft">{formatCurrency(finalPrice)}</span>
                   </div>
                   {quantity > 1 && (
                     <div className="flex justify-between text-sm bg-white/50 p-2 rounded">
                       <span className="text-gray-600">Valor unitário:</span>
-                      <span className="font-medium">R$ {unitPrice.toFixed(2)}</span>
+                      <span className="font-medium">{formatCurrency(unitPrice)}</span>
                     </div>
                   )}
                 </div>

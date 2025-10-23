@@ -8,10 +8,14 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/components/AuthProvider";
 import { toast } from "sonner";
 import { checkPaymentStatus, activatePremiumManually, checkPremiumStatus } from "@/utils/paymentStatus";
+import { useQueryClient } from "@tanstack/react-query";
+import { useSync } from "@/contexts/SyncContext";
 
 export default function VerificarPagamento() {
   const navigate = useNavigate();
   const { empresa } = useAuth();
+  const queryClient = useQueryClient();
+  const { invalidateAll, invalidateRelated } = useSync();
   const [paymentId, setPaymentId] = useState("");
   const [isChecking, setIsChecking] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<any>(null);
@@ -66,9 +70,25 @@ export default function VerificarPagamento() {
       if (success) {
         toast.success("Premium ativado com sucesso!");
         setPremiumStatus(true);
-        // Recarregar a página para atualizar o estado
+        
+        // Invalidar cache inteligentemente em vez de recarregar página
+        console.log("🔄 Invalidando cache após ativação de premium...");
+        
+        // Invalidar dados relacionados ao premium
+        invalidateRelated('empresas');
+        invalidateRelated('dashboard');
+        invalidateRelated('minha-conta');
+        
+        // Refetch dados críticos
+        queryClient.refetchQueries({ queryKey: ['empresa'] });
+        queryClient.refetchQueries({ queryKey: ['dashboard'] });
+        
+        // Mostrar feedback visual
+        toast.info("Dados atualizados! Redirecionando...", { duration: 2000 });
+        
+        // Redirecionar para dashboard após atualização
         setTimeout(() => {
-          window.location.reload();
+          navigate("/", { replace: true });
         }, 2000);
       } else {
         toast.error("Erro ao ativar premium");

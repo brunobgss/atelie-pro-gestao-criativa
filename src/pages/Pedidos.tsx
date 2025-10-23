@@ -10,11 +10,13 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listOrders, updateOrderStatus } from "@/integrations/supabase/orders";
 import { toast } from "sonner";
 import { getOrderStatusColor } from "@/utils/statusConstants";
+import { useInternationalization } from "@/contexts/InternationalizationContext";
 
 export default function Pedidos() {
   const [searchTerm, setSearchTerm] = useState("");
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { formatCurrency } = useInternationalization();
 
   const { data: orders = [] } = useQuery({
     queryKey: ["orders"],
@@ -217,7 +219,7 @@ export default function Pedidos() {
                 </div>
                 <div class="detail-item">
                   <span class="detail-label">Valor</span>
-                  <span class="detail-value">R$ ${order.value.toFixed(2)}</span>
+                  <span class="detail-value">{formatCurrency(order.value)}</span>
                 </div>
                 <div class="detail-item">
                   <span class="detail-label">Entrega</span>
@@ -356,12 +358,12 @@ export default function Pedidos() {
                     
                     <div className="flex items-center gap-2">
                       <div className="w-4 h-4 flex items-center justify-center">
-                        <span className="text-accent">R$</span>
+                        <span className="text-accent">{formatCurrency(0).split(' ')[0]}</span>
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground">Valor / Pago</p>
                         <p className="text-sm font-medium text-foreground">
-                          R$ {order.value} / R$ {order.paid}
+                          {formatCurrency(order.value)} / {formatCurrency(order.paid)}
                         </p>
                       </div>
                     </div>

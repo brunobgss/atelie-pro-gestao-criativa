@@ -13,30 +13,44 @@ const SyncContext = createContext<SyncContextType | undefined>(undefined);
 export function SyncProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
 
-  // Refresh automático a cada 10 segundos para garantir dados atualizados
+  // Refresh automático inteligente - apenas quando necessário
   useEffect(() => {
-    const interval = setInterval(() => {
-      console.log('🔄 Refresh automático dos dados...');
-      // Invalidar e refetch imediatamente
+    let intervalId: NodeJS.Timeout;
+    
+    // Função para refresh inteligente
+    const smartRefresh = () => {
+      // Verificar se há usuários ativos (evitar refresh desnecessário)
+      const isUserActive = document.visibilityState === 'visible' && 
+                          document.hasFocus();
+      
+      if (!isUserActive) {
+        console.log('🔄 Usuário inativo - pulando refresh automático');
+        return;
+      }
+      
+      console.log('🔄 Refresh automático inteligente dos dados...');
+      
+      // Invalidar apenas queries críticas
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
-      queryClient.invalidateQueries({ queryKey: ['inventory'] });
       queryClient.invalidateQueries({ queryKey: ['receitas'] });
-      queryClient.invalidateQueries({ queryKey: ['products'] });
-      queryClient.invalidateQueries({ queryKey: ['medidas'] });
       
-      // Forçar refetch imediato
-      queryClient.refetchQueries({ queryKey: ['orders'] });
-      queryClient.refetchQueries({ queryKey: ['quotes'] });
-      queryClient.refetchQueries({ queryKey: ['customers'] });
-      queryClient.refetchQueries({ queryKey: ['inventory'] });
-      queryClient.refetchQueries({ queryKey: ['receitas'] });
-      queryClient.refetchQueries({ queryKey: ['products'] });
-      queryClient.refetchQueries({ queryKey: ['medidas'] });
-    }, 10000); // 10 segundos
-
-    return () => clearInterval(interval);
+      // Refetch apenas se necessário (não forçar sempre)
+      const staleQueries = queryClient.getQueriesData({ stale: true });
+      if (staleQueries.length > 0) {
+        console.log(`🔄 Refazendo ${staleQueries.length} queries obsoletas`);
+        queryClient.refetchQueries({ stale: true });
+      }
+    };
+    
+    // Refresh a cada 30 segundos (reduzido de 10s)
+    intervalId = setInterval(smartRefresh, 30000);
+    
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
   }, [queryClient]);
 
   const invalidateAll = () => {

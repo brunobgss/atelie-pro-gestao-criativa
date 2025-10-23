@@ -10,8 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listOrders } from "@/integrations/supabase/orders";
 import { listReceitas, updatePaymentStatus } from "@/integrations/supabase/receitas";
+import { useInternationalization } from "@/contexts/InternationalizationContext";
 import { useAuth } from "@/components/AuthProvider";
-import { toast } from "sonner";
 import { PAYMENT_STATUS_OPTIONS, getPaymentStatusColor } from "@/utils/statusConstants";
 
 interface PaymentStatus {
@@ -32,6 +32,7 @@ export default function ControleFinanceiro() {
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const queryClient = useQueryClient();
   const { empresa } = useAuth();
+  const { formatCurrency } = useInternationalization();
 
   const { data: orders = [] } = useQuery({
     queryKey: ["orders"],
@@ -124,9 +125,9 @@ export default function ControleFinanceiro() {
 Lembramos sobre o pagamento do pedido ${payment.orderCode}.
 
 *VALORES:*
-• Total: R$ ${payment.totalValue.toFixed(2)}
-• Pago: R$ ${payment.paidAmount.toFixed(2)}
-• Restante: R$ ${payment.remainingAmount.toFixed(2)}
+• Total: ${formatCurrency(payment.totalValue)}
+• Pago: ${formatCurrency(payment.paidAmount)}
+• Restante: ${formatCurrency(payment.remainingAmount)}
 
 ${payment.isOverdue ? 'ATENÇÃO: Este pedido está em atraso!' : 'Prazo de entrega: ' + new Date(payment.deliveryDate).toLocaleDateString('pt-BR')}
 
@@ -186,7 +187,7 @@ _${empresa?.nome || 'Ateliê'}_`;
                 <div>
                   <p className="text-sm font-medium text-gray-600">Receita Total</p>
                   <p className="text-2xl font-bold text-green-600">
-                    R$ {totalRevenue.toFixed(2)}
+                    {formatCurrency(totalRevenue)}
                   </p>
                 </div>
                 <DollarSign className="w-8 h-8 text-green-500" />
@@ -200,7 +201,7 @@ _${empresa?.nome || 'Ateliê'}_`;
                 <div>
                   <p className="text-sm font-medium text-gray-600">Recebido</p>
                   <p className="text-2xl font-bold text-blue-600">
-                    R$ {totalPaid.toFixed(2)}
+                    {formatCurrency(totalPaid)}
                   </p>
                 </div>
                 <CheckCircle className="w-8 h-8 text-blue-500" />
@@ -214,7 +215,7 @@ _${empresa?.nome || 'Ateliê'}_`;
                 <div>
                   <p className="text-sm font-medium text-gray-600">Pendente</p>
                   <p className="text-2xl font-bold text-orange-600">
-                    R$ {totalPending.toFixed(2)}
+                    {formatCurrency(totalPending)}
                   </p>
                 </div>
                 <CreditCard className="w-8 h-8 text-orange-500" />
@@ -345,17 +346,17 @@ _${empresa?.nome || 'Ateliê'}_`;
                         <div className="space-y-1">
                           <div className="text-sm">
                             <span className="text-gray-600">Total: </span>
-                            <span className="font-semibold">R$ {payment.totalValue.toFixed(2)}</span>
+                            <span className="font-semibold">{formatCurrency(payment.totalValue)}</span>
                           </div>
                           <div className="text-sm">
                             <span className="text-gray-600">Pago: </span>
-                            <span className="font-semibold text-green-600">R$ {payment.paidAmount.toFixed(2)}</span>
+                            <span className="font-semibold text-green-600">{formatCurrency(payment.paidAmount)}</span>
                           </div>
                           {!payment.isFullyPaid && (
                             <div className="text-sm">
                               <span className="text-gray-600">Restante: </span>
                               <span className={`font-semibold ${payment.isOverdue ? 'text-red-600' : 'text-orange-600'}`}>
-                                R$ {payment.remainingAmount.toFixed(2)}
+                                {formatCurrency(payment.remainingAmount)}
                               </span>
                             </div>
                           )}

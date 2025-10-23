@@ -6,6 +6,8 @@ import { Outlet, Navigate } from "react-router-dom";
 import { useAuth } from "./AuthProvider";
 import { TrialProtectedRoute } from "./TrialProtectedRoute";
 import { TrialBanner } from "./TrialBanner";
+import { SyncIndicator } from "./SyncIndicator";
+import { ConcurrencyAlert } from "./ConcurrencyAlert";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 export function Layout() {
@@ -46,12 +48,26 @@ export function Layout() {
         <div className="min-h-screen flex w-full bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100 relative">
           <AppSidebar />
           
+          {/* Alerta de concorrência */}
+          <ConcurrencyAlert />
+          
           <main className="flex-1 overflow-auto">
-            {/* Botão mobile para abrir/fechar menu */}
+            {/* Header mobile */}
             <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-200/50 p-3 md:hidden flex items-center justify-between">
               <MobileSidebarTrigger />
               <div className="text-sm text-gray-600 font-medium">
                 Ateliê PRO
+              </div>
+              <SyncIndicator />
+            </div>
+            
+            {/* Header desktop */}
+            <div className="hidden md:block sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-200/50 p-4">
+              <div className="flex items-center justify-between">
+                <div className="text-lg text-gray-700 font-semibold">
+                  Ateliê PRO - Sistema de Gestão
+                </div>
+                <SyncIndicator />
               </div>
             </div>
             

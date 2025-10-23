@@ -7,6 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { TrendingUp, TrendingDown, DollarSign, Package, Users, Calendar, Download, Filter } from "lucide-react";
 import { toast } from "sonner";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { useInternationalization } from "@/contexts/InternationalizationContext";
 import { useQuery } from "@tanstack/react-query";
 import { listOrders } from "@/integrations/supabase/orders";
 import { listQuotes } from "@/integrations/supabase/quotes";
@@ -23,6 +24,7 @@ interface ReportData {
 
 export default function Relatorios() {
   const [selectedPeriod, setSelectedPeriod] = useState<string>("30");
+  const { formatCurrency } = useInternationalization();
   const [reportType, setReportType] = useState<string>("overview");
 
   const { data: orders = [] } = useQuery({
@@ -233,7 +235,7 @@ export default function Relatorios() {
               <div class="grid">
                 <div class="metric-card">
                   <div class="metric-title">Receita Total</div>
-                  <div class="metric-value">R$ ${reportData.totalRevenue.toFixed(2)}</div>
+                  <div class="metric-value">{formatCurrency(reportData.totalRevenue)}</div>
                 </div>
                 <div class="metric-card">
                   <div class="metric-title">Total de Pedidos</div>
@@ -241,7 +243,7 @@ export default function Relatorios() {
                 </div>
                 <div class="metric-card">
                   <div class="metric-title">Ticket Médio</div>
-                  <div class="metric-value">R$ ${reportData.averageOrderValue.toFixed(2)}</div>
+                  <div class="metric-value">{formatCurrency(reportData.averageOrderValue)}</div>
                 </div>
                 <div class="metric-card">
                   <div class="metric-title">Clientes Ativos</div>
@@ -257,12 +259,12 @@ export default function Relatorios() {
                   <div class="metric-title">Margem de Lucro</div>
                   <div class="metric-value" style="color: #059669;">${((reportData.totalRevenue * 0.35).toFixed(0))}%</div>
                   <div style="font-size: 12px; color: #059669; margin-top: 5px;">
-                    R$ ${(reportData.totalRevenue * 0.35).toFixed(2)} lucro estimado
+                    {formatCurrency(reportData.totalRevenue * 0.35)} lucro estimado
                   </div>
                 </div>
                 <div class="metric-card" style="background: #eff6ff; border-left: 4px solid #3b82f6;">
                   <div class="metric-title">Custos Estimados</div>
-                  <div class="metric-value" style="color: #3b82f6;">R$ ${(reportData.totalRevenue * 0.65).toFixed(2)}</div>
+                  <div class="metric-value" style="color: #3b82f6;">{formatCurrency(reportData.totalRevenue * 0.65)}</div>
                   <div style="font-size: 12px; color: #3b82f6; margin-top: 5px;">
                     65% da receita total
                   </div>
@@ -285,7 +287,7 @@ export default function Relatorios() {
                     <div class="name">${index + 1}. ${product.name}</div>
                     <div style="font-size: 12px; color: #6b7280;">${product.count} vendas</div>
                   </div>
-                  <div class="value">R$ ${product.revenue.toFixed(2)}</div>
+                  <div class="value">{formatCurrency(product.revenue)}</div>
                 </div>
               `).join('')}
             </div>
@@ -298,7 +300,7 @@ export default function Relatorios() {
                     <div class="name">${index + 1}. ${customer.name}</div>
                     <div style="font-size: 12px; color: #6b7280;">${customer.orders} pedidos</div>
                   </div>
-                  <div class="value">R$ ${customer.revenue.toFixed(2)}</div>
+                  <div class="value">{formatCurrency(customer.revenue)}</div>
                 </div>
               `).join('')}
             </div>
@@ -386,7 +388,7 @@ export default function Relatorios() {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Receita Total</p>
                   <p className="text-2xl font-bold text-green-600">
-                    R$ {reportData.totalRevenue.toFixed(2)}
+                    {formatCurrency(reportData.totalRevenue)}
                   </p>
                 </div>
                 <DollarSign className="w-8 h-8 text-green-500" />
@@ -414,7 +416,7 @@ export default function Relatorios() {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Ticket Médio</p>
                   <p className="text-2xl font-bold text-purple-600">
-                    R$ {reportData.averageOrderValue.toFixed(2)}
+                    {formatCurrency(reportData.averageOrderValue)}
                   </p>
                 </div>
                 <TrendingUp className="w-8 h-8 text-purple-500" />
@@ -448,7 +450,7 @@ export default function Relatorios() {
                     {((reportData.totalRevenue * 0.35).toFixed(0))}%
                   </p>
                   <p className="text-xs text-green-600">
-                    R$ {(reportData.totalRevenue * 0.35).toFixed(2)} lucro estimado
+                    {formatCurrency(reportData.totalRevenue * 0.35)} lucro estimado
                   </p>
                 </div>
                 <TrendingUp className="w-8 h-8 text-green-500" />
@@ -462,7 +464,7 @@ export default function Relatorios() {
                 <div>
                   <p className="text-sm font-medium text-blue-700">Custos Estimados</p>
                   <p className="text-2xl font-bold text-blue-600">
-                    R$ {(reportData.totalRevenue * 0.65).toFixed(2)}
+                    {formatCurrency(reportData.totalRevenue * 0.65)}
                   </p>
                   <p className="text-xs text-blue-600">
                     65% da receita total
@@ -514,7 +516,7 @@ export default function Relatorios() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold text-green-600">R$ {product.revenue.toFixed(2)}</p>
+                      <p className="font-bold text-green-600">{formatCurrency(product.revenue)}</p>
                     </div>
                   </div>
                 ))}
@@ -544,7 +546,7 @@ export default function Relatorios() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold text-green-600">R$ {customer.revenue.toFixed(2)}</p>
+                      <p className="font-bold text-green-600">{formatCurrency(customer.revenue)}</p>
                     </div>
                   </div>
                 ))}
@@ -587,7 +589,7 @@ export default function Relatorios() {
                 <TrendingUp className="w-8 h-8 text-green-600 mx-auto mb-2" />
                 <p className="text-sm text-green-600 font-medium">Receita Total</p>
                 <p className="text-2xl font-bold text-green-700">
-                  R$ {reportData.totalRevenue.toFixed(2)}
+                  {formatCurrency(reportData.totalRevenue)}
                 </p>
                 <p className="text-xs text-green-600 mt-1">em {reportData.period}</p>
               </div>
@@ -605,7 +607,7 @@ export default function Relatorios() {
                 <DollarSign className="w-8 h-8 text-purple-600 mx-auto mb-2" />
                 <p className="text-sm text-purple-600 font-medium">Ticket Médio</p>
                 <p className="text-2xl font-bold text-purple-700">
-                  R$ {reportData.averageOrderValue.toFixed(2)}
+                  {formatCurrency(reportData.averageOrderValue)}
                 </p>
                 <p className="text-xs text-purple-600 mt-1">por pedido</p>
               </div>

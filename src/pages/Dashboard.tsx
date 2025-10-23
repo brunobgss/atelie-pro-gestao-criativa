@@ -14,6 +14,7 @@ import { listReceitas } from "@/integrations/supabase/receitas";
 import { listInventory } from "@/integrations/supabase/inventory";
 import { useAuth } from "@/components/AuthProvider";
 import { toast } from "sonner";
+import { useInternationalization } from "@/contexts/InternationalizationContext";
 import { startStockAlerts, checkStockNow } from "@/utils/stockAlerts";
 import { LoadingCard, SkeletonCard } from "@/components/ui/loading";
 import { PageTransition, StaggeredAnimation, FadeIn } from "@/components/ui/page-transition";
@@ -23,6 +24,7 @@ import React from "react";
 export default function Dashboard() {
   const navigate = useNavigate();
   const { empresa } = useAuth();
+  const { formatCurrency } = useInternationalization();
   
   // Iniciar sistema de alertas de estoque
   React.useEffect(() => {
@@ -403,12 +405,12 @@ _${empresa?.nome || 'Atelie'}_`;
                 </CardHeader>
                 <CardContent>
                   <div className="text-4xl font-bold text-foreground">
-                    R$ {orders.reduce((sum, order) => sum + (Number(order.value) || 0), 0).toLocaleString('pt-BR')}
+                    {formatCurrency(orders.reduce((sum, order) => sum + (Number(order.value) || 0), 0))}
                   </div>
                   <div className="flex items-center gap-1 mt-2">
                     <TrendingUp className="w-3 h-3 text-secondary" />
                     <p className="text-xs text-secondary font-medium">
-                      R$ {orders.reduce((sum, order) => sum + (Number(order.paid) || 0), 0).toLocaleString('pt-BR')} recebido
+                      {formatCurrency(orders.reduce((sum, order) => sum + (Number(order.paid) || 0), 0))} recebido
                     </p>
                   </div>
                 </CardContent>

@@ -14,6 +14,7 @@ import { logger } from "@/utils/logger";
 import { performanceMonitor } from "@/utils/performanceMonitor";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { asaasService } from "@/integrations/asaas/service";
+import { useInternationalization, useTranslations } from "@/contexts/InternationalizationContext";
 
 interface Plan {
   id: string;
@@ -71,6 +72,8 @@ const plans: Plan[] = [
 export default function Assinatura() {
   const navigate = useNavigate();
   const { user, empresa } = useAuth();
+  const { formatCurrency, getPricing } = useInternationalization();
+  const t = useTranslations();
   const [selectedPlan, setSelectedPlan] = useState<string>("yearly");
   const [isLoading, setIsLoading] = useState(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("PIX");
@@ -84,23 +87,24 @@ export default function Assinatura() {
   const detectPlan = () => {
     // Verificar se há informações de pagamento no localStorage
     const paymentInfo = localStorage.getItem('lastPaymentInfo');
+    const pricing = getPricing();
     
     if (paymentInfo) {
       try {
         const payment = JSON.parse(paymentInfo);
-        if (payment.value === 39.00) {
+        if (payment.value === pricing.monthly) {
           return {
             type: 'monthly',
-            name: 'Mensal',
-            price: 'R$ 39,00',
-            period: 'mês'
+            name: t.monthly,
+            price: formatCurrency(pricing.monthly),
+            period: t.perMonth
           };
-        } else if (payment.value === 390.00) {
+        } else if (payment.value === pricing.yearly) {
           return {
             type: 'yearly',
-            name: 'Anual',
-            price: 'R$ 390,00',
-            period: 'ano'
+            name: t.yearly,
+            price: formatCurrency(pricing.yearly),
+            period: t.perYear
           };
         }
       } catch (e) {
@@ -111,9 +115,9 @@ export default function Assinatura() {
     // Se não houver informações, assumir mensal como padrão
     return {
       type: 'monthly',
-      name: 'Mensal',
-      price: 'R$ 39,00',
-      period: 'mês'
+      name: t.monthly,
+      price: formatCurrency(pricing.monthly),
+      period: t.perMonth
     };
   };
   

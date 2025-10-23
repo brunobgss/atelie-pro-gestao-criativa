@@ -26,11 +26,17 @@ export function InternationalizationProvider({ children }: InternationalizationP
   const { empresa } = useAuth();
   const [currentCountry, setCurrentCountry] = useState<Country>('BR');
 
+  console.log("🌍 InternationalizationProvider render - empresa:", empresa);
+
   // Usar país da empresa ou fallback para BR
   useEffect(() => {
+    console.log("🌍 InternationalizationContext - empresa mudou:", empresa?.country, empresa?.id);
+    
     if (empresa?.country && AVAILABLE_COUNTRIES.includes(empresa.country as Country)) {
+      console.log("🌍 Mudando país para:", empresa.country);
       setCurrentCountry(empresa.country as Country);
     } else {
+      console.log("🌍 País não encontrado, usando fallback");
       // Fallback: detectar por idioma do navegador
       detectCountryByLocation();
     }
@@ -56,10 +62,25 @@ export function InternationalizationProvider({ children }: InternationalizationP
     }
   };
 
-  const setCountry = (country: Country) => {
+  const setCountry = async (country: Country) => {
     setCurrentCountry(country);
-    // Aqui seria necessário atualizar no banco de dados
-    // Por enquanto, apenas atualiza o estado local
+    
+    // Atualizar no banco de dados
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { error } = await supabase
+        .from("empresas")
+        .update({ country })
+        .eq("id", empresa?.id);
+      
+      if (error) {
+        console.error("Erro ao atualizar país:", error);
+      } else {
+        console.log("País atualizado com sucesso:", country);
+      }
+    } catch (error) {
+      console.error("Erro ao salvar país:", error);
+    }
   };
 
   const countryConfig = COUNTRIES[currentCountry];
@@ -68,6 +89,8 @@ export function InternationalizationProvider({ children }: InternationalizationP
 
   const formatCurrency = (amount: number): string => {
     const { currencySymbol, numberFormat } = countryConfig;
+    console.log("💰 formatCurrency chamada:", { amount, currencySymbol, currentCountry });
+    
     const formattedNumber = amount.toLocaleString(language, {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,

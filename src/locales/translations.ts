@@ -173,7 +173,6 @@ export const translations: Record<Language, Translations> = {
     contactSupport: 'Contatar Suporte',
     whatsappSupport: 'Suporte WhatsApp',
     emailSupport: 'Suporte por E-mail',
-    documentation: 'Documentação',
     frequentlyAskedQuestions: 'Perguntas Frequentes',
     
     // Moeda e valores
@@ -265,7 +264,6 @@ export const translations: Record<Language, Translations> = {
     contactSupport: 'Contactar Suporte',
     whatsappSupport: 'Suporte WhatsApp',
     emailSupport: 'Suporte por E-mail',
-    documentation: 'Documentação',
     frequentlyAskedQuestions: 'Perguntas Frequentes',
     
     // Moeda e valores
@@ -357,7 +355,6 @@ export const translations: Record<Language, Translations> = {
     contactSupport: 'Contact Support',
     whatsappSupport: 'WhatsApp Support',
     emailSupport: 'Email Support',
-    documentation: 'Documentation',
     frequentlyAskedQuestions: 'Frequently Asked Questions',
     
     // Moeda e valores
@@ -435,7 +432,6 @@ export const translations: Record<Language, Translations> = {
     contactSupport: 'Contactar Soporte',
     whatsappSupport: 'Soporte WhatsApp',
     emailSupport: 'Soporte por Correo',
-    documentation: 'Documentación',
     frequentlyAskedQuestions: 'Preguntas Frecuentes',
     currency: 'Moneda',
     total: 'Total',
@@ -510,7 +506,6 @@ export const translations: Record<Language, Translations> = {
     contactSupport: 'Contacter le Support',
     whatsappSupport: 'Support WhatsApp',
     emailSupport: 'Support par E-mail',
-    documentation: 'Documentation',
     frequentlyAskedQuestions: 'Questions Fréquentes',
     currency: 'Devise',
     total: 'Total',
@@ -585,7 +580,6 @@ export const translations: Record<Language, Translations> = {
     contactSupport: 'Contatta il Supporto',
     whatsappSupport: 'Supporto WhatsApp',
     emailSupport: 'Supporto E-mail',
-    documentation: 'Documentazione',
     frequentlyAskedQuestions: 'Domande Frequenti',
     currency: 'Valuta',
     total: 'Totale',
@@ -660,7 +654,6 @@ export const translations: Record<Language, Translations> = {
     contactSupport: 'Support Kontaktieren',
     whatsappSupport: 'WhatsApp Support',
     emailSupport: 'E-Mail Support',
-    documentation: 'Dokumentation',
     frequentlyAskedQuestions: 'Häufig Gestellte Fragen',
     currency: 'Währung',
     total: 'Gesamt',

@@ -14,6 +14,7 @@ import { getProducts, createProduct, updateProduct, deleteProduct } from "@/inte
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSync } from "@/contexts/SyncContext";
 import { useSyncOperations } from "@/hooks/useSyncOperations";
+import { useInternationalization } from "@/contexts/InternationalizationContext";
 import { validateName, validateMoney, validateDescription, validateForm } from "@/utils/validators";
 import { errorHandler } from "@/utils/errorHandler";
 import { logger } from "@/utils/logger";
@@ -35,6 +36,7 @@ export default function CatalogoProdutos() {
   const queryClient = useQueryClient();
   const { invalidateRelated } = useSync();
   const { syncAfterCreate, syncAfterUpdate, syncAfterDelete } = useSyncOperations();
+  const { formatCurrency } = useInternationalization();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -66,7 +68,7 @@ export default function CatalogoProdutos() {
               id: product.id,
               name: product.name || 'Produto sem nome',
               category: product.type || 'outros',
-              description: `Produto ${product.type || 'indefinido'} - R$ ${(product.unit_price || 0).toFixed(2)}`,
+              description: `Produto ${product.type || 'indefinido'} - ${formatCurrency(product.unit_price || 0)}`,
               unit_price: product.unit_price || 0,
               work_hours: product.work_hours || 0,
               materials: Array.isArray(product.materials) 
@@ -283,7 +285,7 @@ export default function CatalogoProdutos() {
 📋 *Categoria:* ${product.category}
 📝 *Descrição:* ${product.description}
 
-💰 *Preço Base:* R$ ${product.unit_price.toFixed(2)}
+💰 *Preço Base:* ${formatCurrency(product.unit_price)}
 ⏱️ *Tempo Estimado:* ${product.work_hours}h
 📦 *Materiais:* ${product.materials.join(", ")}
 
@@ -371,7 +373,7 @@ _Orçamento gerado pelo Ateliê Pro_
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>
-                      Preço Base (R$) <span className="text-red-500">*</span>
+                      Preço Base <span className="text-red-500">*</span>
                     </Label>
                     <Input
                       type="number"
@@ -556,7 +558,7 @@ _Orçamento gerado pelo Ateliê Pro_
                   <div>
                     <span className="font-medium text-gray-700">Preço:</span>
                     <div className="text-lg font-bold text-green-600">
-                      R$ {(product.unit_price || 0).toFixed(2)}
+                      {formatCurrency(product.unit_price || 0)}
                     </div>
                   </div>
                   <div>

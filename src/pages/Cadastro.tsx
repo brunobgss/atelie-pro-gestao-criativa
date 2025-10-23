@@ -4,9 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import logoAteliePro from "@/assets/logo-atelie-pro.png";
+import { Country, COUNTRIES, AVAILABLE_COUNTRIES } from "@/types/internationalization";
 
 export default function Cadastro() {
   const navigate = useNavigate();
@@ -18,6 +20,7 @@ export default function Cadastro() {
     nome: "",
     telefone: "",
     cpfCnpj: "",
+    country: "BR" as Country,
   });
   const [loading, setLoading] = useState(false);
 
@@ -25,6 +28,13 @@ export default function Cadastro() {
     setFormData(prev => ({
       ...prev,
       [e.target.name]: e.target.value
+    }));
+  };
+
+  const handleCountryChange = (value: Country) => {
+    setFormData(prev => ({
+      ...prev,
+      country: value
     }));
   };
 
@@ -65,6 +75,7 @@ export default function Cadastro() {
             telefone: formData.telefone,
             responsavel: formData.nome,
             cpf_cnpj: formData.cpfCnpj,
+            country: formData.country,
             trial_end_date: trialEndDate.toISOString(),
           })
           .select("id")
@@ -92,6 +103,23 @@ export default function Cadastro() {
         }
 
         console.log("Usuário vinculado à empresa com sucesso");
+
+        // Criar perfil do usuário
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .insert({
+            user_id: authData.user.id,
+            email: formData.email,
+            full_name: formData.nome
+          });
+
+        if (profileError) {
+          console.error("Erro ao criar perfil do usuário:", profileError);
+          // Não falhar o cadastro por causa do perfil
+        } else {
+          console.log("Perfil do usuário criado com sucesso");
+        }
+
         toast.success("Cadastro realizado com sucesso!");
         navigate("/login");
       }
@@ -189,6 +217,32 @@ export default function Cadastro() {
                   placeholder="(11) 99999-9999"
                   required
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="country" className="text-white">
+                  País <span className="text-red-300">*</span>
+                </Label>
+                <Select value={formData.country} onValueChange={handleCountryChange}>
+                  <SelectTrigger className="bg-white/20 border-white/30 text-white">
+                    <SelectValue placeholder="Selecione seu país" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {AVAILABLE_COUNTRIES.map((country) => {
+                      const config = COUNTRIES[country];
+                      return (
+                        <SelectItem key={country} value={country}>
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">{config.flag}</span>
+                            <span>{config.name}</span>
+                            <span className="text-muted-foreground text-sm">
+                              ({config.currencySymbol})
+                            </span>
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password" className="text-white">
