@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Package, Clock, CheckCircle, Plus, TrendingUp, MessageCircle, Calculator, BookOpen, AlertTriangle, Bell, DollarSign, Users, Calendar } from "lucide-react";
+import { Package, Clock, CheckCircle, Plus, TrendingUp, MessageCircle, Calculator, BookOpen, AlertTriangle, Bell, DollarSign, Users, Calendar, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { MobileSidebarTrigger } from "@/components/MobileSidebarTrigger";
@@ -176,7 +176,7 @@ E necessario repor urgentemente este item!`;
         priority: "medium",
         title: "Orcamento Pendente",
         message: `${quote.code} - ${quote.customer_name}`,
-        icon: Calendar,
+        icon: FileText,
         color: "blue",
         action: () => {
           const message = `Olá ${quote.customer_name}!
@@ -307,7 +307,7 @@ _${empresa?.nome || 'Atelie'}_`;
           </div>
         </div>
 
-      <div className="p-4 md:p-8 space-y-6 md:space-y-8">
+      <div className="p-6 md:p-10 space-y-8 md:space-y-10">
         {/* Banner de Trial */}
         <TrialBannerSmall />
         
@@ -394,7 +394,7 @@ _${empresa?.nome || 'Atelie'}_`;
                 </CardContent>
               </Card>
 
-              <Card className="bg-gradient-to-br from-purple-50 via-pink-50 to-white border border-purple-300/50 shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 animate-scale-in">
+              <Card className="bg-gradient-to-br from-purple-100 via-pink-50 to-white border-2 border-purple-400 shadow-2xl hover:shadow-3xl hover:scale-[1.03] ring-2 ring-purple-200/30 hover:ring-purple-300/50 transition-all duration-300 animate-scale-in">
                 <CardHeader className="flex flex-row items-center justify-between pb-3 px-6 pt-6">
                   <CardTitle className="text-sm font-medium text-purple-700">
                     Receita do Mes
