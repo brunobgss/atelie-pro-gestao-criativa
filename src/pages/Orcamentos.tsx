@@ -403,12 +403,20 @@ ${empresa?.nome || 'Ateliê'}`;
                     <Button
                       variant="outline"
                       size="sm"
-                      className="border-green-600 text-green-600 hover:bg-green-600/10"
-                      onClick={() => handleApproveQuote(quote)}
-                      disabled={approvingQuote === (quote.code || quote.id)}
+                      className={`border-green-600 text-green-600 hover:bg-green-600/10 ${
+                        quote.status === 'approved' ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
+                      onClick={() => {
+                        if (quote.status === 'approved') {
+                          toast.info("Orçamento já foi aprovado");
+                          return;
+                        }
+                        handleApproveQuote(quote);
+                      }}
+                      disabled={approvingQuote === (quote.code || quote.id) || quote.status === 'approved'}
                     >
                       <CheckCircle className="w-4 h-4 mr-2" />
-                      {approvingQuote === (quote.code || quote.id) ? "Aprovando..." : "Aprovar"}
+                      {quote.status === 'approved' ? 'Aprovado' : (approvingQuote === (quote.code || quote.id) ? "Aprovando..." : "Aprovar")}
                     </Button>
                     <Button
                       variant="outline"

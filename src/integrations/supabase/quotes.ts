@@ -274,6 +274,19 @@ export async function approveQuote(quoteCode: string): Promise<{ ok: boolean; er
 
     console.log("Orçamento encontrado:", quote);
 
+    // Verificar se já existe pedido para este orçamento
+    const { data: existingOrder } = await supabase
+      .from("atelie_orders")
+      .select("code, id")
+      .ilike("description", `%${quoteCode}%`)
+      .limit(1)
+      .maybeSingle();
+
+    if (existingOrder) {
+      console.log("Pedido já existe para este orçamento:", existingOrder.code);
+      return { ok: false, error: `Pedido ${existingOrder.code} já existe para este orçamento. Não foi possível criar duplicata.` };
+    }
+
     // Calcular valor total
     const totalValue = items.reduce((sum, item) => sum + (item.quantity * item.unit_value), 0);
     console.log("Valor total calculado:", totalValue);

@@ -46,6 +46,7 @@ export async function listOrders(): Promise<OrderRow[]> {
       .from("atelie_orders")
       .select("id, code, customer_name, customer_phone, type, description, value, paid, delivery_date, status, file_url")
       .eq("empresa_id", userEmpresa.empresa_id)
+      .neq("status", "Cancelado") // Excluir pedidos cancelados das listagens
       .order("created_at", { ascending: false })
       .limit(100);
     

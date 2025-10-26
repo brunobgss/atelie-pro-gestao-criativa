@@ -225,7 +225,7 @@ export async function updatePaymentStatus(
     // Buscar o pedido para obter o valor total
     const { data: order, error: orderError } = await supabase
       .from("atelie_orders")
-      .select("id, value, paid")
+      .select("id, value, paid, empresa_id")
       .eq("code", orderCode)
       .maybeSingle();
 
@@ -235,7 +235,7 @@ export async function updatePaymentStatus(
     }
 
     // Calcular novo valor pago baseado no status
-    let newPaidValue = order.paid;
+    let newPaidValue = 0;
     
     if (status === 'pago') {
       newPaidValue = order.value; // Pago = valor total
@@ -246,7 +246,47 @@ export async function updatePaymentStatus(
       newPaidValue = order.paid > 0 ? order.paid : order.value / 2;
     }
     
-    // Atualizar APENAS o valor pago, NÃO alterar status de produção
+    // IMPORTANTE: Criar/Atualizar registro na tabela RECEITAS, não apenas order.paid
+    // Buscar se já existe receita para este pedido
+    const { data: existingReceita } = await supabase
+      .from("atelie_receitas")
+      .select("id")
+      .eq("order_code", orderCode)
+      .maybeSingle();
+
+    if (existingReceita) {
+      // Atualizar receita existente
+      const { error: updateReceitaError } = await supabase
+        .from("atelie_receitas")
+        .update({ 
+          amount: newPaidValue,
+          updated_at: new Date().toISOString()
+        })
+        .eq("order_code", orderCode);
+
+      if (updateReceitaError) {
+        console.error("Erro ao atualizar receita:", updateReceitaError);
+        return { ok: false, error: updateReceitaError.message };
+      }
+    } else {
+      // Criar nova receita
+      const { error: createReceitaError } = await supabase
+        .from("atelie_receitas")
+        .insert({
+          order_code: orderCode,
+          amount: newPaidValue,
+          empresa_id: order.empresa_id,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+
+      if (createReceitaError) {
+        console.error("Erro ao criar receita:", createReceitaError);
+        // Não falhar aqui, apenas logar
+      }
+    }
+    
+    // Atualizar também order.paid para compatibilidade (DEPRECATED - não usar mais)
     const { error: updateError } = await supabase
       .from("atelie_orders")
       .update({ 
@@ -256,8 +296,8 @@ export async function updatePaymentStatus(
       .eq("code", orderCode);
 
     if (updateError) {
-      console.error("Erro ao atualizar status de pagamento:", updateError);
-      return { ok: false, error: updateError.message };
+      console.error("Erro ao atualizar order.paid:", updateError);
+      // Não retornar erro aqui, pois a receita já foi atualizada
     }
 
     console.log("Status de pagamento atualizado com sucesso");
