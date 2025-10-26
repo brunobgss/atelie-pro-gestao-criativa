@@ -241,9 +241,9 @@ _${empresa?.nome || 'Atelie'}_`;
   const intelligentAlerts = getIntelligentAlerts();
 
   return (
-    <PageTransition className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100">
+    <PageTransition className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-slate-50">
       {/* Header */}
-      <FadeIn className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 sticky top-0 z-10 shadow-sm">
+      <FadeIn className="bg-white/90 backdrop-blur-lg border-b border-purple-100 sticky top-0 z-10 shadow-lg">
         <div className="p-4 md:p-6">
           {/* Mobile Layout */}
           <div className="md:hidden">
@@ -325,41 +325,41 @@ _${empresa?.nome || 'Atelie'}_`;
             </>
           ) : (
             <>
-              <Card className="bg-gradient-to-br from-white to-gray-50 border border-gray-200/50 shadow-md hover:shadow-xl transition-all duration-300 animate-scale-in">
+              <Card className="bg-gradient-to-br from-white via-purple-50/30 to-white border border-purple-200/40 shadow-lg hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 animate-scale-in">
                 <CardHeader className="flex flex-row items-center justify-between pb-3 px-6 pt-6">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                  <CardTitle className="text-sm font-medium text-gray-600">
                     Pedidos em Andamento
                   </CardTitle>
-                  <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center shadow-sm">
-                    <Package className="h-7 w-7 text-primary" />
+                  <div className="w-14 h-14 rounded-3xl bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center shadow-md">
+                    <Package className="h-7 w-7 text-purple-700" />
                   </div>
                 </CardHeader>
                 <CardContent className="px-6">
-                  <div className="text-5xl font-bold text-foreground mb-3">{orders.length}</div>
+                  <div className="text-5xl font-bold text-gray-900 mb-3">{orders.length}</div>
                   <div className="flex items-center gap-2 mt-3">
-                    <TrendingUp className="w-4 h-4 text-secondary" />
-                    <p className="text-sm text-secondary font-medium">
+                    <TrendingUp className="w-4 h-4 text-purple-600" />
+                    <p className="text-sm text-gray-600 font-medium">
                       {orders.filter(o => o.status === "Em produção" && o.status !== "Cancelado").length} em produção
                     </p>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-gradient-to-br from-white to-gray-50 border border-gray-200/50 shadow-md hover:shadow-xl transition-all duration-300 animate-scale-in">
+              <Card className="bg-gradient-to-br from-white via-blue-50/30 to-white border border-blue-200/40 shadow-lg hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 animate-scale-in">
                 <CardHeader className="flex flex-row items-center justify-between pb-3 px-6 pt-6">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                  <CardTitle className="text-sm font-medium text-gray-600">
                     Em Producao
                   </CardTitle>
-                  <div className="w-14 h-14 rounded-2xl bg-secondary/10 flex items-center justify-center shadow-sm">
-                    <Clock className="h-7 w-7 text-secondary" />
+                  <div className="w-14 h-14 rounded-3xl bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center shadow-md">
+                    <Clock className="h-7 w-7 text-blue-700" />
                   </div>
                 </CardHeader>
                 <CardContent className="px-6">
-                  <div className="text-5xl font-bold text-foreground mb-3">
+                  <div className="text-5xl font-bold text-gray-900 mb-3">
                     {orders.filter(o => o.status === "Em produção" && o.status !== "Cancelado").length}
                   </div>
                   <div className="flex items-center gap-2 mt-3">
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-gray-600 font-medium">
                       {orders.filter(o => {
                         if (!o.delivery_date) return false;
                         const deliveryDate = new Date(o.delivery_date);
@@ -373,34 +373,34 @@ _${empresa?.nome || 'Atelie'}_`;
                 </CardContent>
               </Card>
 
-              <Card className="bg-gradient-to-br from-white to-gray-50 border border-gray-200/50 shadow-md hover:shadow-xl transition-all duration-300 animate-scale-in">
+              <Card className="bg-gradient-to-br from-white via-green-50/30 to-white border border-green-200/40 shadow-lg hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 animate-scale-in">
                 <CardHeader className="flex flex-row items-center justify-between pb-3 px-6 pt-6">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                  <CardTitle className="text-sm font-medium text-gray-600">
                     Concluidos Hoje
                   </CardTitle>
-                  <div className="w-14 h-14 rounded-2xl bg-accent/10 flex items-center justify-center shadow-sm">
-                    <CheckCircle className="h-7 w-7 text-accent" />
+                  <div className="w-14 h-14 rounded-3xl bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center shadow-md">
+                    <CheckCircle className="h-7 w-7 text-green-700" />
                   </div>
                 </CardHeader>
                 <CardContent className="px-6">
-                  <div className="text-5xl font-bold text-foreground mb-3">
+                  <div className="text-5xl font-bold text-gray-900 mb-3">
                     {orders.filter(o => o.status === "Pronto" && o.status !== "Cancelado").length}
                   </div>
                   <div className="flex items-center gap-2 mt-3">
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-gray-600 font-medium">
                       {orders.filter(o => o.status === "Aguardando retirada" && o.status !== "Cancelado").length} aguardando retirada
                     </p>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-gradient-to-br from-purple-50 to-white border border-purple-200/50 shadow-md hover:shadow-xl transition-all duration-300 animate-scale-in">
+              <Card className="bg-gradient-to-br from-purple-50 via-pink-50 to-white border border-purple-300/50 shadow-xl hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 animate-scale-in">
                 <CardHeader className="flex flex-row items-center justify-between pb-3 px-6 pt-6">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                  <CardTitle className="text-sm font-medium text-purple-700">
                     Receita do Mes
                   </CardTitle>
-                  <div className="w-14 h-14 rounded-2xl bg-purple-100 flex items-center justify-center shadow-sm">
-                    <TrendingUp className="h-7 w-7 text-purple-600" />
+                  <div className="w-14 h-14 rounded-3xl bg-gradient-to-br from-purple-200 to-purple-300 flex items-center justify-center shadow-lg">
+                    <TrendingUp className="h-7 w-7 text-purple-800" />
                   </div>
                 </CardHeader>
                 <CardContent className="px-6">
@@ -408,8 +408,8 @@ _${empresa?.nome || 'Atelie'}_`;
                     {formatCurrency(orders.filter(o => o.status !== "Cancelado").reduce((sum, order) => sum + (Number(order.value) || 0), 0))}
                   </div>
                   <div className="flex items-center gap-2 mt-3">
-                    <TrendingUp className="w-4 h-4 text-secondary" />
-                    <p className="text-sm text-secondary font-medium">
+                    <TrendingUp className="w-4 h-4 text-purple-600" />
+                    <p className="text-sm text-purple-700 font-semibold">
                       {formatCurrency(orders.filter(o => o.status !== "Cancelado").reduce((sum, order) => sum + (Number(order.paid) || 0), 0))} recebido
                     </p>
                   </div>
@@ -433,19 +433,23 @@ _${empresa?.nome || 'Atelie'}_`;
                 <MobileCard 
                   onClick={() => navigate("/calculadora")}
                   interactive
-                  className="h-24 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:from-blue-100 hover:to-blue-200 hover:shadow-lg rounded-2xl transition-all animate-fade-in-up"
+                  className="h-28 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-blue-100 via-blue-50 to-blue-100 border-2 border-blue-300/40 hover:border-blue-400 hover:shadow-xl hover:scale-105 rounded-3xl transition-all animate-fade-in-up"
                 >
-                  <Calculator className="w-7 h-7 text-blue-600" />
-                  <span className="text-blue-700 font-semibold text-sm text-center">Calculadora de Preços</span>
+                  <div className="w-12 h-12 rounded-3xl bg-blue-200 flex items-center justify-center">
+                    <Calculator className="w-7 h-7 text-blue-700" />
+                  </div>
+                  <span className="text-blue-800 font-bold text-sm text-center">Calculadora de Preços</span>
                 </MobileCard>
                 
                 <MobileCard 
                   onClick={() => navigate("/catalogo")}
                   interactive
-                  className="h-24 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-green-50 to-green-100 border-green-200 hover:from-green-100 hover:to-green-200 hover:shadow-lg rounded-2xl transition-all animate-fade-in-up"
+                  className="h-28 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-green-100 via-green-50 to-green-100 border-2 border-green-300/40 hover:border-green-400 hover:shadow-xl hover:scale-105 rounded-3xl transition-all animate-fade-in-up"
                 >
-                  <BookOpen className="w-7 h-7 text-green-600" />
-                  <span className="text-green-700 font-semibold text-sm text-center">Catálogo de Produtos</span>
+                  <div className="w-12 h-12 rounded-3xl bg-green-200 flex items-center justify-center">
+                    <BookOpen className="w-7 h-7 text-green-700" />
+                  </div>
+                  <span className="text-green-800 font-bold text-sm text-center">Catálogo de Produtos</span>
                 </MobileCard>
                 
                 <MobileCard 
@@ -467,19 +471,23 @@ _${empresa?.nome || 'Atelie'} - Qualidade e criatividade em cada peca_`;
                     window.open(whatsappUrl, '_blank');
                   }}
                   interactive
-                  className="h-24 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-green-50 to-green-100 border-green-200 hover:from-green-100 hover:to-green-200 hover:shadow-lg rounded-2xl transition-all animate-fade-in-up"
+                  className="h-28 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-emerald-100 via-emerald-50 to-emerald-100 border-2 border-emerald-300/40 hover:border-emerald-400 hover:shadow-xl hover:scale-105 rounded-3xl transition-all animate-fade-in-up"
                 >
-                  <MessageCircle className="w-7 h-7 text-green-600" />
-                  <span className="text-green-700 font-semibold text-sm text-center">Template WhatsApp</span>
+                  <div className="w-12 h-12 rounded-3xl bg-emerald-200 flex items-center justify-center">
+                    <MessageCircle className="w-7 h-7 text-emerald-700" />
+                  </div>
+                  <span className="text-emerald-800 font-bold text-sm text-center">Template WhatsApp</span>
                 </MobileCard>
                 
                 <MobileCard 
                   onClick={() => navigate("/relatorios")}
                   interactive
-                  className="h-24 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 hover:from-purple-100 hover:to-purple-200 hover:shadow-lg rounded-2xl transition-all animate-fade-in-up"
+                  className="h-28 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-purple-100 via-purple-50 to-purple-100 border-2 border-purple-300/40 hover:border-purple-400 hover:shadow-xl hover:scale-105 rounded-3xl transition-all animate-fade-in-up"
                 >
-                  <TrendingUp className="w-7 h-7 text-purple-600" />
-                  <span className="text-purple-700 font-semibold text-sm text-center">Relatórios</span>
+                  <div className="w-12 h-12 rounded-3xl bg-purple-200 flex items-center justify-center">
+                    <TrendingUp className="w-7 h-7 text-purple-700" />
+                  </div>
+                  <span className="text-purple-800 font-bold text-sm text-center">Relatórios</span>
                 </MobileCard>
               </MobileGrid>
           </CardContent>
