@@ -637,6 +637,13 @@ _Orçamento gerado pela Calculadora Profissional_
 
                     {newMaterial.materialType === "fabric" ? (
                       <>
+                        {/* Info sobre como funciona */}
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                          <p className="text-xs text-blue-800">
+                            ℹ️ O cálculo é automático por peça. A quantidade que você adicionar aqui será a quantidade TOTAL de peças que você vai produzir.
+                          </p>
+                        </div>
+
                         {/* Dimensões do Tecido */}
                         <div className="grid grid-cols-2 gap-3">
                           <div className="space-y-2">
@@ -691,7 +698,7 @@ _Orçamento gerado pela Calculadora Profissional_
 
                         {/* Quantidade de Peças */}
                         <div className="space-y-2">
-                          <Label>Quantidade de peças *</Label>
+                          <Label>Quantidade TOTAL de peças a produzir *</Label>
                           <Input
                             type="number"
                             placeholder="Ex: 5"
@@ -699,6 +706,9 @@ _Orçamento gerado pela Calculadora Profissional_
                             onChange={(e) => setNewMaterial({...newMaterial, quantity: Number(e.target.value)})}
                             className="border-input focus:ring-2 focus:ring-purple-500 transition-all"
                           />
+                          <p className="text-xs text-gray-500">
+                            O sistema calcula automaticamente o uso de tecido por peça e multiplica pela quantidade total.
+                          </p>
                         </div>
 
                         {/* Preço por metro */}
