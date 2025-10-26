@@ -147,9 +147,9 @@ export default function CalculadoraPrecos() {
     return totalHours + setupHours;
   };
 
-  // Calcula o uso de tecido baseado nas dimensões
+  // Calcula o uso de tecido baseado nas dimensões (retorna metros de tecido POR PEÇA)
   const calculateFabricUsage = (material: { materialType?: string, fabricWidth?: number, pieceWidth?: number, pieceLength?: number, quantity?: number }) => {
-    if (material.materialType !== "fabric" || !material.fabricWidth || !material.pieceWidth || !material.pieceLength || !material.quantity) {
+    if (material.materialType !== "fabric" || !material.fabricWidth || !material.pieceWidth || !material.pieceLength) {
       return material.quantity || 0;
     }
     
@@ -161,46 +161,55 @@ export default function CalculadoraPrecos() {
     const piecesPerWidth = Math.floor(fabricWidthInM / pieceWidthInM);
     
     if (piecesPerWidth === 0) {
-      // Se não cabe na largura, precisa comprar o comprimento total
-      return material.quantity * pieceLengthInM;
+      // Se não cabe na largura, precisa do comprimento total por peça
+      return pieceLengthInM;
     }
     
-    // Calcula quantas "fileiras" são necessárias
-    const rows = Math.ceil(material.quantity / piecesPerWidth);
+    // Calcula o uso de tecido POR PEÇA
+    // Se cabem N peças na largura, cada peça usa (1/N) da largura
+    // Então: metros_por_peca = (1 / piecesPerWidth) * pieceLengthInM
+    // Simplificando: comprimento necessário dividido pelo número de peças na largura
+    const fabricUsagePerPiece = pieceLengthInM / piecesPerWidth;
     
-    // Total em metros
-    return rows * pieceLengthInM;
+    return fabricUsagePerPiece;
   };
 
-  const materialsCost = materials.reduce((total, material) => {
-    let usage = material.quantity;
+  // Calcula o custo de materiais POR PEÇA
+  const materialsCostPerUnit = materials.reduce((total, material) => {
+    let costPerUnit = 0;
     
-    // Se for tecido, calcula o uso real
+    // Se for tecido, calcula o uso real por peça
     if (material.materialType === "fabric" && material.calculatedUsage !== undefined) {
-      return total + (material.calculatedUsage * material.unitPrice);
+      // calculatedUsage = metros de tecido POR PEÇA (já calculado)
+      // material.unitPrice = preço do metro de tecido
+      costPerUnit = material.calculatedUsage * material.unitPrice;
+    } else {
+      // Para outros materiais, o unitPrice já é por peça
+      costPerUnit = material.quantity * material.unitPrice;
     }
     
-    return total + (usage * material.unitPrice);
+    return total + costPerUnit;
   }, 0);
 
   const productionCost = getProductionCost();
-  const totalMaterialsCost = materialsCost * (productType === "personalizado" ? quantity : 1);
+  // Multiplica o custo por peça pela quantidade total de peças
+  const totalMaterialsCost = materialsCostPerUnit * quantity;
   const subtotal = productionCost + totalMaterialsCost;
   const profitAmount = (subtotal * profitMargin) / 100;
   const finalPrice = subtotal + profitAmount;
   const unitPrice = quantity > 1 ? finalPrice / quantity : finalPrice;
 
   const addMaterial = () => {
-    if (newMaterial.name && newMaterial.quantity > 0 && newMaterial.unitPrice >= 0) {
-      // Calcular uso se for tecido
-      let calculatedUsage = newMaterial.quantity;
+    if (newMaterial.name && newMaterial.unitPrice >= 0) {
+      // Calcular uso se for tecido (sempre calcula para 1 peça)
+      let calculatedUsage = newMaterial.quantity || 0;
       if (newMaterial.materialType === "fabric" && newMaterial.fabricWidth && newMaterial.pieceWidth && newMaterial.pieceLength) {
         calculatedUsage = calculateFabricUsage({
           materialType: newMaterial.materialType,
           fabricWidth: newMaterial.fabricWidth,
           pieceWidth: newMaterial.pieceWidth,
           pieceLength: newMaterial.pieceLength,
-          quantity: newMaterial.quantity
+          quantity: 1 // Sempre calcula para 1 peça
         });
       }
       
