@@ -399,11 +399,11 @@ export default function MedidasClientes() {
   }
 
   return (
-    <div className="p-6">
-      <div className="flex items-center gap-2 mb-6">
-        <SidebarTrigger />
-        <Ruler className="w-6 h-6 text-blue-600" />
-        <h1 className="text-2xl font-bold">Medidas de Clientes</h1>
+    <div className="p-4 md:p-6">
+      <div className="flex items-center gap-2 mb-4 md:mb-6">
+        <SidebarTrigger className="flex-shrink-0" />
+        <Ruler className="w-5 h-5 md:w-6 md:h-6 text-blue-600 flex-shrink-0" />
+        <h1 className="text-lg md:text-2xl font-bold truncate">Medidas de Clientes</h1>
       </div>
 
       {/* Filtros */}
@@ -434,9 +434,10 @@ export default function MedidasClientes() {
         </Select>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
-            <Button onClick={() => openDialog()}>
-              <Plus className="w-4 h-4 mr-2" />
-              Nova Medida
+            <Button onClick={() => openDialog()} size="sm" className="w-full sm:w-auto text-xs md:text-sm">
+              <Plus className="w-4 h-4 mr-1 md:mr-2" />
+              <span className="hidden sm:inline">Nova Medida</span>
+              <span className="sm:hidden">Nova</span>
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -762,30 +763,31 @@ export default function MedidasClientes() {
           filteredMedidas.map((medida) => (
             <Card key={medida.id}>
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div className="flex-1 min-w-0">
                     <CardTitle className="flex items-center gap-2">
-                      <User className="w-5 h-5 text-blue-600" />
-                      {medida.cliente_nome}
+                      <User className="w-4 h-4 md:w-5 md:h-5 text-blue-600 flex-shrink-0" />
+                      <span className="truncate">{medida.cliente_nome}</span>
                     </CardTitle>
-                    <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                    <div className="flex flex-wrap items-center gap-3 md:gap-4 mt-2 text-xs md:text-sm text-muted-foreground">
                       <div className="flex items-center gap-1">
-                        <Badge variant="outline" className="flex items-center gap-1">
+                        <Badge variant="outline" className="flex items-center gap-1 text-xs">
                           <Scissors className="w-3 h-3" />
                           {medida.tipo_peca.toUpperCase()}
                         </Badge>
                       </div>
-                      <span className="flex items-center gap-1 text-sm text-gray-500">
-                        <Calendar className="w-3 h-3" />
+                      <span className="flex items-center gap-1 text-xs md:text-sm text-gray-500">
+                        <Calendar className="w-3 h-3 flex-shrink-0" />
                         {new Date(medida.created_at).toLocaleDateString('pt-BR')}
                       </span>
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => generatePDF(medida)}
+                      className="flex-1 sm:flex-none text-xs"
                     >
                       <Download className="w-4 h-4 mr-1" />
                       PDF
@@ -794,6 +796,7 @@ export default function MedidasClientes() {
                       variant="outline"
                       size="sm"
                       onClick={() => openDialog(medida)}
+                      className="flex-1 sm:flex-none text-xs"
                     >
                       <Edit className="w-4 h-4 mr-1" />
                       Editar
@@ -802,7 +805,7 @@ export default function MedidasClientes() {
                       variant="outline"
                       size="sm"
                       onClick={() => handleDelete(medida.id)}
-                      className="text-red-600 hover:text-red-700"
+                      className="text-red-600 hover:text-red-700 flex-1 sm:flex-none text-xs"
                     >
                       <Trash2 className="w-4 h-4 mr-1" />
                       Excluir
