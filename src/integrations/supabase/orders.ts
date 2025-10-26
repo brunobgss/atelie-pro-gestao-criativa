@@ -226,6 +226,63 @@ export async function updateOrderStatus(
       return { ok: false, error: error.message };
     }
     
+    // Se o campo 'paid' foi alterado, atualizar também a tabela de receitas
+    if (paid !== undefined) {
+      console.log("Campo 'paid' foi alterado, atualizando tabela de receitas...");
+      
+      // Buscar se já existe receita para este pedido
+      const { data: existingReceita } = await supabase
+        .from("atelie_receitas")
+        .select("id")
+        .eq("order_code", code)
+        .maybeSingle();
+
+      if (existingReceita) {
+        // Atualizar receita existente
+        const { error: updateReceitaError } = await supabase
+          .from("atelie_receitas")
+          .update({ 
+            amount: paid,
+            updated_at: new Date().toISOString()
+          })
+          .eq("order_code", code);
+
+        if (updateReceitaError) {
+          console.error("Erro ao atualizar receita:", updateReceitaError);
+          // Não falhar aqui, apenas logar
+        } else {
+          console.log("Receita atualizada com sucesso");
+        }
+      } else {
+        // Buscar empresa_id do pedido para criar receita
+        const { data: orderData } = await supabase
+          .from("atelie_orders")
+          .select("empresa_id")
+          .eq("code", code)
+          .single();
+
+        if (orderData) {
+          // Criar nova receita
+          const { error: createReceitaError } = await supabase
+            .from("atelie_receitas")
+            .insert({
+              order_code: code,
+              amount: paid,
+              empresa_id: orderData.empresa_id,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
+
+          if (createReceitaError) {
+            console.error("Erro ao criar receita:", createReceitaError);
+            // Não falhar aqui, apenas logar
+          } else {
+            console.log("Receita criada com sucesso");
+          }
+        }
+      }
+    }
+    
     console.log("Pedido atualizado com sucesso:", data);
     return { ok: true, data: data as OrderRow };
   } catch (e: unknown) {
@@ -284,6 +341,63 @@ export async function updateOrder(
     if (error) {
       console.error("Erro ao atualizar pedido:", error);
       return { ok: false, error: error.message };
+    }
+    
+    // Se o campo 'paid' foi alterado, atualizar também a tabela de receitas
+    if (updates.paid !== undefined) {
+      console.log("Campo 'paid' foi alterado, atualizando tabela de receitas...");
+      
+      // Buscar se já existe receita para este pedido
+      const { data: existingReceita } = await supabase
+        .from("atelie_receitas")
+        .select("id")
+        .eq("order_code", orderCode)
+        .maybeSingle();
+
+      if (existingReceita) {
+        // Atualizar receita existente
+        const { error: updateReceitaError } = await supabase
+          .from("atelie_receitas")
+          .update({ 
+            amount: updates.paid,
+            updated_at: new Date().toISOString()
+          })
+          .eq("order_code", orderCode);
+
+        if (updateReceitaError) {
+          console.error("Erro ao atualizar receita:", updateReceitaError);
+          // Não falhar aqui, apenas logar
+        } else {
+          console.log("Receita atualizada com sucesso");
+        }
+      } else {
+        // Buscar empresa_id do pedido para criar receita
+        const { data: orderData } = await supabase
+          .from("atelie_orders")
+          .select("empresa_id")
+          .eq("code", orderCode)
+          .single();
+
+        if (orderData) {
+          // Criar nova receita
+          const { error: createReceitaError } = await supabase
+            .from("atelie_receitas")
+            .insert({
+              order_code: orderCode,
+              amount: updates.paid,
+              empresa_id: orderData.empresa_id,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            });
+
+          if (createReceitaError) {
+            console.error("Erro ao criar receita:", createReceitaError);
+            // Não falhar aqui, apenas logar
+          } else {
+            console.log("Receita criada com sucesso");
+          }
+        }
+      }
     }
     
     console.log("Pedido atualizado com sucesso:", data);
