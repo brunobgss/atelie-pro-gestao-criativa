@@ -254,8 +254,12 @@ _${empresa?.nome || 'Ateliê'}_`;
                           event.isOverdue 
                             ? 'bg-red-100 text-red-600' 
                             : event.isUrgent 
-                            ? 'bg-orange-100 text-orange-600' 
-                            : 'bg-blue-100 text-blue-600'
+                            ? 'bg-orange-100 text-orange-600'
+                            : event.status === 'Pronto'
+                            ? 'bg-green-100 text-green-600'
+                            : event.status === 'Em produção'
+                            ? 'bg-blue-100 text-blue-600'
+                            : 'bg-gray-100 text-gray-600'
                         }`}>
                           <Calendar className="w-5 h-5 md:w-6 md:h-6" />
                         </div>
@@ -311,23 +315,31 @@ _${empresa?.nome || 'Ateliê'}_`;
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-center py-8">
+            <div className="text-center py-6">
               <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">Calendário Visual</h3>
-              <p className="text-gray-600 mb-4">Visualização em calendário será implementada em breve</p>
-              <div className="flex justify-center gap-2">
-                <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-                  🔴 Atrasados
-                </Badge>
-                <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
-                  🟠 Urgentes
-                </Badge>
-                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                  🔵 Em Produção
-                </Badge>
-                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                  🟢 Prontos
-                </Badge>
+              <p className="text-gray-600 mb-6 text-sm">Visualização em calendário será implementada em breve</p>
+              
+              {/* Legenda de Cores */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <p className="text-sm font-semibold text-gray-700 mb-3">Legenda de Cores:</p>
+                <div className="flex flex-wrap justify-center gap-2">
+                  <Badge variant="outline" className="bg-red-50 text-red-700 border-red-300 text-xs">
+                    🔴 Vermelho - Atrasados
+                  </Badge>
+                  <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-300 text-xs">
+                    🟠 Laranja - Urgentes (2-3 dias)
+                  </Badge>
+                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300 text-xs">
+                    🔵 Azul - Em Produção
+                  </Badge>
+                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300 text-xs">
+                    🟢 Verde - Prontos
+                  </Badge>
+                  <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-300 text-xs">
+                    ⚪ Cinza - Outros Status
+                  </Badge>
+                </div>
               </div>
             </div>
           </CardContent>
