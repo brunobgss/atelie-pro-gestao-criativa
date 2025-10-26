@@ -276,6 +276,7 @@ export async function updateOrderStatus(
               .insert({
                 order_code: code,
                 customer_name: fullOrderData.customer_name || "Sem nome",
+                description: `Pagamento do pedido ${code}`, // Campo obrigatório
                 amount: paid,
                 payment_method: "Dinheiro", // Método padrão
                 payment_date: new Date().toISOString().split('T')[0], // Data de hoje
@@ -406,6 +407,7 @@ export async function updateOrder(
               .insert({
                 order_code: orderCode,
                 customer_name: fullOrderData.customer_name || "Sem nome",
+                description: `Pagamento do pedido ${orderCode}`, // Campo obrigatório
                 amount: updates.paid,
                 payment_method: "Dinheiro", // Método padrão
                 payment_date: new Date().toISOString().split('T')[0], // Data de hoje

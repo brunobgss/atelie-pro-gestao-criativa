@@ -275,6 +275,7 @@ export async function updatePaymentStatus(
         .insert({
           order_code: orderCode,
           customer_name: order.customer_name || "Sem nome",
+          description: `Pagamento do pedido ${orderCode}`, // Campo obrigatório
           amount: newPaidValue,
           payment_method: "Dinheiro", // Método padrão
           payment_date: new Date().toISOString().split('T')[0], // Data de hoje
