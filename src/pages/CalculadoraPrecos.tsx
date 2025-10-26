@@ -19,6 +19,12 @@ interface Material {
   name: string;
   quantity: number;
   unitPrice: number;
+  materialType?: "fabric" | "other";
+  fabricWidth?: number; // Largura do tecido (em metros)
+  fabricLength?: number; // Comprimento do tecido comprado (em metros)
+  pieceWidth?: number; // Largura da peça necessária (em cm)
+  pieceLength?: number; // Comprimento da peça necessária (em cm)
+  calculatedUsage?: number; // Uso calculado em metros
 }
 
 interface ProductTemplate {
@@ -43,7 +49,16 @@ export default function CalculadoraPrecos() {
   const [hourlyRate, setHourlyRate] = useState<number>(25);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [profitMargin, setProfitMargin] = useState<number>(35);
-  const [newMaterial, setNewMaterial] = useState({ name: "", quantity: 0, unitPrice: 0 });
+  const [newMaterial, setNewMaterial] = useState({ 
+    name: "", 
+    quantity: 0, 
+    unitPrice: 0,
+    materialType: "other" as "fabric" | "other",
+    fabricWidth: 0,
+    fabricLength: 0,
+    pieceWidth: 0,
+    pieceLength: 0
+  });
   
   // Produto personalizado
   const [quantity, setQuantity] = useState<number>(1);
@@ -132,8 +147,41 @@ export default function CalculadoraPrecos() {
     return totalHours + setupHours;
   };
 
-  const materialsCost = materials.reduce((total, material) => 
-    total + (material.quantity * material.unitPrice), 0);
+  // Calcula o uso de tecido baseado nas dimensões
+  const calculateFabricUsage = (material: { materialType?: string, fabricWidth?: number, pieceWidth?: number, pieceLength?: number, quantity?: number }) => {
+    if (material.materialType !== "fabric" || !material.fabricWidth || !material.pieceWidth || !material.pieceLength || !material.quantity) {
+      return material.quantity || 0;
+    }
+    
+    const fabricWidthInM = material.fabricWidth; // já em metros
+    const pieceWidthInM = material.pieceWidth / 100; // converter cm para metros
+    const pieceLengthInM = material.pieceLength / 100; // converter cm para metros
+    
+    // Calcula quantos pedaços cabem na largura do tecido
+    const piecesPerWidth = Math.floor(fabricWidthInM / pieceWidthInM);
+    
+    if (piecesPerWidth === 0) {
+      // Se não cabe na largura, precisa comprar o comprimento total
+      return material.quantity * pieceLengthInM;
+    }
+    
+    // Calcula quantas "fileiras" são necessárias
+    const rows = Math.ceil(material.quantity / piecesPerWidth);
+    
+    // Total em metros
+    return rows * pieceLengthInM;
+  };
+
+  const materialsCost = materials.reduce((total, material) => {
+    let usage = material.quantity;
+    
+    // Se for tecido, calcula o uso real
+    if (material.materialType === "fabric" && material.calculatedUsage !== undefined) {
+      return total + (material.calculatedUsage * material.unitPrice);
+    }
+    
+    return total + (usage * material.unitPrice);
+  }, 0);
 
   const productionCost = getProductionCost();
   const totalMaterialsCost = materialsCost * (productType === "personalizado" ? quantity : 1);
@@ -144,8 +192,29 @@ export default function CalculadoraPrecos() {
 
   const addMaterial = () => {
     if (newMaterial.name && newMaterial.quantity > 0 && newMaterial.unitPrice >= 0) {
-      setMaterials([...materials, { ...newMaterial, id: Date.now().toString() }]);
-      setNewMaterial({ name: "", quantity: 0, unitPrice: 0 });
+      // Calcular uso se for tecido
+      let calculatedUsage = newMaterial.quantity;
+      if (newMaterial.materialType === "fabric" && newMaterial.fabricWidth && newMaterial.pieceWidth && newMaterial.pieceLength) {
+        calculatedUsage = calculateFabricUsage({
+          materialType: newMaterial.materialType,
+          fabricWidth: newMaterial.fabricWidth,
+          pieceWidth: newMaterial.pieceWidth,
+          pieceLength: newMaterial.pieceLength,
+          quantity: newMaterial.quantity
+        });
+      }
+      
+      setMaterials([...materials, { ...newMaterial, calculatedUsage, id: Date.now().toString() }]);
+      setNewMaterial({ 
+        name: "", 
+        quantity: 0, 
+        unitPrice: 0, 
+        materialType: "other",
+        fabricWidth: 0,
+        fabricLength: 0,
+        pieceWidth: 0,
+        pieceLength: 0
+      });
     }
   };
 
@@ -493,6 +562,28 @@ _Orçamento gerado pela Calculadora Profissional_
               </TabsContent>
 
               <TabsContent value="materials" className="space-y-4">
+                {/* Info Card */}
+                <Card className="bg-blue-50 border border-blue-200">
+                  <CardContent className="pt-6">
+                    <div className="flex items-start gap-3">
+                      <div className="text-2xl">💡</div>
+                      <div className="flex-1 text-sm text-blue-900">
+                        <strong className="font-semibold">Calculadora de Tecido:</strong>
+                        <p className="mt-1 text-blue-800">
+                          Para calcular o uso de tecido automaticamente, selecione <strong>"Tecido"</strong> e informe:
+                        </p>
+                        <ul className="list-disc list-inside mt-1 space-y-1 text-blue-800">
+                          <li>Largura do tecido (ex: Tricoline tem 1.5m)</li>
+                          <li>Dimensões da peça necessária (largura × comprimento em cm)</li>
+                          <li>Quantidade de peças</li>
+                          <li>Preço por metro</li>
+                        </ul>
+                        <p className="mt-2 italic">O sistema calculará automaticamente quanto tecido você precisa comprar!</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
                 <Card className="bg-white border border-gray-200/50 shadow-sm">
                   <CardHeader>
                     <CardTitle className="text-gray-900 flex items-center gap-2">
@@ -501,62 +592,207 @@ _Orçamento gerado pela Calculadora Profissional_
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {/* Labels dos campos */}
-                    <div className="grid grid-cols-4 gap-3 text-sm font-medium text-gray-600 mb-2">
-                      <div>Nome do Material</div>
-                      <div>Quantidade</div>
-                      <div>Preço Unitário</div>
-                      <div>Ação</div>
+                    {/* Tipo de Material */}
+                    <div className="space-y-2">
+                      <Label>Tipo de Material</Label>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant={newMaterial.materialType === "fabric" ? "default" : "outline"}
+                          onClick={() => setNewMaterial({...newMaterial, materialType: "fabric"})}
+                          className="flex-1"
+                        >
+                          🧵 Tecido
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={newMaterial.materialType === "other" ? "default" : "outline"}
+                          onClick={() => setNewMaterial({...newMaterial, materialType: "other"})}
+                          className="flex-1"
+                        >
+                          📦 Outro
+                        </Button>
+                      </div>
                     </div>
-                    
-                    {/* Adicionar Material */}
-                    <div className="grid grid-cols-4 gap-3">
+
+                    {/* Nome e Tipo */}
+                    <div className="space-y-2">
+                      <Label>Nome do Material *</Label>
                       <Input
-                        placeholder="Ex: Linha de bordado"
+                        placeholder={newMaterial.materialType === "fabric" ? "Ex: Tricoline" : "Ex: Linha de bordado"}
                         value={newMaterial.name}
                         onChange={(e) => setNewMaterial({...newMaterial, name: e.target.value})}
                         className="border-input focus:ring-2 focus:ring-purple-500 transition-all"
                       />
-                      <Input
-                        type="number"
-                        placeholder="Ex: 5"
-                        value={newMaterial.quantity}
-                        onChange={(e) => setNewMaterial({...newMaterial, quantity: Number(e.target.value)})}
-                        className="border-input focus:ring-2 focus:ring-purple-500 transition-all"
-                      />
-                      <Input
-                        type="number"
-                        step="0.01"
-                        placeholder="Ex: 2.50"
-                        value={newMaterial.unitPrice}
-                        onChange={(e) => setNewMaterial({...newMaterial, unitPrice: Number(e.target.value)})}
-                        className="border-input focus:ring-2 focus:ring-purple-500 transition-all"
-                      />
-                      <Button onClick={addMaterial} className="w-full bg-green-600 hover:bg-green-700 transform hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl">
-                        <Plus className="w-4 h-4" />
-                      </Button>
                     </div>
+
+                    {newMaterial.materialType === "fabric" ? (
+                      <>
+                        {/* Dimensões do Tecido */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-2">
+                            <Label>Largura do tecido (m) *</Label>
+                            <Input
+                              type="number"
+                              step="0.1"
+                              placeholder="Ex: 1.5"
+                              value={newMaterial.fabricWidth || ""}
+                              onChange={(e) => setNewMaterial({...newMaterial, fabricWidth: Number(e.target.value)})}
+                            />
+                            <p className="text-xs text-gray-500">Ex: Tricoline tem 1.5m de largura</p>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Comprimento do tecido comprado (m)</Label>
+                            <Input
+                              type="number"
+                              step="0.1"
+                              placeholder="Ex: 1.0"
+                              value={newMaterial.fabricLength || ""}
+                              onChange={(e) => setNewMaterial({...newMaterial, fabricLength: Number(e.target.value)})}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Dimensões da Peça */}
+                        <div className="space-y-2">
+                          <Label className="text-sm font-semibold text-gray-700">Dimensões da peça necessária:</Label>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-2">
+                              <Label>Largura da peça (cm) *</Label>
+                              <Input
+                                type="number"
+                                step="0.1"
+                                placeholder="Ex: 20"
+                                value={newMaterial.pieceWidth || ""}
+                                onChange={(e) => setNewMaterial({...newMaterial, pieceWidth: Number(e.target.value)})}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Comprimento da peça (cm) *</Label>
+                              <Input
+                                type="number"
+                                step="0.1"
+                                placeholder="Ex: 68"
+                                value={newMaterial.pieceLength || ""}
+                                onChange={(e) => setNewMaterial({...newMaterial, pieceLength: Number(e.target.value)})}
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Quantidade de Peças */}
+                        <div className="space-y-2">
+                          <Label>Quantidade de peças *</Label>
+                          <Input
+                            type="number"
+                            placeholder="Ex: 5"
+                            value={newMaterial.quantity || ""}
+                            onChange={(e) => setNewMaterial({...newMaterial, quantity: Number(e.target.value)})}
+                            className="border-input focus:ring-2 focus:ring-purple-500 transition-all"
+                          />
+                        </div>
+
+                        {/* Preço por metro */}
+                        <div className="space-y-2">
+                          <Label>Preço por metro *</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="Ex: 15.00"
+                            value={newMaterial.unitPrice || ""}
+                            onChange={(e) => setNewMaterial({...newMaterial, unitPrice: Number(e.target.value)})}
+                            className="border-input focus:ring-2 focus:ring-purple-500 transition-all"
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {/* Material normal */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-2">
+                            <Label>Quantidade *</Label>
+                            <Input
+                              type="number"
+                              placeholder="Ex: 5"
+                              value={newMaterial.quantity || ""}
+                              onChange={(e) => setNewMaterial({...newMaterial, quantity: Number(e.target.value)})}
+                              className="border-input focus:ring-2 focus:ring-purple-500 transition-all"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Preço Unitário *</Label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              placeholder="Ex: 2.50"
+                              value={newMaterial.unitPrice || ""}
+                              onChange={(e) => setNewMaterial({...newMaterial, unitPrice: Number(e.target.value)})}
+                              className="border-input focus:ring-2 focus:ring-purple-500 transition-all"
+                            />
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    <Button onClick={addMaterial} className="w-full bg-green-600 hover:bg-green-700 transform hover:scale-105 transition-all duration-200 shadow-lg hover:shadow-xl">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Adicionar Material
+                    </Button>
 
                     {/* Lista de Materiais */}
                     <div className="space-y-2">
-                      {materials.map((material) => (
-                        <div key={material.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                          <div className="flex-1">
-                            <span className="font-medium">{material.name}</span>
-                            <span className="text-sm text-gray-600 ml-2">
-                              {material.quantity} × {formatCurrency(material.unitPrice)} = {formatCurrency(material.quantity * material.unitPrice)}
-                            </span>
+                      <Label className="text-sm font-medium text-gray-700">Materiais adicionados:</Label>
+                      {materials.length === 0 ? (
+                        <p className="text-sm text-gray-500 italic text-center py-4">Nenhum material adicionado ainda</p>
+                      ) : (
+                        materials.map((material) => (
+                          <div key={material.id} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1 space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium">{material.name}</span>
+                                  {material.materialType === "fabric" && (
+                                    <Badge variant="outline" className="text-xs">🧵 Tecido</Badge>
+                                  )}
+                                </div>
+                                
+                                {material.materialType === "fabric" ? (
+                                  <div className="text-sm text-gray-600 space-y-1">
+                                    <div>
+                                      <strong>Tecido:</strong> {material.fabricWidth}m de largura
+                                      {material.fabricLength && ` × ${material.fabricLength}m (comprado)`}
+                                    </div>
+                                    <div>
+                                      <strong>Peça:</strong> {material.pieceWidth}cm × {material.pieceLength}cm
+                                    </div>
+                                    <div>
+                                      <strong>Quantidade:</strong> {material.quantity} peça(s)
+                                    </div>
+                                    {material.calculatedUsage !== undefined && (
+                                      <div className="text-green-700 font-medium">
+                                        <strong>Uso calculado:</strong> {material.calculatedUsage.toFixed(2)}m 
+                                        × {formatCurrency(material.unitPrice)}/m = {formatCurrency(material.calculatedUsage * material.unitPrice)}
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="text-sm text-gray-600">
+                                    {material.quantity} un. × {formatCurrency(material.unitPrice)} = {formatCurrency(material.quantity * material.unitPrice)}
+                                  </div>
+                                )}
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeMaterial(material.id)}
+                                className="text-red-600 hover:text-red-700 ml-2"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeMaterial(material.id)}
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      ))}
+                        ))
+                      )}
                     </div>
                   </CardContent>
                 </Card>
