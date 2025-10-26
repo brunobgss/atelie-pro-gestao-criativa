@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Calendar, Package, AlertCircle, Clock, CheckCircle, Bell, MessageCircle } from "lucide-react";
+import { Calendar, Package, AlertCircle, Clock, CheckCircle, Bell, MessageCircle, ChevronLeft, ChevronRight } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { listOrders } from "@/integrations/supabase/orders";
 import { useAuth } from "@/components/AuthProvider";
@@ -133,6 +133,34 @@ _${empresa?.nome || 'Ateliê'}_`;
     window.open(whatsappUrl, '_blank');
     toast.success("Mensagem do WhatsApp preparada!");
   };
+
+  // Calendário Visual
+  const getDaysInMonth = (date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay();
+    
+    return { daysInMonth, startingDayOfWeek, year, month };
+  };
+
+  const getEventColor = (event: DeliveryEvent) => {
+    if (event.isOverdue) return "bg-red-100 border-red-300 text-red-700";
+    if (event.isUrgent) return "bg-orange-100 border-orange-300 text-orange-700";
+    if (event.status === 'Pronto') return "bg-green-100 border-green-300 text-green-700";
+    if (event.status === 'Em produção') return "bg-blue-100 border-blue-300 text-blue-700";
+    return "bg-gray-100 border-gray-300 text-gray-700";
+  };
+
+  const getEventsForDate = (day: number) => {
+    const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    return deliveryEvents.filter(event => event.date.startsWith(dateStr));
+  };
+
+  const { daysInMonth, startingDayOfWeek } = getDaysInMonth(currentDate);
+  const weekdayNames = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100">
@@ -309,37 +337,86 @@ _${empresa?.nome || 'Ateliê'}_`;
         {/* Calendário Visual */}
         <Card className="bg-white border border-gray-200/50 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-gray-900 flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-purple-600" />
-              Visão do Mês
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-gray-900 flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-purple-600" />
+                Visão do Mês - {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+              </CardTitle>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-center py-6">
-              <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Calendário Visual</h3>
-              <p className="text-gray-600 mb-6 text-sm">Visualização em calendário será implementada em breve</p>
-              
-              {/* Legenda de Cores */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <p className="text-sm font-semibold text-gray-700 mb-3">Legenda de Cores:</p>
-                <div className="flex flex-wrap justify-center gap-2">
-                  <Badge variant="outline" className="bg-red-50 text-red-700 border-red-300 text-xs">
-                    🔴 Vermelho - Atrasados
-                  </Badge>
-                  <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-300 text-xs">
-                    🟠 Laranja - Urgentes (2-3 dias)
-                  </Badge>
-                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300 text-xs">
-                    🔵 Azul - Em Produção
-                  </Badge>
-                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300 text-xs">
-                    🟢 Verde - Prontos
-                  </Badge>
-                  <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-300 text-xs">
-                    ⚪ Cinza - Outros Status
-                  </Badge>
+            {/* Cabeçalho do Calendário - Dias da Semana */}
+            <div className="grid grid-cols-7 gap-1 mb-2">
+              {weekdayNames.map(day => (
+                <div key={day} className="text-center text-xs font-semibold text-gray-600 py-2">
+                  {day}
                 </div>
+              ))}
+            </div>
+
+            {/* Grid do Calendário */}
+            <div className="grid grid-cols-7 gap-1">
+              {/* Dias vazios antes do primeiro dia do mês */}
+              {Array.from({ length: startingDayOfWeek }).map((_, index) => (
+                <div key={`empty-${index}`} className="aspect-square" />
+              ))}
+              
+              {/* Dias do mês */}
+              {Array.from({ length: daysInMonth }).map((_, dayIndex) => {
+                const day = dayIndex + 1;
+                const events = getEventsForDate(day);
+                const isToday = day === new Date().getDate() && currentDate.getMonth() === new Date().getMonth() && currentDate.getFullYear() === new Date().getFullYear();
+                
+                return (
+                  <div 
+                    key={day}
+                    className={`aspect-square border border-gray-200 rounded-lg p-1 ${
+                      isToday ? 'bg-purple-50 border-purple-300' : ''
+                    }`}
+                  >
+                    <div className={`text-xs font-semibold mb-1 ${isToday ? 'text-purple-700' : 'text-gray-700'}`}>
+                      {day}
+                    </div>
+                    <div className="space-y-1">
+                      {events.slice(0, 2).map((event, eventIndex) => (
+                        <div
+                          key={event.id}
+                          className={`text-[10px] p-1 rounded border ${getEventColor(event)} truncate`}
+                          title={`${event.client} - ${event.orderCode}`}
+                        >
+                          {event.orderCode}
+                        </div>
+                      ))}
+                      {events.length > 2 && (
+                        <div className="text-[10px] text-gray-500 font-semibold">
+                          +{events.length - 2}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Legenda de Cores */}
+            <div className="mt-4 bg-gray-50 rounded-lg p-3">
+              <p className="text-xs font-semibold text-gray-700 mb-2">Legenda de Cores:</p>
+              <div className="flex flex-wrap justify-center gap-2">
+                <Badge variant="outline" className="bg-red-50 text-red-700 border-red-300 text-xs px-2 py-0.5">
+                  🔴 Atrasados
+                </Badge>
+                <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-300 text-xs px-2 py-0.5">
+                  🟠 Urgentes (2-3 dias)
+                </Badge>
+                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-300 text-xs px-2 py-0.5">
+                  🔵 Em Produção
+                </Badge>
+                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-300 text-xs px-2 py-0.5">
+                  🟢 Prontos
+                </Badge>
+                <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-300 text-xs px-2 py-0.5">
+                  ⚪ Outros
+                </Badge>
               </div>
             </div>
           </CardContent>
