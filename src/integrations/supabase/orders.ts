@@ -280,7 +280,7 @@ export async function updateOrderStatus(
                 amount: paid,
                 payment_method: "Dinheiro", // Método padrão
                 payment_date: new Date().toISOString().split('T')[0], // Data de hoje
-                status: paid > 0 ? "Pago" : "Pendente",
+                status: paid > 0 ? "pago" : "pendente",
                 empresa_id: orderData.empresa_id,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()
@@ -411,7 +411,7 @@ export async function updateOrder(
                 amount: updates.paid,
                 payment_method: "Dinheiro", // Método padrão
                 payment_date: new Date().toISOString().split('T')[0], // Data de hoje
-                status: updates.paid > 0 ? "Pago" : "Pendente",
+                status: updates.paid > 0 ? "pago" : "pendente",
                 empresa_id: orderData.empresa_id,
                 created_at: new Date().toISOString(),
                 updated_at: new Date().toISOString()

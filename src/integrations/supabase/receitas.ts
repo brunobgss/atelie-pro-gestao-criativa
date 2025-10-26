@@ -277,7 +277,7 @@ export async function updatePaymentStatus(
         amount: newPaidValue,
         payment_method: "Dinheiro", // Método padrão
         payment_date: new Date().toISOString().split('T')[0], // Data de hoje
-        status: newPaidValue > 0 ? "Pago" : "Pendente",
+        status: newPaidValue > 0 ? "pago" : "pendente",
         empresa_id: order.empresa_id,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
