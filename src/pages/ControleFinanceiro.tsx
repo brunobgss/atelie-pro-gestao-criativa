@@ -65,7 +65,7 @@ export default function ControleFinanceiro() {
 
   // Processar dados de pagamento combinando pedidos e receitas
   const paymentStatus: PaymentStatus[] = orders
-    .filter(order => order && order.code && order.customer_name) // Filtrar pedidos válidos
+    .filter(order => order && order.code && order.customer_name && order.status !== 'Cancelado') // Filtrar pedidos válidos e não cancelados
     .map(order => {
       const totalValue = Number(order.value || 0);
       
@@ -164,21 +164,21 @@ _${empresa?.nome || 'Ateliê'}_`;
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100">
       {/* Header */}
       <div className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 sticky top-0 z-10 shadow-sm">
-        <div className="p-6 flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <SidebarTrigger className="text-gray-700 hover:bg-gray-100" />
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                <DollarSign className="w-6 h-6 text-purple-600" />
-                Controle Financeiro
+        <div className="p-4 md:p-6 flex justify-between items-center">
+          <div className="flex items-center gap-2 md:gap-4 flex-1 min-w-0">
+            <SidebarTrigger className="text-gray-700 hover:bg-gray-100 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <h1 className="text-lg md:text-2xl font-bold text-gray-900 flex items-center gap-2">
+                <DollarSign className="w-5 h-5 md:w-6 md:h-6 text-purple-600 flex-shrink-0" />
+                <span className="truncate">Controle Financeiro</span>
               </h1>
-              <p className="text-gray-600 text-sm mt-0.5">Gestão de pagamentos e cobranças</p>
+              <p className="text-gray-600 text-xs md:text-sm mt-0.5 truncate">Gestão de pagamentos e cobranças</p>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="p-8 space-y-6">
+      <div className="p-4 md:p-8 space-y-4 md:space-y-6">
         {/* Estatísticas Financeiras */}
         <div className="grid gap-6 md:grid-cols-4">
           <Card className="bg-white border border-gray-200/50 shadow-sm">
@@ -308,7 +308,7 @@ _${empresa?.nome || 'Ateliê'}_`;
                 {filteredPayments.map((payment) => (
                   <div
                     key={payment.id}
-                    className={`p-4 rounded-lg border ${
+                    className={`p-3 md:p-4 rounded-lg border ${
                       payment.isOverdue 
                         ? 'bg-red-50 border-red-200' 
                         : payment.isFullyPaid
@@ -316,44 +316,44 @@ _${empresa?.nome || 'Ateliê'}_`;
                         : 'bg-gray-50 border-gray-200'
                     }`}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-0">
+                      <div className="flex items-center gap-3 md:gap-4">
+                        <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
                           payment.isOverdue 
                             ? 'bg-red-100 text-red-600' 
                             : payment.isFullyPaid
                             ? 'bg-green-100 text-green-600'
                             : 'bg-blue-100 text-blue-600'
                         }`}>
-                          <DollarSign className="w-6 h-6" />
+                          <DollarSign className="w-5 h-5 md:w-6 md:h-6" />
                         </div>
                         
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-semibold text-gray-900">{payment.client}</h3>
-                            <Badge variant="outline" className={getPaymentStatusColor(payment)}>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2 mb-1">
+                            <h3 className="font-semibold text-sm md:text-base text-gray-900 truncate">{payment.client}</h3>
+                            <Badge variant="outline" className={`text-xs ${getPaymentStatusColor(payment)} flex-shrink-0`}>
                               {getPaymentStatusText(payment)}
                             </Badge>
                           </div>
-                          <p className="text-sm text-gray-600">Pedido: {payment.orderCode}</p>
-                          <p className="text-xs text-gray-500">
+                          <p className="text-xs md:text-sm text-gray-600 truncate">Pedido: {payment.orderCode}</p>
+                          <p className="text-xs text-gray-500 truncate">
                             Entrega: {payment.deliveryDate ? new Date(payment.deliveryDate).toLocaleDateString('pt-BR') : 'Não definida'}
                           </p>
                         </div>
                       </div>
 
-                      <div className="text-right">
+                      <div className="text-left md:text-right">
                         <div className="space-y-1">
-                          <div className="text-sm">
+                          <div className="text-xs md:text-sm">
                             <span className="text-gray-600">Total: </span>
                             <span className="font-semibold">{formatCurrency(payment.totalValue)}</span>
                           </div>
-                          <div className="text-sm">
+                          <div className="text-xs md:text-sm">
                             <span className="text-gray-600">Pago: </span>
                             <span className="font-semibold text-green-600">{formatCurrency(payment.paidAmount)}</span>
                           </div>
                           {!payment.isFullyPaid && (
-                            <div className="text-sm">
+                            <div className="text-xs md:text-sm">
                               <span className="text-gray-600">Restante: </span>
                               <span className={`font-semibold ${payment.isOverdue ? 'text-red-600' : 'text-orange-600'}`}>
                                 {formatCurrency(payment.remainingAmount)}
@@ -366,16 +366,16 @@ _${empresa?.nome || 'Ateliê'}_`;
                         </div>
                       </div>
 
-                      <div className="flex gap-2">
+                      <div className="flex flex-col sm:flex-row gap-2">
                         {/* Seletor de Status de Pagamento */}
-                        <div className="min-w-[120px]">
+                        <div className="w-full sm:min-w-[120px]">
                           <Select
                             value={payment.isFullyPaid ? 'pago' : (payment.paidAmount > 0 ? 'parcial' : 'pendente')}
                             onValueChange={(value: 'pago' | 'parcial' | 'pendente') => 
                               handlePaymentStatusChange(payment.orderCode, value)
                             }
                           >
-                            <SelectTrigger className="h-8 text-xs">
+                            <SelectTrigger className="h-8 text-xs w-full">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -394,7 +394,7 @@ _${empresa?.nome || 'Ateliê'}_`;
                             variant="outline"
                             size="sm"
                             onClick={() => sendPaymentReminder(payment)}
-                            className="text-green-600 border-green-200 hover:bg-green-50"
+                            className="text-green-600 border-green-200 hover:bg-green-50 flex-1 sm:flex-none text-xs"
                           >
                             <MessageCircle className="w-4 h-4 mr-1" />
                             Cobrar
@@ -404,6 +404,7 @@ _${empresa?.nome || 'Ateliê'}_`;
                           variant="outline"
                           size="sm"
                           onClick={() => window.open(`/pedidos/${payment.orderCode}`, '_blank')}
+                          className="flex-1 sm:flex-none text-xs"
                         >
                           Ver Pedido
                         </Button>

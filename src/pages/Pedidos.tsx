@@ -262,34 +262,37 @@ export default function Pedidos() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="flex items-center justify-between p-4">
-          <div className="flex items-center gap-4">
-            <SidebarTrigger />
-            <div>
-              <h1 className="text-2xl font-semibold text-foreground">Gestão de Pedidos</h1>
-              <p className="text-sm text-muted-foreground">Gerencie todos os pedidos do ateliê</p>
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 p-4 md:p-6">
+          <div className="flex items-center gap-2 md:gap-4 flex-1 min-w-0">
+            <SidebarTrigger className="flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <h1 className="text-lg md:text-2xl font-semibold text-foreground truncate">Gestão de Pedidos</h1>
+              <p className="text-xs md:text-sm text-muted-foreground truncate">Gerencie todos os pedidos do ateliê</p>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 w-full md:w-auto">
             <Button 
               variant="outline" 
+              size="sm"
               onClick={() => generateProductionOrderPDF(orders)}
-              className="border-blue-200 text-blue-600 hover:bg-blue-50"
+              className="flex-1 md:flex-none border-blue-200 text-blue-600 hover:bg-blue-50 text-xs md:text-sm"
             >
-              <FileText className="w-4 h-4 mr-2" />
-              Lista de Pedidos em Aberto
+              <FileText className="w-4 h-4 mr-1 md:mr-2" />
+              <span className="hidden md:inline">Lista de Pedidos em Aberto</span>
+              <span className="md:hidden">Lista PDF</span>
             </Button>
-            <Link to="/pedidos/novo">
-              <Button className="bg-primary hover:bg-primary/90">
-                <Plus className="w-4 h-4 mr-2" />
-                Novo Pedido
+            <Link to="/pedidos/novo" className="flex-1 md:flex-none">
+              <Button size="sm" className="w-full bg-primary hover:bg-primary/90 text-xs md:text-sm">
+                <Plus className="w-4 h-4 mr-1 md:mr-2" />
+                <span className="hidden md:inline">Novo Pedido</span>
+                <span className="md:hidden">Novo</span>
               </Button>
             </Link>
           </div>
         </div>
       </header>
 
-      <div className="p-6 space-y-6">
+      <div className="p-4 md:p-6 space-y-4 md:space-y-6">
         {/* Filters */}
         <Card className="border-border">
           <CardContent className="p-4">

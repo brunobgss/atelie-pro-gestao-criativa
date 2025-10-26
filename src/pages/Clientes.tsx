@@ -326,19 +326,20 @@ export default function Clientes() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="flex items-center justify-between p-4">
-          <div className="flex items-center gap-4">
-            <SidebarTrigger />
-            <div>
-              <h1 className="text-2xl font-semibold text-foreground">Clientes</h1>
-              <p className="text-sm text-muted-foreground">Gerencie seus clientes</p>
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 p-4 md:p-6">
+          <div className="flex items-center gap-2 md:gap-4 flex-1 min-w-0">
+            <SidebarTrigger className="flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <h1 className="text-lg md:text-2xl font-semibold text-foreground truncate">Clientes</h1>
+              <p className="text-xs md:text-sm text-muted-foreground truncate">Gerencie seus clientes</p>
             </div>
           </div>
           <Dialog>
             <DialogTrigger asChild>
-              <Button className="bg-primary hover:bg-primary/90">
-                <Plus className="w-4 h-4 mr-2" />
-                Novo Cliente
+              <Button size="sm" className="w-full md:w-auto bg-primary hover:bg-primary/90 text-xs md:text-sm">
+                <Plus className="w-4 h-4 mr-1 md:mr-2" />
+                <span className="hidden md:inline">Novo Cliente</span>
+                <span className="md:hidden">Novo</span>
               </Button>
             </DialogTrigger>
             <DialogContent>
@@ -425,7 +426,7 @@ export default function Clientes() {
         </div>
       </header>
 
-      <div className="p-6 space-y-6">
+      <div className="p-4 md:p-6 space-y-4 md:space-y-6">
         {/* Search */}
         <Card className="border-border">
           <CardContent className="p-4">
@@ -548,7 +549,7 @@ export default function Clientes() {
                     )}
                     
                     {/* Links para ver histórico */}
-                    <div className="flex gap-2 pt-2">
+                    <div className="flex flex-col sm:flex-row gap-2 pt-2">
                       {client.orders > 0 && (
                         <Button
                           variant="outline"
@@ -557,7 +558,7 @@ export default function Clientes() {
                             e.stopPropagation();
                             navigate('/pedidos');
                           }}
-                          className="h-7 text-xs"
+                          className="h-8 text-xs flex-1"
                         >
                           <ShoppingCart className="w-3 h-3 mr-1" />
                           Ver Pedidos
@@ -572,7 +573,7 @@ export default function Clientes() {
                             e.stopPropagation();
                             navigate('/orcamentos');
                           }}
-                          className="h-7 text-xs"
+                          className="h-8 text-xs flex-1"
                         >
                           <FileText className="w-3 h-3 mr-1" />
                           Ver Orçamentos

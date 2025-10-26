@@ -303,23 +303,24 @@ _Orçamento gerado pelo Ateliê Pro_
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100">
       {/* Header */}
       <div className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 sticky top-0 z-10 shadow-sm">
-        <div className="p-6 flex justify-between items-center">
-          <div className="flex items-center gap-4">
-            <SidebarTrigger className="text-gray-700 hover:bg-gray-100" />
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                <Package className="w-6 h-6 text-purple-600" />
-                Catálogo de Produtos
+        <div className="p-4 md:p-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+          <div className="flex items-center gap-2 md:gap-4 flex-1 min-w-0">
+            <SidebarTrigger className="text-gray-700 hover:bg-gray-100 flex-shrink-0" />
+            <div className="flex-1 min-w-0">
+              <h1 className="text-lg md:text-2xl font-bold text-gray-900 flex items-center gap-2">
+                <Package className="w-5 h-5 md:w-6 md:h-6 text-purple-600 flex-shrink-0" />
+                <span className="truncate">Catálogo de Produtos</span>
               </h1>
-              <p className="text-gray-600 text-sm mt-0.5">Modelos prontos para reutilização</p>
+              <p className="text-gray-600 text-xs md:text-sm mt-0.5 truncate">Modelos prontos para reutilização</p>
             </div>
           </div>
           
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-gray-900 text-white hover:bg-gray-800 shadow-lg">
-                <Plus className="w-4 h-4 mr-2" />
-                Novo Produto
+              <Button size="sm" className="w-full md:w-auto bg-gray-900 text-white hover:bg-gray-800 shadow-lg text-xs md:text-sm">
+                <Plus className="w-4 h-4 mr-1 md:mr-2" />
+                <span className="hidden md:inline">Novo Produto</span>
+                <span className="md:hidden">Novo</span>
               </Button>
             </DialogTrigger>
             <DialogContent className="max-w-2xl">
@@ -458,7 +459,7 @@ _Orçamento gerado pelo Ateliê Pro_
         </div>
       </div>
 
-      <div className="p-8">
+      <div className="p-4 md:p-8">
         {/* Filtros */}
         <Card className="bg-white border border-gray-200/50 shadow-sm mb-6">
           <CardContent className="p-6">
