@@ -496,24 +496,31 @@ _${empresa?.nome || 'Atelie'} - Qualidade e criatividade em cada peca_`;
 
         {/* Centro de Alertas Inteligentes */}
         <FadeIn>
-          <Card className="bg-white/95 backdrop-blur border-0 shadow-lg">
-          <CardHeader className="border-b border-border/50 px-6 pt-6">
+          <Card className="bg-gradient-to-br from-white via-purple-50/20 to-white border border-purple-200/50 shadow-xl">
+          <CardHeader className="border-b border-purple-100 px-6 pt-6 pb-5">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-xl flex items-center gap-2">
-                <Bell className="w-6 h-6 text-purple-600" />
-                Centro de Alertas Inteligentes
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center shadow-md">
+                  <Bell className="w-7 h-7 text-purple-700" />
+                </div>
+                <div>
+                  <CardTitle className="text-2xl font-bold text-gray-900 flex items-center gap-3">
+                    Centro de Alertas Inteligentes
+                  </CardTitle>
+                  <p className="text-sm text-gray-600 mt-0.5">Acompanhe o status do seu negócio</p>
+                </div>
                 {intelligentAlerts.length > 0 && (
-                  <Badge variant="destructive" className="ml-2">
+                  <Badge variant="destructive" className="ml-2 text-xs font-bold px-3 py-1">
                     {intelligentAlerts.length}
                   </Badge>
                 )}
-              </CardTitle>
+              </div>
               <div className="flex gap-2">
                 <Button 
                   size="sm" 
                   variant="outline"
                   onClick={() => navigate("/agenda")}
-                  className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                  className="text-blue-700 border-blue-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 hover:border-blue-400 font-semibold"
                 >
                   <Calendar className="w-4 h-4 mr-1" />
                   Ver Agenda
@@ -522,7 +529,7 @@ _${empresa?.nome || 'Atelie'} - Qualidade e criatividade em cada peca_`;
                   size="sm" 
                   variant="outline"
                   onClick={() => navigate("/financeiro")}
-                  className="text-green-600 border-green-200 hover:bg-green-50"
+                  className="text-green-700 border-green-300 hover:bg-gradient-to-r hover:from-green-50 hover:to-green-100 hover:border-green-400 font-semibold"
                 >
                   <DollarSign className="w-4 h-4 mr-1" />
                   Ver Financeiro
@@ -532,54 +539,65 @@ _${empresa?.nome || 'Atelie'} - Qualidade e criatividade em cada peca_`;
           </CardHeader>
           <CardContent className="p-6">
             {intelligentAlerts.length === 0 ? (
-              <div className="text-center py-8">
-                <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Tudo em ordem! 🎉</h3>
-                <p className="text-gray-600">Nenhum alerta crítico no momento</p>
+              <div className="text-center py-12">
+                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center mx-auto mb-5 shadow-lg">
+                  <CheckCircle className="w-12 h-12 text-green-700" />
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-3">Tudo em ordem! 🎉</h3>
+                <p className="text-gray-600 text-lg">Nenhum alerta crítico no momento</p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-5">
                 {intelligentAlerts.map((alert) => {
                   const IconComponent = alert.icon;
-                  const colorClasses = {
-                    red: "bg-red-50 border-red-200 text-red-800",
-                    orange: "bg-orange-50 border-orange-200 text-orange-800", 
-                    blue: "bg-blue-50 border-blue-200 text-blue-800",
-                    green: "bg-green-50 border-green-200 text-green-800"
-                  };
                   
                   return (
                     <div
                       key={alert.id}
-                      className={`p-4 rounded-lg border ${colorClasses[alert.color]} hover:shadow-md transition-all cursor-pointer`}
+                      className={`p-6 rounded-2xl border-2 hover:shadow-xl hover:scale-[1.02] transition-all duration-300 cursor-pointer ${
+                        alert.color === 'red' ? 'bg-gradient-to-br from-red-50 to-red-100/50 border-red-300 hover:border-red-400' :
+                        alert.color === 'orange' ? 'bg-gradient-to-br from-orange-50 to-orange-100/50 border-orange-300 hover:border-orange-400' :
+                        alert.color === 'blue' ? 'bg-gradient-to-br from-blue-50 to-blue-100/50 border-blue-300 hover:border-blue-400' :
+                        'bg-gradient-to-br from-green-50 to-green-100/50 border-green-300 hover:border-green-400'
+                      }`}
                       onClick={alert.action}
                     >
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                            alert.color === 'red' ? 'bg-red-100 text-red-600' :
-                            alert.color === 'orange' ? 'bg-orange-100 text-orange-600' :
-                            alert.color === 'blue' ? 'bg-blue-100 text-blue-600' :
-                            'bg-green-100 text-green-600'
+                        <div className="flex items-center gap-5">
+                          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shadow-md ${
+                            alert.color === 'red' ? 'bg-gradient-to-br from-red-100 to-red-200' :
+                            alert.color === 'orange' ? 'bg-gradient-to-br from-orange-100 to-orange-200' :
+                            alert.color === 'blue' ? 'bg-gradient-to-br from-blue-100 to-blue-200' :
+                            'bg-gradient-to-br from-green-100 to-green-200'
                           }`}>
-                            <IconComponent className="w-6 h-6" />
+                            <IconComponent className={`w-8 h-8 ${
+                              alert.color === 'red' ? 'text-red-700' :
+                              alert.color === 'orange' ? 'text-orange-700' :
+                              alert.color === 'blue' ? 'text-blue-700' :
+                              'text-green-700'
+                            }`} />
                           </div>
                           
                           <div>
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-semibold">{alert.title}</h3>
+                            <div className="flex items-center gap-3 mb-1">
+                              <h3 className="font-bold text-lg text-gray-900">{alert.title}</h3>
                               <Badge 
                                 variant="outline" 
-                                className={
-                                  alert.priority === 'high' ? 'bg-red-100 text-red-700 border-red-300' :
-                                  alert.priority === 'medium' ? 'bg-orange-100 text-orange-700 border-orange-300' :
-                                  'bg-blue-100 text-blue-700 border-blue-300'
-                                }
+                                className={`font-bold text-xs ${
+                                  alert.priority === 'high' ? 'bg-red-100 text-red-800 border-red-400' :
+                                  alert.priority === 'medium' ? 'bg-orange-100 text-orange-800 border-orange-400' :
+                                  'bg-blue-100 text-blue-800 border-blue-400'
+                                }`}
                               >
                                 {alert.priority === 'high' ? 'Alta' : alert.priority === 'medium' ? 'Media' : 'Baixa'}
                               </Badge>
                             </div>
-                            <p className="text-sm opacity-80">{alert.message}</p>
+                            <p className={`text-sm font-medium ${
+                              alert.color === 'red' ? 'text-red-700' :
+                              alert.color === 'orange' ? 'text-orange-700' :
+                              alert.color === 'blue' ? 'text-blue-700' :
+                              'text-green-700'
+                            }`}>{alert.message}</p>
                           </div>
                         </div>
 
@@ -591,7 +609,7 @@ _${empresa?.nome || 'Atelie'} - Qualidade e criatividade em cada peca_`;
                               e.stopPropagation();
                               alert.action();
                             }}
-                            className="text-green-600 border-green-200 hover:bg-green-50"
+                            className="text-green-700 border-green-400 hover:bg-gradient-to-r hover:from-green-100 hover:to-green-50 hover:border-green-500 font-semibold shadow-sm hover:shadow-md transition-all"
                           >
                             <MessageCircle className="w-4 h-4 mr-1" />
                             WhatsApp
