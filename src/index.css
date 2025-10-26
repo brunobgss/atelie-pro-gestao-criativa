@@ -39,7 +39,14 @@ All colors MUST be HSL.
     --input: 300 20% 90%;
     --ring: 300 100% 25%;
 
-    --radius: 0.5rem;
+    --radius: 1rem; /* Mais arredondado (16px) */
+    
+    /* Border radius customizados para diferentes elementos */
+    --radius-sm: 0.5rem;      /* Botões pequenos (8px) */
+    --radius-md: 1rem;       /* Cards e inputs (16px) */
+    --radius-lg: 1.5rem;     /* Cards grandes (24px) */
+    --radius-xl: 2rem;       /* Containers maiores (32px) */
+    --radius-full: 9999px;   /* Círculos completos */
 
     /* Sidebar elegante e profissional */
     --sidebar-background: 0 0% 100%; /* Branco Limpo */
@@ -155,6 +162,37 @@ All colors MUST be HSL.
   
   .bg-gradient-purple {
     @apply bg-gradient-to-r from-purple-600 via-purple-500 to-pink-500;
+  }
+  
+  /* Border radius modernos e suaves */
+  .rounded-modern {
+    border-radius: var(--radius-md); /* 16px */
+  }
+  
+  .rounded-modern-lg {
+    border-radius: var(--radius-lg); /* 24px */
+  }
+  
+  .rounded-modern-xl {
+    border-radius: var(--radius-xl); /* 32px */
+  }
+  
+  /* Espaçamentos maiores */
+  .gap-modern {
+    gap: 1.5rem; /* 24px */
+  }
+  
+  .gap-modern-lg {
+    gap: 2rem; /* 32px */
+  }
+  
+  /* Padding mais generoso */
+  .p-modern {
+    padding: 1.5rem;
+  }
+  
+  .p-modern-lg {
+    padding: 2rem;
   }
 }
 
