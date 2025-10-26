@@ -73,7 +73,7 @@ export default function Dashboard() {
       if (!order.delivery_date) return false;
       const deliveryDate = new Date(order.delivery_date);
       const today = new Date();
-      return today > deliveryDate && order.status !== "Entregue";
+      return today > deliveryDate && order.status !== "Entregue" && order.status !== "Cancelado"; // Excluir pedidos cancelados
     });
 
     overdueOrders.forEach(order => {
@@ -107,7 +107,7 @@ _${empresa?.nome || 'Atelie'}_`;
     const pendingPayments = orders.filter(order => {
       const totalValue = Number(order.value || 0);
       const paidAmount = Number(order.paid || 0);
-      return totalValue > paidAmount;
+      return totalValue > paidAmount && order.status !== "Cancelado"; // Excluir pedidos cancelados
     });
 
     pendingPayments.slice(0, 3).forEach(order => {
@@ -200,7 +200,7 @@ _${empresa?.nome || 'Atelie'}_`;
       const today = new Date();
       const diffTime = deliveryDate.getTime() - today.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      return diffDays <= 3 && diffDays >= 0 && order.status !== "Entregue";
+      return diffDays <= 3 && diffDays >= 0 && order.status !== "Entregue" && order.status !== "Cancelado"; // Excluir pedidos cancelados
     });
 
     urgentOrders.slice(0, 2).forEach(order => {
@@ -307,7 +307,7 @@ _${empresa?.nome || 'Atelie'}_`;
           </div>
         </div>
 
-      <div className="p-4 md:p-8 space-y-4 md:space-y-6">
+      <div className="p-4 md:p-8 space-y-6 md:space-y-8">
         {/* Banner de Trial */}
         <TrialBannerSmall />
         
@@ -325,92 +325,92 @@ _${empresa?.nome || 'Atelie'}_`;
             </>
           ) : (
             <>
-              <Card className="bg-white border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-200 animate-scale-in">
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <Card className="bg-gradient-to-br from-white to-gray-50 border border-gray-200/50 shadow-md hover:shadow-xl transition-all duration-300 animate-scale-in">
+                <CardHeader className="flex flex-row items-center justify-between pb-3 px-6 pt-6">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
                     Pedidos em Andamento
                   </CardTitle>
-                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <Package className="h-5 w-5 text-primary" />
+                  <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center shadow-sm">
+                    <Package className="h-7 w-7 text-primary" />
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-4xl font-bold text-foreground">{orders.length}</div>
-                  <div className="flex items-center gap-1 mt-2">
-                    <TrendingUp className="w-3 h-3 text-secondary" />
-                    <p className="text-xs text-secondary font-medium">
-                      {orders.filter(o => o.status === "Em produção").length} em produção
+                <CardContent className="px-6">
+                  <div className="text-5xl font-bold text-foreground mb-3">{orders.length}</div>
+                  <div className="flex items-center gap-2 mt-3">
+                    <TrendingUp className="w-4 h-4 text-secondary" />
+                    <p className="text-sm text-secondary font-medium">
+                      {orders.filter(o => o.status === "Em produção" && o.status !== "Cancelado").length} em produção
                     </p>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-200 animate-scale-in">
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <Card className="bg-gradient-to-br from-white to-gray-50 border border-gray-200/50 shadow-md hover:shadow-xl transition-all duration-300 animate-scale-in">
+                <CardHeader className="flex flex-row items-center justify-between pb-3 px-6 pt-6">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
                     Em Producao
                   </CardTitle>
-                  <div className="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center">
-                    <Clock className="h-5 w-5 text-secondary" />
+                  <div className="w-14 h-14 rounded-2xl bg-secondary/10 flex items-center justify-center shadow-sm">
+                    <Clock className="h-7 w-7 text-secondary" />
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-4xl font-bold text-foreground">
-                    {orders.filter(o => o.status === "Em produção").length}
+                <CardContent className="px-6">
+                  <div className="text-5xl font-bold text-foreground mb-3">
+                    {orders.filter(o => o.status === "Em produção" && o.status !== "Cancelado").length}
                   </div>
-                  <div className="flex items-center gap-1 mt-2">
-                    <p className="text-xs text-muted-foreground">
+                  <div className="flex items-center gap-2 mt-3">
+                    <p className="text-sm text-muted-foreground">
                       {orders.filter(o => {
                         if (!o.delivery_date) return false;
                         const deliveryDate = new Date(o.delivery_date);
                         const today = new Date();
                         const diffTime = deliveryDate.getTime() - today.getTime();
                         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                        return diffDays <= 3 && diffDays >= 0;
+                        return diffDays <= 3 && diffDays >= 0 && o.status !== "Cancelado"; // Excluir pedidos cancelados
                       }).length} com prazo proximo
                     </p>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-200 animate-scale-in">
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <Card className="bg-gradient-to-br from-white to-gray-50 border border-gray-200/50 shadow-md hover:shadow-xl transition-all duration-300 animate-scale-in">
+                <CardHeader className="flex flex-row items-center justify-between pb-3 px-6 pt-6">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
                     Concluidos Hoje
                   </CardTitle>
-                  <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center">
-                    <CheckCircle className="h-5 w-5 text-accent" />
+                  <div className="w-14 h-14 rounded-2xl bg-accent/10 flex items-center justify-center shadow-sm">
+                    <CheckCircle className="h-7 w-7 text-accent" />
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-4xl font-bold text-foreground">
-                    {orders.filter(o => o.status === "Pronto").length}
+                <CardContent className="px-6">
+                  <div className="text-5xl font-bold text-foreground mb-3">
+                    {orders.filter(o => o.status === "Pronto" && o.status !== "Cancelado").length}
                   </div>
-                  <div className="flex items-center gap-1 mt-2">
-                    <p className="text-xs text-muted-foreground">
-                      {orders.filter(o => o.status === "Aguardando retirada").length} aguardando retirada
+                  <div className="flex items-center gap-2 mt-3">
+                    <p className="text-sm text-muted-foreground">
+                      {orders.filter(o => o.status === "Aguardando retirada" && o.status !== "Cancelado").length} aguardando retirada
                     </p>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-200 animate-scale-in">
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <Card className="bg-gradient-to-br from-purple-50 to-white border border-purple-200/50 shadow-md hover:shadow-xl transition-all duration-300 animate-scale-in">
+                <CardHeader className="flex flex-row items-center justify-between pb-3 px-6 pt-6">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
                     Receita do Mes
                   </CardTitle>
-                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                    <TrendingUp className="h-5 w-5 text-primary" />
+                  <div className="w-14 h-14 rounded-2xl bg-purple-100 flex items-center justify-center shadow-sm">
+                    <TrendingUp className="h-7 w-7 text-purple-600" />
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-4xl font-bold text-foreground">
-                    {formatCurrency(orders.reduce((sum, order) => sum + (Number(order.value) || 0), 0))}
+                <CardContent className="px-6">
+                  <div className="text-5xl font-bold text-purple-700 mb-3">
+                    {formatCurrency(orders.filter(o => o.status !== "Cancelado").reduce((sum, order) => sum + (Number(order.value) || 0), 0))}
                   </div>
-                  <div className="flex items-center gap-1 mt-2">
-                    <TrendingUp className="w-3 h-3 text-secondary" />
-                    <p className="text-xs text-secondary font-medium">
-                      {formatCurrency(orders.reduce((sum, order) => sum + (Number(order.paid) || 0), 0))} recebido
+                  <div className="flex items-center gap-2 mt-3">
+                    <TrendingUp className="w-4 h-4 text-secondary" />
+                    <p className="text-sm text-secondary font-medium">
+                      {formatCurrency(orders.filter(o => o.status !== "Cancelado").reduce((sum, order) => sum + (Number(order.paid) || 0), 0))} recebido
                     </p>
                   </div>
                 </CardContent>
@@ -421,31 +421,31 @@ _${empresa?.nome || 'Atelie'}_`;
 
         {/* Acoes Rapidass */}
         <FadeIn>
-          <Card className="bg-white border border-gray-200/50 shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MessageCircle className="w-5 h-5 text-purple-600" />
+          <Card className="bg-white border border-gray-200/50 shadow-md">
+            <CardHeader className="px-6 pt-6">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <MessageCircle className="w-6 h-6 text-purple-600" />
                 Ações Rápidas
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <MobileGrid cols={2} className="gap-4">
+            <CardContent className="px-6 pb-6">
+              <MobileGrid cols={2} className="gap-5">
                 <MobileCard 
                   onClick={() => navigate("/calculadora")}
                   interactive
-                  className="h-20 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:from-blue-100 hover:to-blue-200 animate-fade-in-up"
+                  className="h-24 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:from-blue-100 hover:to-blue-200 hover:shadow-lg rounded-2xl transition-all animate-fade-in-up"
                 >
-                  <Calculator className="w-6 h-6 text-blue-600" />
-                  <span className="text-blue-700 font-medium text-sm text-center">Calculadora de Preços</span>
+                  <Calculator className="w-7 h-7 text-blue-600" />
+                  <span className="text-blue-700 font-semibold text-sm text-center">Calculadora de Preços</span>
                 </MobileCard>
                 
                 <MobileCard 
                   onClick={() => navigate("/catalogo")}
                   interactive
-                  className="h-20 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-green-50 to-green-100 border-green-200 hover:from-green-100 hover:to-green-200 animate-fade-in-up"
+                  className="h-24 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-green-50 to-green-100 border-green-200 hover:from-green-100 hover:to-green-200 hover:shadow-lg rounded-2xl transition-all animate-fade-in-up"
                 >
-                  <BookOpen className="w-6 h-6 text-green-600" />
-                  <span className="text-green-700 font-medium text-sm text-center">Catálogo de Produtos</span>
+                  <BookOpen className="w-7 h-7 text-green-600" />
+                  <span className="text-green-700 font-semibold text-sm text-center">Catálogo de Produtos</span>
                 </MobileCard>
                 
                 <MobileCard 
@@ -467,19 +467,19 @@ _${empresa?.nome || 'Atelie'} - Qualidade e criatividade em cada peca_`;
                     window.open(whatsappUrl, '_blank');
                   }}
                   interactive
-                  className="h-20 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-green-50 to-green-100 border-green-200 hover:from-green-100 hover:to-green-200 animate-fade-in-up"
+                  className="h-24 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-green-50 to-green-100 border-green-200 hover:from-green-100 hover:to-green-200 hover:shadow-lg rounded-2xl transition-all animate-fade-in-up"
                 >
-                  <MessageCircle className="w-6 h-6 text-green-600" />
-                  <span className="text-green-700 font-medium text-sm text-center">Template WhatsApp</span>
+                  <MessageCircle className="w-7 h-7 text-green-600" />
+                  <span className="text-green-700 font-semibold text-sm text-center">Template WhatsApp</span>
                 </MobileCard>
                 
                 <MobileCard 
                   onClick={() => navigate("/relatorios")}
                   interactive
-                  className="h-20 flex flex-col items-center justify-center gap-2 bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 hover:from-purple-100 hover:to-purple-200 animate-fade-in-up"
+                  className="h-24 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 hover:from-purple-100 hover:to-purple-200 hover:shadow-lg rounded-2xl transition-all animate-fade-in-up"
                 >
-                  <TrendingUp className="w-6 h-6 text-purple-600" />
-                  <span className="text-purple-700 font-medium text-sm text-center">Relatórios</span>
+                  <TrendingUp className="w-7 h-7 text-purple-600" />
+                  <span className="text-purple-700 font-semibold text-sm text-center">Relatórios</span>
                 </MobileCard>
               </MobileGrid>
           </CardContent>
@@ -489,10 +489,10 @@ _${empresa?.nome || 'Atelie'} - Qualidade e criatividade em cada peca_`;
         {/* Centro de Alertas Inteligentes */}
         <FadeIn>
           <Card className="bg-white/95 backdrop-blur border-0 shadow-lg">
-          <CardHeader className="border-b border-border/50">
+          <CardHeader className="border-b border-border/50 px-6 pt-6">
             <div className="flex items-center justify-between">
               <CardTitle className="text-xl flex items-center gap-2">
-                <Bell className="w-5 h-5 text-purple-600" />
+                <Bell className="w-6 h-6 text-purple-600" />
                 Centro de Alertas Inteligentes
                 {intelligentAlerts.length > 0 && (
                   <Badge variant="destructive" className="ml-2">
