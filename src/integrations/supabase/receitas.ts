@@ -270,24 +270,30 @@ export async function updatePaymentStatus(
       }
     } else {
       // Criar nova receita com todos os campos obrigatórios
+      const receitaData = {
+        order_code: orderCode,
+        customer_name: order.customer_name || "Sem nome",
+        description: `Pagamento do pedido ${orderCode}`, // Campo obrigatório
+        amount: newPaidValue,
+        payment_method: "Dinheiro", // Método padrão
+        payment_date: new Date().toISOString().split('T')[0], // Data de hoje
+        status: newPaidValue > 0 ? "Pago" : "Pendente",
+        empresa_id: order.empresa_id,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      
+      console.log("Tentando criar receita com dados:", receitaData);
+      
       const { error: createReceitaError } = await supabase
         .from("atelie_receitas")
-        .insert({
-          order_code: orderCode,
-          customer_name: order.customer_name || "Sem nome",
-          description: `Pagamento do pedido ${orderCode}`, // Campo obrigatório
-          amount: newPaidValue,
-          payment_method: "Dinheiro", // Método padrão
-          payment_date: new Date().toISOString().split('T')[0], // Data de hoje
-          status: newPaidValue > 0 ? "Pago" : "Pendente",
-          empresa_id: order.empresa_id,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        });
+        .insert(receitaData);
 
       if (createReceitaError) {
-        console.error("Erro ao criar receita:", createReceitaError);
+        console.error("Erro detalhado ao criar receita:", JSON.stringify(createReceitaError, null, 2));
         // Não falhar aqui, apenas logar
+      } else {
+        console.log("Receita criada com sucesso!");
       }
     }
     
