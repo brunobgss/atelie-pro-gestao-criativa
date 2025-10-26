@@ -497,47 +497,49 @@ _${empresa?.nome || 'Atelie'} - Qualidade e criatividade em cada peca_`;
         {/* Centro de Alertas Inteligentes */}
         <FadeIn>
           <Card className="bg-gradient-to-br from-white via-purple-50/20 to-white border border-purple-200/50 shadow-xl">
-          <CardHeader className="border-b border-purple-100 px-6 pt-6 pb-5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center shadow-md">
-                  <Bell className="w-7 h-7 text-purple-700" />
+          <CardHeader className="border-b border-purple-100 px-4 md:px-6 pt-4 md:pt-6 pb-4 md:pb-5">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-0">
+              <div className="flex items-center gap-2 md:gap-3 flex-wrap">
+                <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center shadow-md flex-shrink-0">
+                  <Bell className="w-6 h-6 md:w-7 md:h-7 text-purple-700" />
                 </div>
-                <div>
-                  <CardTitle className="text-2xl font-bold text-gray-900 flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <CardTitle className="text-lg md:text-2xl font-bold text-gray-900">
                     Centro de Alertas Inteligentes
                   </CardTitle>
-                  <p className="text-sm text-gray-600 mt-0.5">Acompanhe o status do seu negócio</p>
+                  <p className="text-xs md:text-sm text-gray-600 mt-0.5">Acompanhe o status do seu negócio</p>
                 </div>
                 {intelligentAlerts.length > 0 && (
-                  <Badge variant="destructive" className="ml-2 text-xs font-bold px-3 py-1">
+                  <Badge variant="destructive" className="text-xs font-bold px-2 md:px-3 py-1 flex-shrink-0">
                     {intelligentAlerts.length}
                   </Badge>
                 )}
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 justify-end">
                 <Button 
                   size="sm" 
                   variant="outline"
                   onClick={() => navigate("/agenda")}
-                  className="text-blue-700 border-blue-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 hover:border-blue-400 font-semibold"
+                  className="text-xs md:text-sm text-blue-700 border-blue-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-blue-100 hover:border-blue-400 font-semibold flex-1 md:flex-none"
                 >
                   <Calendar className="w-4 h-4 mr-1" />
-                  Ver Agenda
+                  <span className="hidden md:inline">Ver Agenda</span>
+                  <span className="md:hidden">Agenda</span>
                 </Button>
                 <Button 
                   size="sm" 
                   variant="outline"
                   onClick={() => navigate("/financeiro")}
-                  className="text-green-700 border-green-300 hover:bg-gradient-to-r hover:from-green-50 hover:to-green-100 hover:border-green-400 font-semibold"
+                  className="text-xs md:text-sm text-green-700 border-green-300 hover:bg-gradient-to-r hover:from-green-50 hover:to-green-100 hover:border-green-400 font-semibold flex-1 md:flex-none"
                 >
                   <DollarSign className="w-4 h-4 mr-1" />
-                  Ver Financeiro
+                  <span className="hidden md:inline">Ver Financeiro</span>
+                  <span className="md:hidden">Financeiro</span>
               </Button>
               </div>
             </div>
           </CardHeader>
-          <CardContent className="p-6">
+          <CardContent className="p-4 md:p-6">
             {intelligentAlerts.length === 0 ? (
               <div className="text-center py-12">
                 <div className="w-20 h-20 rounded-full bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center mx-auto mb-5 shadow-lg">
@@ -554,7 +556,7 @@ _${empresa?.nome || 'Atelie'} - Qualidade e criatividade em cada peca_`;
                   return (
                     <div
                       key={alert.id}
-                      className={`p-6 rounded-2xl border-2 hover:shadow-xl hover:scale-[1.02] transition-all duration-300 cursor-pointer ${
+                      className={`p-4 md:p-6 rounded-2xl border-2 hover:shadow-xl hover:scale-[1.02] transition-all duration-300 cursor-pointer ${
                         alert.color === 'red' ? 'bg-gradient-to-br from-red-50 to-red-100/50 border-red-300 hover:border-red-400' :
                         alert.color === 'orange' ? 'bg-gradient-to-br from-orange-50 to-orange-100/50 border-orange-300 hover:border-orange-400' :
                         alert.color === 'blue' ? 'bg-gradient-to-br from-blue-50 to-blue-100/50 border-blue-300 hover:border-blue-400' :
@@ -562,15 +564,15 @@ _${empresa?.nome || 'Atelie'} - Qualidade e criatividade em cada peca_`;
                       }`}
                       onClick={alert.action}
                     >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-5">
-                          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shadow-md ${
+                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                        <div className="flex items-center gap-3 md:gap-5">
+                          <div className={`w-12 h-12 md:w-16 md:h-16 rounded-2xl flex items-center justify-center shadow-md flex-shrink-0 ${
                             alert.color === 'red' ? 'bg-gradient-to-br from-red-100 to-red-200' :
                             alert.color === 'orange' ? 'bg-gradient-to-br from-orange-100 to-orange-200' :
                             alert.color === 'blue' ? 'bg-gradient-to-br from-blue-100 to-blue-200' :
                             'bg-gradient-to-br from-green-100 to-green-200'
                           }`}>
-                            <IconComponent className={`w-8 h-8 ${
+                            <IconComponent className={`w-6 h-6 md:w-8 md:h-8 ${
                               alert.color === 'red' ? 'text-red-700' :
                               alert.color === 'orange' ? 'text-orange-700' :
                               alert.color === 'blue' ? 'text-blue-700' :
@@ -578,12 +580,12 @@ _${empresa?.nome || 'Atelie'} - Qualidade e criatividade em cada peca_`;
                             }`} />
                           </div>
                           
-                          <div>
-                            <div className="flex items-center gap-3 mb-1">
-                              <h3 className="font-bold text-lg text-gray-900">{alert.title}</h3>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 mb-1">
+                              <h3 className="font-bold text-base md:text-lg text-gray-900">{alert.title}</h3>
                               <Badge 
                                 variant="outline" 
-                                className={`font-bold text-xs ${
+                                className={`font-bold text-xs flex-shrink-0 ${
                                   alert.priority === 'high' ? 'bg-red-100 text-red-800 border-red-400' :
                                   alert.priority === 'medium' ? 'bg-orange-100 text-orange-800 border-orange-400' :
                                   'bg-blue-100 text-blue-800 border-blue-400'
@@ -592,7 +594,7 @@ _${empresa?.nome || 'Atelie'} - Qualidade e criatividade em cada peca_`;
                                 {alert.priority === 'high' ? 'Alta' : alert.priority === 'medium' ? 'Media' : 'Baixa'}
                               </Badge>
                             </div>
-                            <p className={`text-sm font-medium ${
+                            <p className={`text-sm font-medium truncate md:truncate-none ${
                               alert.color === 'red' ? 'text-red-700' :
                               alert.color === 'orange' ? 'text-orange-700' :
                               alert.color === 'blue' ? 'text-blue-700' :
@@ -601,7 +603,7 @@ _${empresa?.nome || 'Atelie'} - Qualidade e criatividade em cada peca_`;
                           </div>
                         </div>
 
-                        <div className="flex gap-2">
+                        <div className="flex justify-end md:block">
                           <Button
                             variant="outline"
                             size="sm"
@@ -609,7 +611,7 @@ _${empresa?.nome || 'Atelie'} - Qualidade e criatividade em cada peca_`;
                               e.stopPropagation();
                               alert.action();
                             }}
-                            className="text-green-700 border-green-400 hover:bg-gradient-to-r hover:from-green-100 hover:to-green-50 hover:border-green-500 font-semibold shadow-sm hover:shadow-md transition-all"
+                            className="w-full md:w-auto text-green-700 border-green-400 hover:bg-gradient-to-r hover:from-green-100 hover:to-green-50 hover:border-green-500 font-semibold shadow-sm hover:shadow-md transition-all"
                           >
                             <MessageCircle className="w-4 h-4 mr-1" />
                             WhatsApp
