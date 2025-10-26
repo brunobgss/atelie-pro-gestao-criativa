@@ -262,22 +262,35 @@ export async function updateOrderStatus(
           .single();
 
         if (orderData) {
-          // Criar nova receita
-          const { error: createReceitaError } = await supabase
-            .from("atelie_receitas")
-            .insert({
-              order_code: code,
-              amount: paid,
-              empresa_id: orderData.empresa_id,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            });
+          // Buscar dados completos do pedido para criar receita
+          const { data: fullOrderData } = await supabase
+            .from("atelie_orders")
+            .select("customer_name")
+            .eq("code", code)
+            .single();
 
-          if (createReceitaError) {
-            console.error("Erro ao criar receita:", createReceitaError);
-            // Não falhar aqui, apenas logar
-          } else {
-            console.log("Receita criada com sucesso");
+          if (fullOrderData) {
+            // Criar nova receita com todos os campos obrigatórios
+            const { error: createReceitaError } = await supabase
+              .from("atelie_receitas")
+              .insert({
+                order_code: code,
+                customer_name: fullOrderData.customer_name || "Sem nome",
+                amount: paid,
+                payment_method: "Dinheiro", // Método padrão
+                payment_date: new Date().toISOString().split('T')[0], // Data de hoje
+                status: paid > 0 ? "Pago" : "Pendente",
+                empresa_id: orderData.empresa_id,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              });
+
+            if (createReceitaError) {
+              console.error("Erro ao criar receita:", createReceitaError);
+              // Não falhar aqui, apenas logar
+            } else {
+              console.log("Receita criada com sucesso");
+            }
           }
         }
       }
@@ -379,22 +392,35 @@ export async function updateOrder(
           .single();
 
         if (orderData) {
-          // Criar nova receita
-          const { error: createReceitaError } = await supabase
-            .from("atelie_receitas")
-            .insert({
-              order_code: orderCode,
-              amount: updates.paid,
-              empresa_id: orderData.empresa_id,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            });
+          // Buscar dados completos do pedido para criar receita
+          const { data: fullOrderData } = await supabase
+            .from("atelie_orders")
+            .select("customer_name")
+            .eq("code", orderCode)
+            .single();
 
-          if (createReceitaError) {
-            console.error("Erro ao criar receita:", createReceitaError);
-            // Não falhar aqui, apenas logar
-          } else {
-            console.log("Receita criada com sucesso");
+          if (fullOrderData) {
+            // Criar nova receita com todos os campos obrigatórios
+            const { error: createReceitaError } = await supabase
+              .from("atelie_receitas")
+              .insert({
+                order_code: orderCode,
+                customer_name: fullOrderData.customer_name || "Sem nome",
+                amount: updates.paid,
+                payment_method: "Dinheiro", // Método padrão
+                payment_date: new Date().toISOString().split('T')[0], // Data de hoje
+                status: updates.paid > 0 ? "Pago" : "Pendente",
+                empresa_id: orderData.empresa_id,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              });
+
+            if (createReceitaError) {
+              console.error("Erro ao criar receita:", createReceitaError);
+              // Não falhar aqui, apenas logar
+            } else {
+              console.log("Receita criada com sucesso");
+            }
           }
         }
       }
