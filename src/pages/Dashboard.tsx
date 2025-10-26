@@ -410,7 +410,7 @@ _${empresa?.nome || 'Atelie'}_`;
                   <div className="flex items-center gap-2 mt-2 md:mt-3">
                     <TrendingUp className="w-4 h-4 text-purple-600 flex-shrink-0" />
                     <p className="text-xs md:text-sm text-purple-700 font-semibold truncate">
-                      {formatCurrency(orders.filter(o => o.status !== "Cancelado").reduce((sum, order) => sum + (Number(order.paid) || 0), 0))} recebido
+                      {formatCurrency(receitas.reduce((sum, receita) => sum + (Number(receita.amount) || 0), 0))} recebido
                     </p>
                   </div>
                 </CardContent>
