@@ -222,10 +222,10 @@ export async function updatePaymentStatus(
   try {
     console.log(`Atualizando status de pagamento para ${orderCode}:`, status);
     
-    // Buscar o pedido para obter o valor total
+    // Buscar o pedido para obter o valor total e customer_name
     const { data: order, error: orderError } = await supabase
       .from("atelie_orders")
-      .select("id, value, paid, empresa_id")
+      .select("id, value, paid, empresa_id, customer_name")
       .eq("code", orderCode)
       .maybeSingle();
 
@@ -269,12 +269,16 @@ export async function updatePaymentStatus(
         return { ok: false, error: updateReceitaError.message };
       }
     } else {
-      // Criar nova receita
+      // Criar nova receita com todos os campos obrigatórios
       const { error: createReceitaError } = await supabase
         .from("atelie_receitas")
         .insert({
           order_code: orderCode,
+          customer_name: order.customer_name || "Sem nome",
           amount: newPaidValue,
+          payment_method: "Dinheiro", // Método padrão
+          payment_date: new Date().toISOString().split('T')[0], // Data de hoje
+          status: newPaidValue > 0 ? "Pago" : "Pendente",
           empresa_id: order.empresa_id,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
