@@ -326,19 +326,19 @@ _${empresa?.nome || 'Atelie'}_`;
           ) : (
             <>
               <Card className="bg-gradient-to-br from-white via-purple-50/30 to-white border border-purple-200/40 shadow-lg hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 animate-scale-in">
-                <CardHeader className="flex flex-row items-center justify-between pb-3 px-6 pt-6">
+                <CardHeader className="flex flex-row items-center justify-between pb-3 px-4 md:px-6 pt-4 md:pt-6">
                   <CardTitle className="text-sm font-medium text-gray-600">
                     Pedidos em Andamento
                   </CardTitle>
-                  <div className="w-14 h-14 rounded-3xl bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center shadow-md">
-                    <Package className="h-7 w-7 text-purple-700" />
+                  <div className="w-12 h-12 md:w-14 md:h-14 rounded-3xl bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center shadow-md flex-shrink-0">
+                    <Package className="h-6 w-6 md:h-7 md:w-7 text-purple-700" />
                   </div>
                 </CardHeader>
-                <CardContent className="px-6">
-                  <div className="text-5xl font-bold text-gray-900 mb-3">{orders.length}</div>
-                  <div className="flex items-center gap-2 mt-3">
-                    <TrendingUp className="w-4 h-4 text-purple-600" />
-                    <p className="text-sm text-gray-600 font-medium">
+                <CardContent className="px-4 md:px-6">
+                  <div className="text-3xl md:text-5xl font-bold text-gray-900 mb-2 md:mb-3">{orders.length}</div>
+                  <div className="flex items-center gap-2 mt-2 md:mt-3">
+                    <TrendingUp className="w-4 h-4 text-purple-600 flex-shrink-0" />
+                    <p className="text-xs md:text-sm text-gray-600 font-medium truncate">
                       {orders.filter(o => o.status === "Em produção" && o.status !== "Cancelado").length} em produção
                     </p>
                   </div>
@@ -346,20 +346,20 @@ _${empresa?.nome || 'Atelie'}_`;
               </Card>
 
               <Card className="bg-gradient-to-br from-white via-blue-50/30 to-white border border-blue-200/40 shadow-lg hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 animate-scale-in">
-                <CardHeader className="flex flex-row items-center justify-between pb-3 px-6 pt-6">
+                <CardHeader className="flex flex-row items-center justify-between pb-3 px-4 md:px-6 pt-4 md:pt-6">
                   <CardTitle className="text-sm font-medium text-gray-600">
                     Em Producao
                   </CardTitle>
-                  <div className="w-14 h-14 rounded-3xl bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center shadow-md">
-                    <Clock className="h-7 w-7 text-blue-700" />
+                  <div className="w-12 h-12 md:w-14 md:h-14 rounded-3xl bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center shadow-md flex-shrink-0">
+                    <Clock className="h-6 w-6 md:h-7 md:w-7 text-blue-700" />
                   </div>
                 </CardHeader>
-                <CardContent className="px-6">
-                  <div className="text-5xl font-bold text-gray-900 mb-3">
+                <CardContent className="px-4 md:px-6">
+                  <div className="text-3xl md:text-5xl font-bold text-gray-900 mb-2 md:mb-3">
                     {orders.filter(o => o.status === "Em produção" && o.status !== "Cancelado").length}
                   </div>
-                  <div className="flex items-center gap-2 mt-3">
-                    <p className="text-sm text-gray-600 font-medium">
+                  <div className="flex items-center gap-2 mt-2 md:mt-3">
+                    <p className="text-xs md:text-sm text-gray-600 font-medium truncate">
                       {orders.filter(o => {
                         if (!o.delivery_date) return false;
                         const deliveryDate = new Date(o.delivery_date);
@@ -374,20 +374,20 @@ _${empresa?.nome || 'Atelie'}_`;
               </Card>
 
               <Card className="bg-gradient-to-br from-white via-green-50/30 to-white border border-green-200/40 shadow-lg hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 animate-scale-in">
-                <CardHeader className="flex flex-row items-center justify-between pb-3 px-6 pt-6">
+                <CardHeader className="flex flex-row items-center justify-between pb-3 px-4 md:px-6 pt-4 md:pt-6">
                   <CardTitle className="text-sm font-medium text-gray-600">
                     Concluidos Hoje
                   </CardTitle>
-                  <div className="w-14 h-14 rounded-3xl bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center shadow-md">
-                    <CheckCircle className="h-7 w-7 text-green-700" />
+                  <div className="w-12 h-12 md:w-14 md:h-14 rounded-3xl bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center shadow-md flex-shrink-0">
+                    <CheckCircle className="h-6 w-6 md:h-7 md:w-7 text-green-700" />
                   </div>
                 </CardHeader>
-                <CardContent className="px-6">
-                  <div className="text-5xl font-bold text-gray-900 mb-3">
+                <CardContent className="px-4 md:px-6">
+                  <div className="text-3xl md:text-5xl font-bold text-gray-900 mb-2 md:mb-3">
                     {orders.filter(o => o.status === "Pronto" && o.status !== "Cancelado").length}
                   </div>
-                  <div className="flex items-center gap-2 mt-3">
-                    <p className="text-sm text-gray-600 font-medium">
+                  <div className="flex items-center gap-2 mt-2 md:mt-3">
+                    <p className="text-xs md:text-sm text-gray-600 font-medium truncate">
                       {orders.filter(o => o.status === "Aguardando retirada" && o.status !== "Cancelado").length} aguardando retirada
                     </p>
                   </div>
@@ -395,21 +395,21 @@ _${empresa?.nome || 'Atelie'}_`;
               </Card>
 
               <Card className="bg-gradient-to-br from-purple-100 via-pink-50 to-white border-2 border-purple-400 shadow-2xl hover:shadow-3xl hover:scale-[1.03] ring-2 ring-purple-200/30 hover:ring-purple-300/50 transition-all duration-300 animate-scale-in">
-                <CardHeader className="flex flex-row items-center justify-between pb-3 px-6 pt-6">
+                <CardHeader className="flex flex-row items-center justify-between pb-3 px-4 md:px-6 pt-4 md:pt-6">
                   <CardTitle className="text-sm font-medium text-purple-700">
                     Receita do Mes
                   </CardTitle>
-                  <div className="w-14 h-14 rounded-3xl bg-gradient-to-br from-purple-200 to-purple-300 flex items-center justify-center shadow-lg">
-                    <TrendingUp className="h-7 w-7 text-purple-800" />
+                  <div className="w-12 h-12 md:w-14 md:h-14 rounded-3xl bg-gradient-to-br from-purple-200 to-purple-300 flex items-center justify-center shadow-lg flex-shrink-0">
+                    <TrendingUp className="h-6 w-6 md:h-7 md:w-7 text-purple-800" />
                   </div>
                 </CardHeader>
-                <CardContent className="px-6">
-                  <div className="text-5xl font-bold text-purple-700 mb-3">
+                <CardContent className="px-4 md:px-6 pb-4 md:pb-6">
+                  <div className="text-3xl md:text-5xl font-bold text-purple-700 mb-2 md:mb-3 break-words">
                     {formatCurrency(orders.filter(o => o.status !== "Cancelado").reduce((sum, order) => sum + (Number(order.value) || 0), 0))}
                   </div>
-                  <div className="flex items-center gap-2 mt-3">
-                    <TrendingUp className="w-4 h-4 text-purple-600" />
-                    <p className="text-sm text-purple-700 font-semibold">
+                  <div className="flex items-center gap-2 mt-2 md:mt-3">
+                    <TrendingUp className="w-4 h-4 text-purple-600 flex-shrink-0" />
+                    <p className="text-xs md:text-sm text-purple-700 font-semibold truncate">
                       {formatCurrency(orders.filter(o => o.status !== "Cancelado").reduce((sum, order) => sum + (Number(order.paid) || 0), 0))} recebido
                     </p>
                   </div>
