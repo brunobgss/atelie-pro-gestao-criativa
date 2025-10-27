@@ -59,11 +59,9 @@ export default function ControleFinanceiro() {
       
       if (result.ok) {
         toast.success(`Status atualizado para: ${newStatus}`);
-        // Recarregar dados imediatamente
-        await queryClient.invalidateQueries({ queryKey: ["receitas"] });
-        await queryClient.invalidateQueries({ queryKey: ["orders"] });
-        await queryClient.refetchQueries({ queryKey: ["receitas"] });
-        await queryClient.refetchQueries({ queryKey: ["orders"] });
+        // Recarregar dados
+        queryClient.invalidateQueries({ queryKey: ["receitas"] });
+        queryClient.invalidateQueries({ queryKey: ["orders"] });
       } else {
         toast.error(result.error || "Erro ao atualizar status");
       }

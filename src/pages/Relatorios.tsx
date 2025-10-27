@@ -45,7 +45,7 @@ export default function Relatorios() {
     // Filtrar dados do período
     const filteredOrders = orders.filter(order => {
       const orderDate = new Date(order.created_at || order.delivery_date || '');
-      return orderDate >= startDate;
+      return orderDate >= startDate && order.status !== 'Cancelado'; // Excluir pedidos cancelados
     });
 
     const filteredQuotes = quotes.filter(quote => {

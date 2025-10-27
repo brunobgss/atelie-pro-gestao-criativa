@@ -16,8 +16,9 @@ export function useTrialProtection() {
       return;
     }
 
-    // Se não há data de fim do trial, aguardar mais tempo para carregamento
-    if (!empresa?.trial_end_date) {
+    // Se é premium mas não tem trial_end_date, ainda deve permitir acesso
+    // Não bloquear premium users por falta de trial_end_date
+    if (!empresa?.trial_end_date && !empresa?.is_premium) {
       console.log("⏳ Trial end date não encontrado - aguardando carregamento completo...");
       // Não definir como expirado imediatamente, aguardar carregamento
       return;

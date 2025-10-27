@@ -1,6 +1,5 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider } from "@/components/ui/sidebar";
@@ -40,6 +39,7 @@ import MedidasClientes from "./pages/MedidasClientes";
 import Ajuda from "./pages/Ajuda";
 import Documentacao from "./pages/Documentacao";
 import FAQ from "./pages/FAQ";
+import RelatorioUso from "./pages/RelatorioUso";
 
 // QueryClient fora do componente para evitar re-criação
 // Cache buster: 2024-12-19 - Corrigindo Dashboard not defined
@@ -47,7 +47,7 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 0, // Sempre buscar dados frescos
-      cacheTime: 2 * 60 * 1000, // Cache por 2 minutos
+      gcTime: 2 * 60 * 1000, // Cache por 2 minutos
       retry: 3, // Tentar 3 vezes em caso de erro
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Backoff exponencial
       refetchOnWindowFocus: false, // Não refetch ao focar na janela
@@ -97,6 +97,7 @@ function App() {
                     <Route path="ajuda" element={<Ajuda />} />
                     <Route path="documentacao" element={<Documentacao />} />
                     <Route path="faq" element={<FAQ />} />
+                    <Route path="admin/relatorio-uso" element={<RelatorioUso />} />
                   </Route>
                 </Routes>
               </BrowserRouter>
@@ -104,7 +105,6 @@ function App() {
           </InternationalizationProvider>
         </AuthProvider>
       </TooltipProvider>
-      <Toaster />
       <Sonner />
     </QueryClientProvider>
   );
