@@ -1,4 +1,6 @@
 // api/webhooks/asaas.js - Webhook ASAAS
+import { createClient } from '@supabase/supabase-js';
+
 export async function POST(req) {
   console.log('🔔 Webhook ASAAS recebido (POST)');
   
@@ -111,7 +113,6 @@ async function activatePremium(payment) {
       return;
     }
 
-    const { createClient } = require('@supabase/supabase-js');
     const supabase = createClient(
       process.env.SUPABASE_URL,
       process.env.SUPABASE_ANON_KEY
@@ -188,7 +189,6 @@ async function deactivatePremiumForOverdue(payment) {
   try {
     console.log('⚠️ Desativando premium por pagamento em atraso:', payment.id);
     
-    const { createClient } = require('@supabase/supabase-js');
     const supabase = createClient(
       process.env.SUPABASE_URL,
       process.env.SUPABASE_ANON_KEY
@@ -218,7 +218,6 @@ async function deactivatePremiumForDeleted(payment) {
   try {
     console.log('🗑️ Desativando premium por pagamento deletado:', payment.id);
     
-    const { createClient } = require('@supabase/supabase-js');
     const supabase = createClient(
       process.env.SUPABASE_URL,
       process.env.SUPABASE_ANON_KEY
@@ -256,7 +255,6 @@ async function activatePremiumForSubscription(subscription) {
       return;
     }
 
-    const { createClient } = require('@supabase/supabase-js');
     const supabase = createClient(
       process.env.SUPABASE_URL,
       process.env.SUPABASE_ANON_KEY
@@ -328,7 +326,6 @@ async function updatePremiumForSubscription(subscription) {
       return;
     }
 
-    const { createClient } = require('@supabase/supabase-js');
     const supabase = createClient(
       process.env.SUPABASE_URL,
       process.env.SUPABASE_ANON_KEY
@@ -364,7 +361,6 @@ async function deactivatePremiumForSubscriptionDeleted(subscription) {
   try {
     console.log('🗑️ Desativando premium por assinatura cancelada:', subscription.id);
     
-    const { createClient } = require('@supabase/supabase-js');
     const supabase = createClient(
       process.env.SUPABASE_URL,
       process.env.SUPABASE_ANON_KEY
