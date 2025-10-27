@@ -1,92 +1,68 @@
 // api/asaas.js - API ASAAS simplificada
-export default async function handler(req, res) {
-  console.log('🚀 ASAAS API chamada:', req.method, req.url);
+export async function POST(req) {
+  console.log('🚀 ASAAS API chamada (POST)');
   
-  // Configurar CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  try {
+    const body = await req.json();
+    const { action, data } = body;
+    console.log('📝 Action:', action);
+    console.log('📝 Data:', data);
 
-  // Responder a requisições OPTIONS (preflight)
-  if (req.method === 'OPTIONS') {
-    console.log('✅ OPTIONS request - CORS preflight');
-    return res.status(200).end();
-  }
-
-  // Aceitar GET para teste
-  if (req.method === 'GET') {
-    console.log('✅ GET request - teste da API');
-    return res.status(200).json({ 
-      message: 'API ASAAS funcionando!',
-      method: req.method,
-      timestamp: new Date().toISOString(),
-      environment: process.env.NODE_ENV || 'development'
-    });
-  }
-
-  // Aceitar POST
-  if (req.method === 'POST') {
-    console.log('✅ POST request recebido');
-    
-    try {
-      const { action, data } = req.body;
-      console.log('📝 Action:', action);
-      console.log('📝 Data:', data);
-
-      // Verificar se a API Key está configurada
-      if (!process.env.VITE_ASAAS_API_KEY) {
-        console.error('❌ API Key não configurada');
-        return res.status(500).json({ 
-          error: 'ASAAS_API_KEY não configurada no Vercel',
-          success: false
-        });
-      }
-
-      console.log('🔑 API Key configurada:', process.env.VITE_ASAAS_API_KEY ? 'SIM' : 'NÃO');
-
-      let result;
-
-      switch (action) {
-        case 'createCustomer':
-          result = await createCustomer(data);
-          break;
-        case 'createPayment':
-          result = await createSubscription(data);
-          break;
-        default:
-          console.error('❌ Ação não reconhecida:', action);
-          return res.status(400).json({ 
-            error: 'Ação não reconhecida. Use: createCustomer ou createPayment',
-            success: false
-          });
-      }
-
-      console.log('✅ Resultado:', result);
-      return res.status(200).json({
-        success: true,
-        action,
-        data: result
-      });
-
-    } catch (error) {
-      console.error('❌ Erro na API:', error);
-      console.error('❌ Stack trace:', error.stack);
-      return res.status(500).json({ 
-        success: false,
-        error: 'Erro interno do servidor',
-        message: error.message,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-      });
+    // Verificar se a API Key está configurada
+    if (!process.env.VITE_ASAAS_API_KEY) {
+      console.error('❌ API Key não configurada');
+      return Response.json({ 
+        error: 'ASAAS_API_KEY não configurada no Vercel',
+        success: false
+      }, { status: 500 });
     }
-  }
 
-  // Método não permitido
-  console.error('❌ Método não permitido:', req.method);
-  return res.status(405).json({ 
-    error: 'Método não permitido',
-    success: false,
-    allowedMethods: ['GET', 'POST', 'OPTIONS']
-  });
+    console.log('🔑 API Key configurada:', process.env.VITE_ASAAS_API_KEY ? 'SIM' : 'NÃO');
+
+    let result;
+
+    switch (action) {
+      case 'createCustomer':
+        result = await createCustomer(data);
+        break;
+      case 'createPayment':
+        result = await createSubscription(data);
+        break;
+      default:
+        console.error('❌ Ação não reconhecida:', action);
+        return Response.json({ 
+          error: 'Ação não reconhecida. Use: createCustomer ou createPayment',
+          success: false
+        }, { status: 400 });
+    }
+
+    console.log('✅ Resultado:', result);
+    return Response.json({
+      success: true,
+      action,
+      data: result
+    }, { status: 200 });
+
+  } catch (error) {
+    console.error('❌ Erro na API:', error);
+    console.error('❌ Stack trace:', error.stack);
+    return Response.json({ 
+      success: false,
+      error: 'Erro interno do servidor',
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    }, { status: 500 });
+  }
+}
+
+export async function GET() {
+  console.log('✅ GET request - teste da API');
+  return Response.json({ 
+    message: 'API ASAAS funcionando!',
+    method: 'GET',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development'
+  }, { status: 200 });
 }
 
 // Função para criar cliente no ASAAS
