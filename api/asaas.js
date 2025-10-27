@@ -155,7 +155,7 @@ async function createSubscription(paymentData) {
       description: 'Assinatura Mensal - Ateliê Pro',
       externalReference: companyId || 'temp-company',
       cycle: 'MONTHLY', // Cobrança mensal recorrente
-      nextDueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      split: [], // Não dividir com ninguém
       callbackUrl: callbackUrl,
       successUrl: successUrl
     };
@@ -167,7 +167,7 @@ async function createSubscription(paymentData) {
       description: 'Assinatura Anual - Ateliê Pro',
       externalReference: companyId || 'temp-company',
       cycle: 'YEARLY', // Cobrança anual recorrente
-      nextDueDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      split: [], // Não dividir com ninguém
       callbackUrl: callbackUrl,
       successUrl: successUrl
     };

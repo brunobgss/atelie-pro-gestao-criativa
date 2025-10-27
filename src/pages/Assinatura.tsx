@@ -218,8 +218,13 @@ export default function Assinatura() {
       // Extrair os dados do pagamento se vier dentro de result.data
       const paymentData = result?.data || result;
       
+      console.log('🔍 PaymentData completo:', paymentData);
+      console.log('🔍 PaymentData.invoiceUrl:', paymentData?.invoiceUrl);
+      console.log('🔍 PaymentData.paymentLink:', paymentData?.paymentLink);
+      
       // Verificar se temos dados de pagamento válidos
-      if (paymentData && (paymentData.id || paymentData.invoiceUrl)) {
+      // Para subscription, pode vir com object: 'subscription'
+      if (paymentData && (paymentData.id || paymentData.invoiceUrl || paymentData.paymentLink)) {
         logger.userAction('subscription_created', 'ASSINATURA', { 
           planType: pendingPlanId, 
           paymentMethod: selectedPaymentMethod,
@@ -232,21 +237,25 @@ export default function Assinatura() {
         // Mostrar informações do pagamento
         console.log('✅ Pagamento criado:', paymentData);
         
+        // Determinar a URL de pagamento (pode ser invoiceUrl ou paymentLink)
+        const paymentUrl = paymentData.invoiceUrl || paymentData.paymentLink;
+        
         // Redirecionar para o link de pagamento do ASAAS
-        if (paymentData.invoiceUrl) {
+        if (paymentUrl) {
           // Tentar abrir em nova aba, se falhar, redirecionar na mesma aba
-          const newWindow = window.open(paymentData.invoiceUrl, '_blank');
+          const newWindow = window.open(paymentUrl, '_blank');
           
           // Verificar se a janela foi bloqueada (mobile)
           if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
             // Se não conseguiu abrir nova aba, redirecionar na mesma aba
-            window.location.href = paymentData.invoiceUrl;
+            window.location.href = paymentUrl;
             toast.success(`Pagamento ${pendingPlanId === 'monthly' ? 'Mensal' : 'Anual'} criado! Redirecionando para pagamento...`);
           } else {
             toast.success(`Pagamento ${pendingPlanId === 'monthly' ? 'Mensal' : 'Anual'} criado! Abra o link para pagar via ${selectedPaymentMethod === 'PIX' ? 'PIX' : 'cartão'}.`);
           }
         } else {
-          toast.success(`Pagamento ${pendingPlanId === 'monthly' ? 'Mensal' : 'Anual'} criado! Verifique seu email para o ${selectedPaymentMethod === 'PIX' ? 'PIX' : 'pagamento'}.`);
+          // Para assinaturas PIX, o link pode vir no webhook ou no email
+          toast.success(`Assinatura ${pendingPlanId === 'monthly' ? 'Mensal' : 'Anual'} criada! Verifique seu email para o ${selectedPaymentMethod === 'PIX' ? 'PIX' : 'pagamento'}.`);
         }
         
         // Aqui você pode redirecionar ou mostrar mais informações
