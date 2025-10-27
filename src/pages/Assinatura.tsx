@@ -242,10 +242,10 @@ export default function Assinatura() {
         // Determinar a URL de pagamento (pode ser invoiceUrl ou paymentLink)
         const paymentUrl = paymentData.invoiceUrl || paymentData.paymentLink;
         
-        // Se for PIX e não tiver URL de pagamento, mostrar instruções
-        if (selectedPaymentMethod === 'PIX' && !paymentUrl) {
+        // Se não tiver URL de pagamento, mostrar instruções
+        if (!paymentUrl) {
           setPaymentInfo(paymentData);
-          setShowPixInstructions(true);
+          setShowPixInstructions(true); // Reutiliza o mesmo modal para ambos os métodos
           return;
         }
         
@@ -958,7 +958,7 @@ export default function Assinatura() {
               <CreditCard className="w-8 h-8 text-white" />
             </div>
             <DialogTitle className="text-2xl font-bold text-gray-900">
-              Instruções de Pagamento PIX
+              Instruções de Pagamento {selectedPaymentMethod === 'PIX' ? 'PIX' : 'Cartão'}
             </DialogTitle>
             <p className="text-gray-600 text-sm mt-2">
               Siga os passos abaixo para concluir sua assinatura
@@ -993,7 +993,9 @@ export default function Assinatura() {
                 <div className="flex-1">
                   <h5 className="font-semibold text-gray-900 mb-1">Verifique seu email</h5>
                   <p className="text-sm text-gray-600">
-                    Você receberá um email com o código PIX para pagamento em instantes.
+                    {selectedPaymentMethod === 'PIX' 
+                      ? 'Você receberá um email com o código PIX para pagamento em instantes.'
+                      : 'Você receberá um email com o link de pagamento em instantes.'}
                   </p>
                 </div>
               </div>
@@ -1004,9 +1006,13 @@ export default function Assinatura() {
                   <span className="text-white font-bold text-sm">2</span>
                 </div>
                 <div className="flex-1">
-                  <h5 className="font-semibold text-gray-900 mb-1">Pague via PIX</h5>
+                  <h5 className="font-semibold text-gray-900 mb-1">
+                    {selectedPaymentMethod === 'PIX' ? 'Pague via PIX' : 'Efetue o pagamento'}
+                  </h5>
                   <p className="text-sm text-gray-600">
-                    Copie o código PIX e efetue o pagamento usando o app do seu banco.
+                    {selectedPaymentMethod === 'PIX'
+                      ? 'Copie o código PIX e efetue o pagamento usando o app do seu banco.'
+                      : 'Acesse o link e complete o pagamento com seu cartão de crédito.'}
                   </p>
                 </div>
               </div>
@@ -1045,7 +1051,9 @@ export default function Assinatura() {
                 <div>
                   <h5 className="font-semibold text-yellow-900 mb-1">Importante</h5>
                   <p className="text-sm text-yellow-800">
-                    O código PIX é enviado por email. Verifique sua caixa de entrada e spam.
+                    {selectedPaymentMethod === 'PIX'
+                      ? 'O código PIX é enviado por email. Verifique sua caixa de entrada e spam.'
+                      : 'O link de pagamento é enviado por email. Verifique sua caixa de entrada e spam.'}
                   </p>
                 </div>
               </div>
