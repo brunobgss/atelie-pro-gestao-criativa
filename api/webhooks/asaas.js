@@ -1,38 +1,29 @@
 // api/webhooks/asaas.js - Webhook ASAAS
-export default async function handler(req, res) {
-  console.log('🔔 Webhook ASAAS recebido:', req.method, req.url);
+export async function POST(req) {
+  console.log('🔔 Webhook ASAAS recebido (POST)');
   
-  // Configurar CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-  // Responder a requisições OPTIONS (preflight)
-  if (req.method === 'OPTIONS') {
-    console.log('✅ OPTIONS request - CORS preflight');
-    return res.status(200).end();
-  }
-
-  // Aceitar apenas POST para webhooks
-  if (req.method !== 'POST') {
-    console.error('❌ Método não permitido para webhook:', req.method);
-    return res.status(405).json({ 
-      error: 'Método não permitido. Webhooks ASAAS só aceitam POST.',
-      success: false
-    });
-  }
-
   try {
-    const webhookData = req.body;
-    console.log('📨 Dados do webhook:', webhookData);
+    const webhookData = await req.json();
+    console.log('📨 Dados do webhook:', JSON.stringify(webhookData, null, 2));
 
     // Verificar se é um evento válido do ASAAS
-    if (!webhookData.event || !webhookData.payment) {
-      console.error('❌ Dados do webhook inválidos:', webhookData);
-      return res.status(400).json({ 
-        error: 'Dados do webhook inválidos',
+    if (!webhookData.event) {
+      console.error('❌ Dados do webhook inválidos: evento ausente');
+      console.error('📨 Payload completo:', JSON.stringify(webhookData, null, 2));
+      return Response.json({ 
+        error: 'Dados do webhook inválidos - evento ausente',
         success: false
-      });
+      }, { status: 400 });
+    }
+
+    // Verificar se tem payment OU subscription
+    if (!webhookData.payment && !webhookData.subscription) {
+      console.error('❌ Dados do webhook inválidos: nem payment nem subscription encontrados');
+      console.error('📨 Payload completo:', JSON.stringify(webhookData, null, 2));
+      return Response.json({ 
+        error: 'Dados do webhook inválidos - payment ou subscription ausente',
+        success: false
+      }, { status: 400 });
     }
 
     // Processar diferentes tipos de eventos
@@ -68,10 +59,14 @@ export default async function handler(req, res) {
 
       case 'SUBSCRIPTION_CREATED':
         console.log('🔄 Assinatura criada:', webhookData.subscription.id);
+        // Ativar premium quando assinatura é criada
+        await activatePremiumForSubscription(webhookData.subscription);
         break;
 
       case 'SUBSCRIPTION_UPDATED':
         console.log('🔄 Assinatura atualizada:', webhookData.subscription.id);
+        // Verificar se precisa atualizar status
+        await updatePremiumForSubscription(webhookData.subscription);
         break;
 
       case 'SUBSCRIPTION_DELETED':
@@ -86,18 +81,18 @@ export default async function handler(req, res) {
 
     // Responder com sucesso para o ASAAS
     console.log('✅ Webhook processado com sucesso');
-    return res.status(200).json({ 
+    return Response.json({ 
       success: true,
       message: 'Webhook processado com sucesso'
-    });
+    }, { status: 200 });
 
   } catch (error) {
     console.error('❌ Erro ao processar webhook:', error);
-    return res.status(500).json({ 
+    return Response.json({ 
       success: false,
       error: 'Erro interno do servidor',
       message: error.message
-    });
+    }, { status: 500 });
   }
 }
 
@@ -245,6 +240,122 @@ async function deactivatePremiumForDeleted(payment) {
     }
   } catch (error) {
     console.error('❌ Erro ao desativar premium por pagamento deletado:', error);
+  }
+}
+
+// Função para ativar premium quando assinatura é criada
+async function activatePremiumForSubscription(subscription) {
+  try {
+    console.log('🔄 Ativando premium para assinatura:', subscription.id);
+    console.log('🔄 Subscription Value:', subscription.value);
+    console.log('🔄 External Reference:', subscription.externalReference);
+    
+    // Verificar se a API Key do Supabase está configurada
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
+      console.error('❌ Variáveis do Supabase não configuradas');
+      return;
+    }
+
+    const { createClient } = require('@supabase/supabase-js');
+    const supabase = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_ANON_KEY
+    );
+
+    // Calcular data de expiração baseado no valor
+    let expirationDate;
+    
+    if (subscription.value === 39) {
+      // Plano mensal - calcular próxima data de vencimento
+      expirationDate = new Date(subscription.nextDueDate);
+    } else if (subscription.value === 390) {
+      // Plano anual
+      expirationDate = new Date(subscription.nextDueDate);
+    } else {
+      console.error('❌ Valor de assinatura não reconhecido:', subscription.value);
+      return;
+    }
+
+    console.log('🔄 Data de expiração calculada:', expirationDate.toISOString());
+
+    // Buscar empresa pelo externalReference (que é o ID da empresa)
+    const { data: empresaData, error: empresaError } = await supabase
+      .from('empresas')
+      .select('id, nome')
+      .eq('id', subscription.externalReference)
+      .single();
+
+    if (empresaError || !empresaData) {
+      console.error('❌ Erro ao buscar empresa:', empresaError);
+      console.error('❌ External Reference:', subscription.externalReference);
+      
+      // Tentar buscar pela empresa pelo nome ou outro campo
+      console.log('🔍 Tentando busca alternativa...');
+      return;
+    }
+
+    console.log('✅ Empresa encontrada:', empresaData.nome);
+
+    // Atualizar empresa como premium
+    const { data, error } = await supabase
+      .from('empresas')
+      .update({
+        is_premium: true,
+        status: 'active',
+        trial_end_date: expirationDate.toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', subscription.externalReference);
+
+    if (error) {
+      console.error('❌ Erro ao ativar premium:', error);
+    } else {
+      console.log('✅ Premium ativado com sucesso para empresa:', subscription.externalReference);
+    }
+
+  } catch (error) {
+    console.error('❌ Erro na função activatePremiumForSubscription:', error);
+  }
+}
+
+// Função para atualizar premium quando assinatura é atualizada
+async function updatePremiumForSubscription(subscription) {
+  try {
+    console.log('🔄 Atualizando premium para assinatura:', subscription.id);
+    
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
+      console.error('❌ Variáveis do Supabase não configuradas');
+      return;
+    }
+
+    const { createClient } = require('@supabase/supabase-js');
+    const supabase = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_ANON_KEY
+    );
+
+    // Calcular data de expiração
+    const expirationDate = new Date(subscription.nextDueDate);
+
+    // Atualizar empresa
+    const { error } = await supabase
+      .from('empresas')
+      .update({
+        is_premium: true,
+        status: 'active',
+        trial_end_date: expirationDate.toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', subscription.externalReference);
+
+    if (error) {
+      console.error('❌ Erro ao atualizar premium:', error);
+    } else {
+      console.log('✅ Premium atualizado com sucesso');
+    }
+
+  } catch (error) {
+    console.error('❌ Erro ao atualizar premium:', error);
   }
 }
 

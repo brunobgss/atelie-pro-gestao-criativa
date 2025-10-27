@@ -215,8 +215,11 @@ export default function Assinatura() {
       console.log('🔍 Result.data:', result?.data);
       console.log('🔍 Result.success:', result?.success);
 
-      // O Asaas retorna o pagamento diretamente, não dentro de {success, data}
-      if (result && result.id && result.object === 'payment') {
+      // Extrair os dados do pagamento se vier dentro de result.data
+      const paymentData = result?.data || result;
+      
+      // Verificar se temos dados de pagamento válidos
+      if (paymentData && (paymentData.id || paymentData.invoiceUrl)) {
         logger.userAction('subscription_created', 'ASSINATURA', { 
           planType: pendingPlanId, 
           paymentMethod: selectedPaymentMethod,
@@ -227,17 +230,17 @@ export default function Assinatura() {
         toast.success("Pagamento criado com sucesso!");
         
         // Mostrar informações do pagamento
-        console.log('✅ Pagamento criado:', result);
+        console.log('✅ Pagamento criado:', paymentData);
         
         // Redirecionar para o link de pagamento do ASAAS
-        if (result.invoiceUrl) {
+        if (paymentData.invoiceUrl) {
           // Tentar abrir em nova aba, se falhar, redirecionar na mesma aba
-          const newWindow = window.open(result.invoiceUrl, '_blank');
+          const newWindow = window.open(paymentData.invoiceUrl, '_blank');
           
           // Verificar se a janela foi bloqueada (mobile)
           if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
             // Se não conseguiu abrir nova aba, redirecionar na mesma aba
-            window.location.href = result.invoiceUrl;
+            window.location.href = paymentData.invoiceUrl;
             toast.success(`Pagamento ${pendingPlanId === 'monthly' ? 'Mensal' : 'Anual'} criado! Redirecionando para pagamento...`);
           } else {
             toast.success(`Pagamento ${pendingPlanId === 'monthly' ? 'Mensal' : 'Anual'} criado! Abra o link para pagar via ${selectedPaymentMethod === 'PIX' ? 'PIX' : 'cartão'}.`);

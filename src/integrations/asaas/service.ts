@@ -58,14 +58,20 @@ class ASAASService {
     }
 
     console.log(`✅ ASAAS Response: ${action}`, responseData);
-    return responseData.data;
+    // Retornar o objeto completo da resposta, não apenas .data
+    return responseData;
   }
 
   // Criar cliente no ASAAS
   async createCustomer(customer: ASAASCustomer) {
     try {
       const response = await this.makeRequest('createCustomer', customer);
-      return { success: true, customer: response };
+      console.log('🔍 createCustomer response:', response);
+      // A resposta agora vem com { success, action, data }
+      if (response.success && response.data) {
+        return { success: true, customer: response.data };
+      }
+      return response;
     } catch (error) {
       console.error('Erro ao criar cliente ASAAS:', error);
       return { success: false, error: error.message };
@@ -76,7 +82,12 @@ class ASAASService {
   async createSubscription(subscription: ASAASSubscription) {
     try {
       const response = await this.makeRequest('createSubscription', subscription);
-      return { success: true, data: response };
+      console.log('🔍 createSubscription response:', response);
+      // A resposta agora vem com { success, action, data }
+      if (response.success && response.data) {
+        return { success: true, data: response.data };
+      }
+      return response;
     } catch (error) {
       console.error('Erro ao criar assinatura ASAAS:', error);
       return { success: false, error: error.message };

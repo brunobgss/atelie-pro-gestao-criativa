@@ -14,9 +14,9 @@ let premiumCache: { data: PremiumStatus; timestamp: number } | null = null;
 const CACHE_DURATION = 30000; // 30 segundos
 
 // Verificar status de premium no frontend
-export async function checkPremiumStatus(): Promise<PremiumStatus> {
-  // Verificar cache primeiro
-  if (premiumCache && (Date.now() - premiumCache.timestamp) < CACHE_DURATION) {
+export async function checkPremiumStatus(forceRefresh = false): Promise<PremiumStatus> {
+  // Verificar cache primeiro (a menos que forceRefresh seja true)
+  if (!forceRefresh && premiumCache && (Date.now() - premiumCache.timestamp) < CACHE_DURATION) {
     return premiumCache.data;
   }
 
@@ -67,10 +67,17 @@ export async function checkPremiumStatus(): Promise<PremiumStatus> {
 
     // Se é premium, verificar se não expirou
     if (empresa.is_premium) {
-      // Como não temos current_period_end, vamos usar trial_end_date para calcular expiração
-      // Se é premium, vamos considerar que tem 30 dias a partir da data atual
-      const expirationDate = new Date();
-      expirationDate.setDate(expirationDate.getDate() + 30);
+      // Se tem trial_end_date, usar ele como data de expiração do premium
+      // Caso contrário, calcular 30 dias a partir da data atual (fallback)
+      let expirationDate: Date;
+      
+      if (empresa.trial_end_date) {
+        expirationDate = new Date(empresa.trial_end_date);
+      } else {
+        // Fallback: calcular 30 dias a partir de agora
+        expirationDate = new Date();
+        expirationDate.setDate(expirationDate.getDate() + 30);
+      }
       
       const now = new Date();
       const isExpired = now > expirationDate;
@@ -151,6 +158,12 @@ export async function hasPremiumAccess(): Promise<boolean> {
 export async function isTrialExpired(): Promise<boolean> {
   const status = await checkPremiumStatus();
   return status.isTrialExpired && !status.isPremium;
+}
+
+// Limpar cache de premium (útil após mudanças no status)
+export function clearPremiumCache(): void {
+  premiumCache = null;
+  console.log('🗑️ Cache de premium limpo');
 }
 
 // Log de tentativa de acesso não autorizado
