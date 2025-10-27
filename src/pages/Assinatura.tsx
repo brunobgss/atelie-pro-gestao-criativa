@@ -79,6 +79,8 @@ export default function Assinatura() {
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>("PIX");
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [pendingPlanId, setPendingPlanId] = useState<string | null>(null);
+  const [showPixInstructions, setShowPixInstructions] = useState(false);
+  const [paymentInfo, setPaymentInfo] = useState<any>(null);
 
   // Verificar se o usuário já tem assinatura ativa
   const isPremium = empresa?.is_premium === true;
@@ -240,6 +242,13 @@ export default function Assinatura() {
         // Determinar a URL de pagamento (pode ser invoiceUrl ou paymentLink)
         const paymentUrl = paymentData.invoiceUrl || paymentData.paymentLink;
         
+        // Se for PIX e não tiver URL de pagamento, mostrar instruções
+        if (selectedPaymentMethod === 'PIX' && !paymentUrl) {
+          setPaymentInfo(paymentData);
+          setShowPixInstructions(true);
+          return;
+        }
+        
         // Redirecionar para o link de pagamento do ASAAS
         if (paymentUrl) {
           // Tentar abrir em nova aba, se falhar, redirecionar na mesma aba
@@ -253,9 +262,6 @@ export default function Assinatura() {
           } else {
             toast.success(`Pagamento ${pendingPlanId === 'monthly' ? 'Mensal' : 'Anual'} criado! Abra o link para pagar via ${selectedPaymentMethod === 'PIX' ? 'PIX' : 'cartão'}.`);
           }
-        } else {
-          // Para assinaturas PIX, o link pode vir no webhook ou no email
-          toast.success(`Assinatura ${pendingPlanId === 'monthly' ? 'Mensal' : 'Anual'} criada! Verifique seu email para o ${selectedPaymentMethod === 'PIX' ? 'PIX' : 'pagamento'}.`);
         }
         
         // Aqui você pode redirecionar ou mostrar mais informações
@@ -938,6 +944,132 @@ export default function Assinatura() {
                 className="text-blue-600 hover:text-blue-700 text-sm"
               >
                 Verificar Status do Pagamento
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de Instruções de Pagamento PIX */}
+      <Dialog open={showPixInstructions} onOpenChange={setShowPixInstructions}>
+        <DialogContent className="sm:max-w-lg max-h-[95vh] overflow-y-auto">
+          <DialogHeader className="text-center pb-4">
+            <div className="mx-auto w-16 h-16 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center mb-3">
+              <CreditCard className="w-8 h-8 text-white" />
+            </div>
+            <DialogTitle className="text-2xl font-bold text-gray-900">
+              Instruções de Pagamento PIX
+            </DialogTitle>
+            <p className="text-gray-600 text-sm mt-2">
+              Siga os passos abaixo para concluir sua assinatura
+            </p>
+          </DialogHeader>
+          
+          <div className="space-y-6 py-4">
+            {/* Resumo do Plano */}
+            <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-4 border border-green-200">
+              <h3 className="font-semibold text-gray-900 mb-2">
+                {pendingPlanId === 'yearly' ? 'Plano Anual' : 'Plano Mensal'}
+              </h3>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600 text-sm">
+                  {pendingPlanId === 'yearly' ? 'R$ 390,00/ano' : 'R$ 39,00/mês'}
+                </span>
+                <span className="text-xl font-bold text-green-600">
+                  {pendingPlanId === 'yearly' ? 'R$ 390' : 'R$ 39'}
+                </span>
+              </div>
+            </div>
+
+            {/* Passos */}
+            <div className="space-y-4">
+              <h4 className="font-semibold text-gray-900 text-lg">Passo a Passo:</h4>
+              
+              {/* Passo 1 */}
+              <div className="flex gap-3">
+                <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center flex-shrink-0">
+                  <span className="text-white font-bold text-sm">1</span>
+                </div>
+                <div className="flex-1">
+                  <h5 className="font-semibold text-gray-900 mb-1">Verifique seu email</h5>
+                  <p className="text-sm text-gray-600">
+                    Você receberá um email com o código PIX para pagamento em instantes.
+                  </p>
+                </div>
+              </div>
+
+              {/* Passo 2 */}
+              <div className="flex gap-3">
+                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
+                  <span className="text-white font-bold text-sm">2</span>
+                </div>
+                <div className="flex-1">
+                  <h5 className="font-semibold text-gray-900 mb-1">Pague via PIX</h5>
+                  <p className="text-sm text-gray-600">
+                    Copie o código PIX e efetue o pagamento usando o app do seu banco.
+                  </p>
+                </div>
+              </div>
+
+              {/* Passo 3 */}
+              <div className="flex gap-3">
+                <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
+                  <span className="text-white font-bold text-sm">3</span>
+                </div>
+                <div className="flex-1">
+                  <h5 className="font-semibold text-gray-900 mb-1">Aguarde a confirmação</h5>
+                  <p className="text-sm text-gray-600">
+                    Após o pagamento, sua assinatura será ativada automaticamente em alguns minutos.
+                  </p>
+                </div>
+              </div>
+
+              {/* Passo 4 */}
+              <div className="flex gap-3">
+                <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-orange-600 rounded-full flex items-center justify-center flex-shrink-0">
+                  <span className="text-white font-bold text-sm">4</span>
+                </div>
+                <div className="flex-1">
+                  <h5 className="font-semibold text-gray-900 mb-1">Recarregue a página</h5>
+                  <p className="text-sm text-gray-600">
+                    Quando receber a confirmação, recarregue esta página para atualizar seu status.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Alerta */}
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <div className="flex gap-3">
+                <div className="text-2xl">⚠️</div>
+                <div>
+                  <h5 className="font-semibold text-yellow-900 mb-1">Importante</h5>
+                  <p className="text-sm text-yellow-800">
+                    O código PIX é enviado por email. Verifique sua caixa de entrada e spam.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Botões */}
+            <div className="flex gap-2 justify-end pt-4 border-t border-gray-200">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setShowPixInstructions(false);
+                  navigate('/');
+                }}
+                className="px-6"
+              >
+                Entendi
+              </Button>
+              <Button 
+                onClick={() => {
+                  window.location.reload();
+                }}
+                className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white px-6"
+              >
+                Recarregar Página
               </Button>
             </div>
           </div>
