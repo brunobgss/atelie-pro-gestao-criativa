@@ -263,18 +263,38 @@ async function activatePremiumForSubscription(subscription) {
     // Calcular data de expiração baseado no valor
     let expirationDate;
     
+    // Função auxiliar para converter data do formato brasileiro (DD/MM/YYYY) para ISO
+    const parseBrazilianDate = (dateStr) => {
+      if (!dateStr) return new Date();
+      
+      // Se já vier em formato ISO ou válido, usar diretamente
+      if (dateStr.includes('T') || dateStr.includes('-')) {
+        return new Date(dateStr);
+      }
+      
+      // Converter formato brasileiro DD/MM/YYYY para YYYY-MM-DD
+      const parts = dateStr.split('/');
+      if (parts.length === 3) {
+        const [day, month, year] = parts;
+        return new Date(`${year}-${month}-${day}`);
+      }
+      
+      return new Date();
+    };
+    
     if (subscription.value === 39) {
       // Plano mensal - calcular próxima data de vencimento
-      expirationDate = new Date(subscription.nextDueDate);
+      expirationDate = parseBrazilianDate(subscription.nextDueDate);
     } else if (subscription.value === 390) {
       // Plano anual
-      expirationDate = new Date(subscription.nextDueDate);
+      expirationDate = parseBrazilianDate(subscription.nextDueDate);
     } else {
       console.error('❌ Valor de assinatura não reconhecido:', subscription.value);
       return;
     }
 
     console.log('🔄 Data de expiração calculada:', expirationDate.toISOString());
+    console.log('🔄 Original nextDueDate:', subscription.nextDueDate);
 
     // Buscar empresa pelo externalReference (que é o ID da empresa)
     const { data: empresaData, error: empresaError } = await supabase
@@ -331,8 +351,27 @@ async function updatePremiumForSubscription(subscription) {
       process.env.SUPABASE_ANON_KEY
     );
 
+    // Função auxiliar para converter data do formato brasileiro (DD/MM/YYYY) para ISO
+    const parseBrazilianDate = (dateStr) => {
+      if (!dateStr) return new Date();
+      
+      // Se já vier em formato ISO ou válido, usar diretamente
+      if (dateStr.includes('T') || dateStr.includes('-')) {
+        return new Date(dateStr);
+      }
+      
+      // Converter formato brasileiro DD/MM/YYYY para YYYY-MM-DD
+      const parts = dateStr.split('/');
+      if (parts.length === 3) {
+        const [day, month, year] = parts;
+        return new Date(`${year}-${month}-${day}`);
+      }
+      
+      return new Date();
+    };
+    
     // Calcular data de expiração
-    const expirationDate = new Date(subscription.nextDueDate);
+    const expirationDate = parseBrazilianDate(subscription.nextDueDate);
 
     // Atualizar empresa
     const { error } = await supabase
