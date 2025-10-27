@@ -7,12 +7,15 @@ import { Label } from "@/components/ui/label";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { DollarSign, CreditCard, AlertCircle, CheckCircle, MessageCircle, Search } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listOrders } from "@/integrations/supabase/orders";
 import { listReceitas, updatePaymentStatus } from "@/integrations/supabase/receitas";
 import { useInternationalization } from "@/contexts/InternationalizationContext";
 import { useAuth } from "@/components/AuthProvider";
 import { PAYMENT_STATUS_OPTIONS, getPaymentStatusColor } from "@/utils/statusConstants";
+import { toast } from "sonner";
 
 interface PaymentStatus {
   id: string;
@@ -33,6 +36,11 @@ export default function ControleFinanceiro() {
   const queryClient = useQueryClient();
   const { empresa } = useAuth();
   const { formatCurrency } = useInternationalization();
+  
+  // Estados para modal de cobrança
+  const [whatsappModalOpen, setWhatsappModalOpen] = useState(false);
+  const [customMessage, setCustomMessage] = useState("");
+  const [selectedPayment, setSelectedPayment] = useState<PaymentStatus | null>(null);
 
   const { data: orders = [] } = useQuery({
     queryKey: ["orders"],
@@ -51,9 +59,11 @@ export default function ControleFinanceiro() {
       
       if (result.ok) {
         toast.success(`Status atualizado para: ${newStatus}`);
-        // Recarregar dados
-        queryClient.invalidateQueries({ queryKey: ["receitas"] });
-        queryClient.invalidateQueries({ queryKey: ["orders"] });
+        // Recarregar dados imediatamente
+        await queryClient.invalidateQueries({ queryKey: ["receitas"] });
+        await queryClient.invalidateQueries({ queryKey: ["orders"] });
+        await queryClient.refetchQueries({ queryKey: ["receitas"] });
+        await queryClient.refetchQueries({ queryKey: ["orders"] });
       } else {
         toast.error(result.error || "Erro ao atualizar status");
       }
@@ -119,8 +129,8 @@ export default function ControleFinanceiro() {
   const totalPending = paymentStatus.reduce((sum, p) => sum + p.remainingAmount, 0);
   const overdueCount = paymentStatus.filter(p => p.isOverdue).length;
 
-  const sendPaymentReminder = (payment: PaymentStatus) => {
-    const message = `Olá ${payment.client}!
+  const generateDefaultPaymentMessage = (payment: PaymentStatus) => {
+    return `Olá ${payment.client}!
 
 Lembramos sobre o pagamento do pedido ${payment.orderCode}.
 
@@ -134,10 +144,25 @@ ${payment.isOverdue ? 'ATENÇÃO: Este pedido está em atraso!' : 'Prazo de entr
 Por favor, entre em contato para quitar o saldo.
 
 _${empresa?.nome || 'Ateliê'}_`;
+  };
 
-    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
-    window.open(whatsappUrl, '_blank');
+  const openPaymentReminderModal = (payment: PaymentStatus) => {
+    setSelectedPayment(payment);
+    const defaultMessage = generateDefaultPaymentMessage(payment);
+    setCustomMessage(defaultMessage);
+    setWhatsappModalOpen(true);
+  };
+
+  const sendPaymentReminder = () => {
+    if (!customMessage) {
+      toast.error("Mensagem não pode estar vazia");
+      return;
+    }
+    
+    const message = encodeURIComponent(customMessage);
+    window.open(`https://wa.me/?text=${message}`, '_blank');
     toast.success("Lembrete de pagamento enviado!");
+    setWhatsappModalOpen(false);
   };
 
   const getPaymentStatusColor = (payment: PaymentStatus) => {
@@ -393,7 +418,7 @@ _${empresa?.nome || 'Ateliê'}_`;
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => sendPaymentReminder(payment)}
+                            onClick={() => openPaymentReminderModal(payment)}
                             className="text-green-600 border-green-200 hover:bg-green-50 flex-1 sm:flex-none text-xs"
                           >
                             <MessageCircle className="w-4 h-4 mr-1" />
@@ -416,6 +441,60 @@ _${empresa?.nome || 'Ateliê'}_`;
             )}
           </CardContent>
         </Card>
+
+        {/* Modal de Cobrança WhatsApp */}
+        <Dialog open={whatsappModalOpen} onOpenChange={setWhatsappModalOpen}>
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Personalizar Mensagem de Cobrança</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              {selectedPayment && (
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <p className="text-sm text-gray-600">Pedido:</p>
+                  <p className="font-medium">{selectedPayment.orderCode} - {selectedPayment.client}</p>
+                  <p className="text-sm text-gray-500">
+                    Valor Restante: {formatCurrency(selectedPayment.remainingAmount)}
+                  </p>
+                </div>
+              )}
+              
+              <div className="space-y-2">
+                <Label htmlFor="payment-message">Mensagem</Label>
+                <Textarea
+                  id="payment-message"
+                  value={customMessage}
+                  onChange={(e) => setCustomMessage(e.target.value)}
+                  placeholder="Digite sua mensagem personalizada..."
+                  rows={8}
+                  className="resize-none"
+                />
+              </div>
+              
+              <div className="flex gap-2 justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setWhatsappModalOpen(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={() => selectedPayment && setCustomMessage(generateDefaultPaymentMessage(selectedPayment))}
+                  variant="outline"
+                >
+                  Usar Modelo Padrão
+                </Button>
+                <Button
+                  onClick={sendPaymentReminder}
+                  className="bg-green-600 hover:bg-green-700"
+                >
+                  <MessageCircle className="w-4 h-4 mr-2" />
+                  Enviar WhatsApp
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
