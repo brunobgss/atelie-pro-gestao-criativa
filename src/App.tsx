@@ -11,6 +11,7 @@ import { Layout } from "./components/Layout";
 // Páginas públicas
 import Login from "./pages/Login";
 import Cadastro from "./pages/Cadastro";
+import ResetPassword from "./pages/ResetPassword";
 import OrcamentoPublico from "./pages/OrcamentoPublico";
 
 // Páginas protegidas
@@ -68,6 +69,7 @@ function App() {
                   {/* Rotas públicas */}
                   <Route path="/login" element={<Login />} />
                   <Route path="/cadastro" element={<Cadastro />} />
+                  <Route path="/reset-password" element={<ResetPassword />} />
                   <Route path="/orcamento/:id" element={<OrcamentoPublico />} />
                   <Route path="/orcamentos/:id/impressao" element={<OrcamentoImpressaoNovo />} />
                   <Route path="/assinatura-sucesso" element={<AssinaturaSucesso />} />
