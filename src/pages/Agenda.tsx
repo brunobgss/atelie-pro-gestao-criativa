@@ -33,7 +33,7 @@ export default function Agenda() {
 
   // Processar pedidos para eventos de entrega
   const deliveryEvents: DeliveryEvent[] = orders
-    .filter(order => order.delivery_date && order.status !== 'Cancelado') // Filtrar pedidos com data de entrega e não cancelados
+    .filter(order => order.delivery_date && order.status !== 'Cancelado' && order.status !== 'Entregue') // Filtrar pedidos com data de entrega, não cancelados e não entregues
     .map(order => {
       const deliveryDate = new Date(order.delivery_date!);
       const today = new Date();
