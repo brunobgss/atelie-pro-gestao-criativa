@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { DollarSign, CreditCard, AlertCircle, CheckCircle, MessageCircle, Search } from "lucide-react";
+import { DollarSign, CreditCard, AlertCircle, CheckCircle, MessageCircle, Search, Calendar } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -33,6 +33,7 @@ interface PaymentStatus {
 export default function ControleFinanceiro() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [selectedPeriod, setSelectedPeriod] = useState<string>("current_month"); // current_month, last_month, all
   const queryClient = useQueryClient();
   const { empresa } = useAuth();
   const { formatCurrency } = useInternationalization();
@@ -71,9 +72,44 @@ export default function ControleFinanceiro() {
     }
   };
 
+  // Calcular período de filtro
+  const getPeriodDates = () => {
+    const now = new Date();
+    
+    if (selectedPeriod === "current_month") {
+      // Mês atual: primeiro dia do mês até hoje (fim do dia)
+      const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      const endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+      return { startDate, endDate };
+    } else if (selectedPeriod === "last_month") {
+      // Mês anterior: primeiro até último dia do mês passado
+      const startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const endDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+      return { startDate, endDate };
+    } else {
+      // Todo o período: sem filtro de data
+      return { startDate: null, endDate: null };
+    }
+  };
+
+  const { startDate, endDate } = getPeriodDates();
+
   // Processar dados de pagamento combinando pedidos e receitas
   const paymentStatus: PaymentStatus[] = orders
-    .filter(order => order && order.code && order.customer_name && order.status !== 'Cancelado') // Filtrar pedidos válidos e não cancelados
+    .filter(order => {
+      // Filtrar pedidos válidos e não cancelados
+      if (!order || !order.code || !order.customer_name || order.status === 'Cancelado') {
+        return false;
+      }
+      
+      // Filtrar por período se especificado
+      if (startDate && endDate) {
+        const orderDate = new Date(order.created_at || order.delivery_date || '');
+        return orderDate >= startDate && orderDate <= endDate;
+      }
+      
+      return true;
+    })
     .map(order => {
       const totalValue = Number(order.value || 0);
       
@@ -183,6 +219,23 @@ _${empresa?.nome || 'Ateliê'}_`;
     return "Sinal";
   };
 
+  // Obter label do período selecionado
+  const getPeriodLabel = () => {
+    const now = new Date();
+    const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+      "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+    
+    if (selectedPeriod === "current_month") {
+      return `${monthNames[now.getMonth()]} ${now.getFullYear()}`;
+    } else if (selectedPeriod === "last_month") {
+      const lastMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+      const lastMonthYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+      return `${monthNames[lastMonth]} ${lastMonthYear}`;
+    } else {
+      return "Todo o período";
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100">
       {/* Header */}
@@ -202,6 +255,29 @@ _${empresa?.nome || 'Ateliê'}_`;
       </div>
 
       <div className="p-4 md:p-8 space-y-4 md:space-y-6">
+        {/* Filtro de Período */}
+        <Card className="bg-white border border-gray-200/50 shadow-sm">
+          <CardContent className="p-4">
+            <div className="flex flex-col sm:flex-row gap-4 items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-purple-600" />
+                <span className="text-sm font-medium text-gray-700">Período:</span>
+                <span className="text-sm text-gray-600 font-semibold">{getPeriodLabel()}</span>
+              </div>
+              <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+                <SelectTrigger className="w-full sm:w-[200px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="current_month">Mês Atual</SelectItem>
+                  <SelectItem value="last_month">Mês Anterior</SelectItem>
+                  <SelectItem value="all">Todo o Período</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Estatísticas Financeiras */}
         <div className="grid gap-6 md:grid-cols-4">
           <Card className="bg-white border border-gray-200/50 shadow-sm">
@@ -212,6 +288,7 @@ _${empresa?.nome || 'Ateliê'}_`;
                   <p className="text-2xl font-bold text-green-600">
                     {formatCurrency(totalRevenue)}
                   </p>
+                  <p className="text-xs text-gray-500 mt-1">{getPeriodLabel()}</p>
                 </div>
                 <DollarSign className="w-8 h-8 text-green-500" />
               </div>
@@ -226,6 +303,7 @@ _${empresa?.nome || 'Ateliê'}_`;
                   <p className="text-2xl font-bold text-blue-600">
                     {formatCurrency(totalPaid)}
                   </p>
+                  <p className="text-xs text-gray-500 mt-1">{getPeriodLabel()}</p>
                 </div>
                 <CheckCircle className="w-8 h-8 text-blue-500" />
               </div>
@@ -240,6 +318,7 @@ _${empresa?.nome || 'Ateliê'}_`;
                   <p className="text-2xl font-bold text-orange-600">
                     {formatCurrency(totalPending)}
                   </p>
+                  <p className="text-xs text-gray-500 mt-1">{getPeriodLabel()}</p>
                 </div>
                 <CreditCard className="w-8 h-8 text-orange-500" />
               </div>
