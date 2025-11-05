@@ -13,6 +13,7 @@ export interface Empresa {
   updated_at?: string;
   // Campos que existem na tabela real
   is_premium?: boolean;
+  tem_nota_fiscal?: boolean;
   status?: string;
   // Campos que podem existir mas não estão sendo usados atualmente
   asaas_customer_id?: string;

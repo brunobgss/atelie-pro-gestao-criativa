@@ -1,0 +1,53 @@
+Assunto: Erro 404 "Endpoint não encontrado" ao emitir NFe via API - Homologação
+
+Prezado(a) suporte da Focus NF,
+
+Estou enfrentando um erro ao tentar emitir NFe via API no ambiente de homologação e gostaria de solicitar ajuda para resolver.
+
+DADOS DO CADASTRO:
+- CNPJ: 47.357.170/0001-91
+- Email da conta: brunobgs1888@gmail.com
+- Ambiente: Homologação
+- Tipo de documento: NFe (Nota Fiscal Eletrônica)
+
+CONFIGURAÇÕES REALIZADAS:
+✅ CNPJ cadastrado como emitente no painel
+✅ Toggle "NFe" ativado na aba "DOCUMENTOS FISCAIS" (status: ativo/laranja)
+✅ Configurações salvas após ativar o toggle
+✅ Token de homologação configurado e copiado da aba "TOKENS"
+✅ Certificado Digital válido (status: "Certificado Digital: Válido")
+✅ Dados da empresa completos (identificação, contato, endereço, responsável)
+✅ Série e numeração configuradas
+
+ERRO ENCONTRADO:
+- Status HTTP: 404 Not Found
+- Código do erro: nao_encontrado
+- Mensagem: "Endpoint não encontrado, verifique a documentação desta API em https://focusnfe.com.br/doc/"
+
+URL DA REQUISIÇÃO:
+POST https://api.focusnfe.com.br/v2/homologacao/nfe/47357170000191/NFE-PED-{codigo}-{timestamp}
+
+TENTATIVAS DE RESOLUÇÃO:
+1. Verifiquei e reativei o toggle NFe no painel
+2. Salvei novamente todas as configurações
+3. Aguardei mais de 5 minutos após salvar para processamento
+4. Verifiquei que o token foi gerado para o CNPJ correto
+5. Verifiquei que o certificado digital está válido
+6. Revisei toda a documentação da API
+
+O erro persiste mesmo após todas essas verificações. 
+
+PERGUNTAS:
+1. Existe algum tempo adicional de processamento após ativar o toggle NFe que preciso aguardar?
+2. Há alguma configuração adicional necessária além das que já realizei?
+3. O CNPJ precisa estar aprovado/validado de alguma forma específica no ambiente de homologação?
+4. Há algum problema conhecido com a API de homologação que possa estar causando este erro?
+
+Agradeço desde já pela atenção e aguardo retorno para poder prosseguir com os testes.
+
+Atenciosamente,
+Bruno Borges
+Ateliê Borges
+Email: brunobgs1888@gmail.com
+CNPJ: 47.357.170/0001-91
+

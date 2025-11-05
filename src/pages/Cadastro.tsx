@@ -49,10 +49,13 @@ export default function Cadastro() {
     setLoading(true);
 
     try {
-      // Criar usuário no Supabase Auth
+      // Criar usuário no Supabase Auth com confirmação de email
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/confirmar-email`,
+        },
       });
 
       if (authError) throw authError;
@@ -120,8 +123,14 @@ export default function Cadastro() {
           console.log("Perfil do usuário criado com sucesso");
         }
 
-        toast.success("Cadastro realizado com sucesso!");
-        navigate("/login");
+        // Verificar se o email precisa ser confirmado
+        if (authData.user && !authData.user.email_confirmed_at) {
+          toast.success("Cadastro realizado! Verifique seu email para confirmar sua conta.");
+          navigate("/confirmar-email");
+        } else {
+          toast.success("Cadastro realizado com sucesso!");
+          navigate("/login");
+        }
       }
     } catch (error: unknown) {
       console.error("Erro no cadastro:", error);

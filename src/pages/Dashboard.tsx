@@ -34,28 +34,47 @@ export default function Dashboard() {
     };
   }, []);
   
-  // Buscar dados reais das APIs com loading states
+  // Buscar dados com prioridade - carregar críticos primeiro, secundários depois
+  // Prioridade 1: Orders (mais importante para o dashboard)
   const { data: orders = [], isLoading: ordersLoading } = useQuery({
     queryKey: ["orders"],
     queryFn: listOrders,
+    staleTime: 30000, // Cache por 30 segundos
+    gcTime: 2 * 60 * 1000, // Manter cache por 2 minutos
   });
 
+  // Prioridade 2: Quotes (importante mas pode esperar um pouco)
   const { data: quotes = [], isLoading: quotesLoading } = useQuery({
     queryKey: ["quotes"],
     queryFn: listQuotes,
+    staleTime: 30000,
+    gcTime: 2 * 60 * 1000,
+    // Carregar apenas se orders já carregou (para não bloquear)
+    enabled: !ordersLoading,
   });
 
+  // Prioridade 3: Receitas (pode carregar depois)
   const { data: receitas = [], isLoading: receitasLoading } = useQuery({
     queryKey: ["receitas"],
     queryFn: listReceitas,
+    staleTime: 30000,
+    gcTime: 2 * 60 * 1000,
+    // Carregar apenas se orders já carregou
+    enabled: !ordersLoading,
   });
 
+  // Prioridade 4: Inventory (menos crítico, carregar por último)
   const { data: inventory = [], isLoading: inventoryLoading } = useQuery({
     queryKey: ["inventory"],
     queryFn: listInventory,
+    staleTime: 60000, // Cache por 1 minuto (inventory muda menos)
+    gcTime: 5 * 60 * 1000, // Manter cache por 5 minutos
+    // Carregar apenas se orders já carregou
+    enabled: !ordersLoading,
   });
 
-  const isLoading = ordersLoading || quotesLoading || receitasLoading || inventoryLoading;
+  // Mostrar loading apenas se orders ainda estiver carregando (conteúdo crítico)
+  const isCriticalLoading = ordersLoading;
 
   // Funcao para enviar WhatsApp
   const sendWhatsApp = (message: string) => {
@@ -141,8 +160,8 @@ _${empresa?.nome || 'Atelie'}_`;
       });
     });
 
-    // 3. Estoque crítico (do Estoque)
-    const criticalItems = inventory.filter(item => item.status === "critical");
+    // 3. Estoque crítico (do Estoque) - apenas se inventory já carregou
+    const criticalItems = inventoryLoading ? [] : inventory.filter(item => item.status === "critical");
     
     criticalItems.slice(0, 2).forEach(item => {
       alerts.push({
@@ -166,8 +185,8 @@ E necessario repor urgentemente este item!`;
       });
     });
 
-    // 4. Orçamentos aguardando aprovação
-    const pendingQuotes = quotes.filter(quote => quote.status === "pending");
+    // 4. Orçamentos aguardando aprovação - apenas se quotes já carregou
+    const pendingQuotes = quotesLoading ? [] : quotes.filter(quote => quote.status === "pending");
     
     pendingQuotes.slice(0, 2).forEach(quote => {
       alerts.push({
@@ -316,7 +335,7 @@ _${empresa?.nome || 'Atelie'}_`;
         
         {/* Stats Cards */}
         <div className="grid gap-4 md:gap-6 grid-cols-2 md:grid-cols-2 lg:grid-cols-4">
-          {isLoading ? (
+          {isCriticalLoading ? (
             <>
               <SkeletonCard />
               <SkeletonCard />
@@ -410,7 +429,11 @@ _${empresa?.nome || 'Atelie'}_`;
                   <div className="flex items-center gap-2 mt-2 md:mt-3">
                     <TrendingUp className="w-4 h-4 text-purple-600 flex-shrink-0" />
                     <p className="text-xs md:text-sm text-purple-700 font-semibold truncate">
-                      {formatCurrency(receitas.reduce((sum, receita) => sum + (Number(receita.amount) || 0), 0))} recebido
+                      {receitasLoading ? (
+                        <span className="text-gray-400">Carregando...</span>
+                      ) : (
+                        formatCurrency(receitas.reduce((sum, receita) => sum + (Number(receita.amount) || 0), 0)) + " recebido"
+                      )}
                     </p>
                   </div>
                 </CardContent>

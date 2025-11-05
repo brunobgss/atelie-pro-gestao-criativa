@@ -147,3 +147,4 @@ O token não está na URL = link inválido ou expirado.
 **Status atual:** Funcionando até o envio de email ✅  
 **Próximo:** Testar reset da senha ⏳
 
+

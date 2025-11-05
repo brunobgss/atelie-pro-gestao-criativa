@@ -131,3 +131,6 @@ Se o problema persistir:
 - Envie os logs do Vercel
 - Envie os logs do Asaas (webhook delivery)
 - Verifique se as variáveis de ambiente estão corretas
+
+
+

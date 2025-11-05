@@ -118,24 +118,36 @@ async function activatePremium(payment) {
       process.env.SUPABASE_ANON_KEY
     );
 
+    // Detectar se tem nota fiscal e extrair empresa ID
+    let empresaId = payment.externalReference;
+    let temNotaFiscal = false;
+    
+    if (empresaId && empresaId.includes('|NF=true')) {
+      temNotaFiscal = true;
+      empresaId = empresaId.split('|')[0];
+    }
+    
     // Calcular data de expiração e tipo de plano baseado no valor do pagamento
     let expirationDate;
     let planType;
     
-    if (payment.value === 39.00) {
-      // Plano mensal - 30 dias
-      expirationDate = new Date();
-      expirationDate.setDate(expirationDate.getDate() + 30);
-      planType = 'monthly';
-    } else if (payment.value === 390.00) {
-      // Plano anual - 365 dias (R$ 390,00 anual)
-      expirationDate = new Date();
-      expirationDate.setDate(expirationDate.getDate() + 365);
-      planType = 'yearly';
-    } else {
+    const planValues = {
+      39.00: { days: 30, type: 'monthly-basic', temNF: false },
+      390.00: { days: 365, type: 'yearly-basic', temNF: false },
+      149.00: { days: 30, type: 'monthly-professional', temNF: true },
+      1488.00: { days: 365, type: 'yearly-professional', temNF: true }
+    };
+    
+    const planInfo = planValues[payment.value];
+    if (!planInfo) {
       console.error('❌ Valor de pagamento não reconhecido:', payment.value);
       return;
     }
+    
+    expirationDate = new Date();
+    expirationDate.setDate(expirationDate.getDate() + planInfo.days);
+    planType = planInfo.type;
+    temNotaFiscal = temNotaFiscal || planInfo.temNF;
 
     console.log('🔄 Data de expiração calculada:', expirationDate.toISOString());
     console.log('🔄 Tipo de plano:', planType);
@@ -144,7 +156,7 @@ async function activatePremium(payment) {
     const { data: empresaData, error: empresaError } = await supabase
       .from('empresas')
       .select('id, nome')
-      .eq('id', payment.externalReference)
+      .eq('id', empresaId)
       .single();
 
     if (empresaError) {
@@ -165,10 +177,11 @@ async function activatePremium(payment) {
       .update({
         is_premium: true,
         status: 'active',
-        trial_end_date: expirationDate.toISOString(), // Usar trial_end_date como data de expiração
+        trial_end_date: expirationDate.toISOString(),
+        tem_nota_fiscal: temNotaFiscal,
         updated_at: new Date().toISOString()
       })
-      .eq('id', payment.externalReference);
+      .eq('id', empresaId);
 
     if (error) {
       console.error('❌ Erro ao ativar premium:', error);
@@ -282,30 +295,46 @@ async function activatePremiumForSubscription(subscription) {
       return new Date();
     };
     
-    if (subscription.value === 39) {
-      // Plano mensal - calcular próxima data de vencimento
-      expirationDate = parseBrazilianDate(subscription.nextDueDate);
-    } else if (subscription.value === 390) {
-      // Plano anual
-      expirationDate = parseBrazilianDate(subscription.nextDueDate);
-    } else {
+    // Detectar se tem nota fiscal e extrair empresa ID
+    let empresaId = subscription.externalReference;
+    let temNotaFiscal = false;
+    
+    if (empresaId && empresaId.includes('|NF=true')) {
+      temNotaFiscal = true;
+      empresaId = empresaId.split('|')[0];
+    }
+    
+    // Identificar plano baseado no valor
+    const planValues = {
+      39: { temNF: false },
+      390: { temNF: false },
+      149: { temNF: true },
+      1488: { temNF: true }
+    };
+    
+    const planInfo = planValues[subscription.value];
+    if (!planInfo) {
       console.error('❌ Valor de assinatura não reconhecido:', subscription.value);
       return;
     }
+    
+    temNotaFiscal = temNotaFiscal || planInfo.temNF;
+    expirationDate = parseBrazilianDate(subscription.nextDueDate);
 
     console.log('🔄 Data de expiração calculada:', expirationDate.toISOString());
     console.log('🔄 Original nextDueDate:', subscription.nextDueDate);
+    console.log('🔄 Tem Nota Fiscal:', temNotaFiscal);
 
     // Buscar empresa pelo externalReference (que é o ID da empresa)
     const { data: empresaData, error: empresaError } = await supabase
       .from('empresas')
       .select('id, nome')
-      .eq('id', subscription.externalReference)
+      .eq('id', empresaId)
       .single();
 
     if (empresaError || !empresaData) {
       console.error('❌ Erro ao buscar empresa:', empresaError);
-      console.error('❌ External Reference:', subscription.externalReference);
+      console.error('❌ External Reference:', empresaId);
       
       // Tentar buscar pela empresa pelo nome ou outro campo
       console.log('🔍 Tentando busca alternativa...');
@@ -321,14 +350,15 @@ async function activatePremiumForSubscription(subscription) {
         is_premium: true,
         status: 'active',
         trial_end_date: expirationDate.toISOString(),
+        tem_nota_fiscal: temNotaFiscal,
         updated_at: new Date().toISOString()
       })
-      .eq('id', subscription.externalReference);
+      .eq('id', empresaId);
 
     if (error) {
       console.error('❌ Erro ao ativar premium:', error);
     } else {
-      console.log('✅ Premium ativado com sucesso para empresa:', subscription.externalReference);
+      console.log('✅ Premium ativado com sucesso para empresa:', empresaId);
     }
 
   } catch (error) {

@@ -1,0 +1,34 @@
+Olá! Preciso de ajuda com um erro ao emitir NFe via API.
+
+📋 DADOS:
+• CNPJ: 47.357.170/0001-91
+• Ambiente: Homologação
+• Email: brunobgs1888@gmail.com
+
+✅ JÁ FIZ:
+• CNPJ cadastrado como emitente
+• Toggle NFe ativado (laranja) na aba DOCUMENTOS FISCAIS
+• Salvei as configurações
+• Token de homologação configurado
+• Certificado Digital válido
+• Dados completos preenchidos
+• Série e numeração configuradas
+
+❌ ERRO:
+Status 404 - "Endpoint não encontrado"
+Código: nao_encontrado
+
+🔗 URL da requisição:
+POST https://api.focusnfe.com.br/v2/homologacao/nfe/47357170000191/NFE-PED-251017-448-...
+
+⚠️ JÁ TENTEI:
+1. Verificar toggle NFe (está ativo)
+2. Salvar novamente
+3. Aguardar 5+ minutos
+4. Verificar token e CNPJ
+5. Verificar certificado
+
+O erro continua mesmo assim. Existe alguma configuração adicional ou preciso aguardar mais tempo após ativar o toggle?
+
+Aguardo retorno, obrigado!
+

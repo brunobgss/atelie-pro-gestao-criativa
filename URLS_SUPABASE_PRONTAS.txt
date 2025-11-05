@@ -1,0 +1,18 @@
+# URLs para Copiar e Colar no Supabase
+# Acesse: https://supabase.com/dashboard → Authentication → URL Configuration → Redirect URLs
+
+# Cole todas estas URLs abaixo (uma por linha):
+
+http://localhost:8080/confirmar-email
+http://localhost:8080/reset-password
+http://localhost:8080/assinatura-sucesso
+http://localhost:8080/login
+https://app.ateliepro.online/confirmar-email
+https://app.ateliepro.online/reset-password
+https://app.ateliepro.online/assinatura-sucesso
+https://app.ateliepro.online/login
+
+# Site URL (configure também):
+# Desenvolvimento: http://localhost:8080
+# Produção: https://app.ateliepro.online
+

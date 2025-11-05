@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Check, Crown, Zap, Star, ArrowLeft, CreditCard, CheckCircle, User, MessageCircle, Mail } from "lucide-react";
+import { Check, Crown, Zap, Star, ArrowLeft, CreditCard, CheckCircle, User, MessageCircle, Mail, FileText, RefreshCw, Loader2, ArrowUpDown, AlertTriangle } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -12,9 +12,13 @@ import { validateCpfCnpj, validatePhone, validateForm, cleanPhone } from "@/util
 import { errorHandler } from "@/utils/errorHandler";
 import { logger } from "@/utils/logger";
 import { performanceMonitor } from "@/utils/performanceMonitor";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { asaasService } from "@/integrations/asaas/service";
 import { useInternationalization, useTranslations } from "@/contexts/InternationalizationContext";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Plan {
   id: string;
@@ -31,8 +35,8 @@ interface Plan {
 
 const plans: Plan[] = [
   {
-    id: "monthly",
-    name: "Mensal",
+    id: "monthly-basic",
+    name: "Básico Mensal",
     price: 39.00,
     period: "mês",
     features: [
@@ -48,15 +52,14 @@ const plans: Plan[] = [
     color: "blue"
   },
   {
-    id: "yearly",
-    name: "Anual",
+    id: "yearly-basic",
+    name: "Básico Anual",
     price: 390.00,
     period: "ano",
     originalPrice: 468.00,
     discount: "2 meses grátis",
-    popular: true,
     features: [
-      "Tudo do plano mensal",
+      "Tudo do plano básico mensal",
       "2 meses grátis",
       "Suporte prioritário",
       "Recursos premium",
@@ -66,12 +69,48 @@ const plans: Plan[] = [
     ],
     icon: Crown,
     color: "purple"
+  },
+  {
+    id: "monthly-professional",
+    name: "Profissional Mensal",
+    price: 149.00,
+    period: "mês",
+    popular: true,
+    features: [
+      "Tudo do plano básico",
+      "Emissão de Notas Fiscais",
+      "NFe, NFSe, NFCe e mais",
+      "Integração Focus NF",
+      "Até 300 notas/mês",
+      "Suporte prioritário",
+      "Backup premium"
+    ],
+    icon: Crown,
+    color: "green"
+  },
+  {
+    id: "yearly-professional",
+    name: "Profissional Anual",
+    price: 1488.00,
+    period: "ano",
+    originalPrice: 1788.00,
+    discount: "2 meses grátis",
+    features: [
+      "Tudo do plano profissional mensal",
+      "2 meses grátis",
+      "Economia de R$ 300/ano",
+      "Suporte prioritário",
+      "Recursos premium",
+      "Backup premium"
+    ],
+    icon: Crown,
+    color: "green"
   }
 ];
 
 export default function Assinatura() {
   const navigate = useNavigate();
-  const { user, empresa } = useAuth();
+  const { user, empresa, refreshEmpresa } = useAuth();
   const { formatCurrency, getPricing } = useInternationalization();
   const t = useTranslations();
   const [selectedPlan, setSelectedPlan] = useState<string>("yearly");
@@ -81,6 +120,13 @@ export default function Assinatura() {
   const [pendingPlanId, setPendingPlanId] = useState<string | null>(null);
   const [showPixInstructions, setShowPixInstructions] = useState(false);
   const [paymentInfo, setPaymentInfo] = useState<any>(null);
+  const [dialogTrocarPlanoOpen, setDialogTrocarPlanoOpen] = useState(false);
+  const [dialogTrocarPagamentoOpen, setDialogTrocarPagamentoOpen] = useState(false);
+  const [trocandoPlano, setTrocandoPlano] = useState(false);
+  const [trocandoPagamento, setTrocandoPagamento] = useState(false);
+  const [assinaturaAtiva, setAssinaturaAtiva] = useState<any>(null);
+  const [novoPlanoSelecionado, setNovoPlanoSelecionado] = useState<string | null>(null);
+  const [novaFormaPagamento, setNovaFormaPagamento] = useState<'PIX' | 'CREDIT_CARD' | 'BOLETO' | null>(null);
 
   // Verificar se o usuário já tem assinatura ativa
   const isPremium = empresa?.is_premium === true;
@@ -91,21 +137,51 @@ export default function Assinatura() {
     const paymentInfo = localStorage.getItem('lastPaymentInfo');
     const pricing = getPricing();
     
+    // Se tem nota fiscal, é plano profissional
+    const isProfessional = empresa?.tem_nota_fiscal === true;
+    
     if (paymentInfo) {
       try {
         const payment = JSON.parse(paymentInfo);
-        if (payment.value === pricing.monthly) {
+        const planValues: Record<string, { value: number; isProfessional: boolean }> = {
+          'monthly-basic': { value: 39.00, isProfessional: false },
+          'yearly-basic': { value: 390.00, isProfessional: false },
+          'monthly-professional': { value: 149.00, isProfessional: true },
+          'yearly-professional': { value: 1488.00, isProfessional: true }
+        };
+        
+        const planInfo = planValues[payment.planId];
+        if (planInfo) {
+          if (planInfo.isProfessional) {
+            return {
+              type: payment.planId.includes('yearly') ? 'yearly-professional' : 'monthly-professional',
+              name: payment.planId.includes('yearly') ? 'Profissional Anual' : 'Profissional Mensal',
+              price: formatCurrency(planInfo.value),
+              period: payment.planId.includes('yearly') ? t.perYear : t.perMonth
+            };
+          } else {
+            return {
+              type: payment.planId.includes('yearly') ? 'yearly-basic' : 'monthly-basic',
+              name: payment.planId.includes('yearly') ? 'Básico Anual' : 'Básico Mensal',
+              price: formatCurrency(planInfo.value),
+              period: payment.planId.includes('yearly') ? t.perYear : t.perMonth
+            };
+          }
+        }
+        
+        // Fallback para valores antigos
+        if (payment.value === 39.00) {
           return {
-            type: 'monthly',
-            name: t.monthly,
-            price: formatCurrency(pricing.monthly),
+            type: 'monthly-basic',
+            name: isProfessional ? 'Profissional Mensal' : 'Básico Mensal',
+            price: formatCurrency(isProfessional ? 149.00 : 39.00),
             period: t.perMonth
           };
-        } else if (payment.value === pricing.yearly) {
+        } else if (payment.value === 390.00) {
           return {
-            type: 'yearly',
-            name: t.yearly,
-            price: formatCurrency(pricing.yearly),
+            type: 'yearly-basic',
+            name: isProfessional ? 'Profissional Anual' : 'Básico Anual',
+            price: formatCurrency(isProfessional ? 1488.00 : 390.00),
             period: t.perYear
           };
         }
@@ -114,10 +190,20 @@ export default function Assinatura() {
       }
     }
     
-    // Se não houver informações, assumir mensal como padrão
+    // Se não houver informações, detectar baseado em tem_nota_fiscal
+    if (isProfessional) {
+      return {
+        type: 'monthly-professional',
+        name: 'Profissional Mensal',
+        price: formatCurrency(149.00),
+        period: t.perMonth
+      };
+    }
+    
+    // Padrão: plano básico
     return {
-      type: 'monthly',
-      name: t.monthly,
+      type: 'monthly-basic',
+      name: 'Básico Mensal',
       price: formatCurrency(pricing.monthly),
       period: t.perMonth
     };
@@ -128,6 +214,134 @@ export default function Assinatura() {
   const planName = planInfo.name;
   const planPrice = planInfo.price;
   const planPeriod = planInfo.period;
+
+  // Buscar assinatura ativa do usuário
+  useEffect(() => {
+    const loadAssinaturaAtiva = async () => {
+      if (!empresa?.id) return;
+
+      try {
+        // Tentar buscar na tabela payments primeiro
+        const { data: payments } = await supabase
+          .from('payments')
+          .select('*')
+          .eq('empresa_id', empresa.id)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        let subscriptionId: string | null = null;
+        let subscriptionData: any = null;
+
+        if (payments && payments.length > 0 && payments[0].asaas_subscription_id) {
+          subscriptionId = payments[0].asaas_subscription_id;
+          subscriptionData = payments[0];
+        } else {
+          // Fallback: buscar na tabela asaas_subscriptions
+          const { data: subscriptions } = await supabase
+            .from('asaas_subscriptions')
+            .select('*')
+            .eq('empresa_id', empresa.id)
+            .eq('status', 'ACTIVE')
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+          if (subscriptions && subscriptions.length > 0 && subscriptions[0].asaas_subscription_id) {
+            subscriptionId = subscriptions[0].asaas_subscription_id;
+            subscriptionData = subscriptions[0];
+          }
+        }
+
+        // Se encontrou uma assinatura, buscar detalhes no ASAAS
+        if (subscriptionId) {
+          console.log('🔍 Buscando assinatura no ASAAS:', subscriptionId);
+          const result = await asaasService.getSubscription(subscriptionId);
+          if (result.success && result.data) {
+            console.log('✅ Assinatura encontrada:', result.data);
+            setAssinaturaAtiva({ 
+              ...subscriptionData, 
+              asaas_subscription_id: subscriptionId,
+              asaasData: result.data 
+            });
+          } else {
+            console.warn('⚠️ Erro ao buscar detalhes da assinatura no ASAAS:', result.error);
+          }
+        } else {
+          console.log('ℹ️ Nenhuma assinatura ativa encontrada para esta empresa');
+        }
+      } catch (error) {
+        console.error('❌ Erro ao buscar assinatura ativa:', error);
+      }
+    };
+
+    if (isPremium) {
+      loadAssinaturaAtiva();
+    }
+  }, [empresa?.id, isPremium]);
+
+  const handleTrocarPlano = async () => {
+    if (!novoPlanoSelecionado || !assinaturaAtiva?.asaas_subscription_id) {
+      toast.error('Selecione um plano para trocar');
+      return;
+    }
+
+    setTrocandoPlano(true);
+
+    try {
+      const temNotaFiscal = novoPlanoSelecionado.includes('professional');
+      const result = await asaasService.updateSubscription(
+        assinaturaAtiva.asaas_subscription_id,
+        novoPlanoSelecionado,
+        temNotaFiscal
+      );
+
+      if (result.success) {
+        toast.success('Plano atualizado com sucesso!');
+        setDialogTrocarPlanoOpen(false);
+        setNovoPlanoSelecionado(null);
+        await refreshEmpresa(true);
+      } else {
+        toast.error(result.error || 'Erro ao trocar plano');
+      }
+    } catch (error: any) {
+      toast.error(error?.message || 'Erro ao trocar plano');
+    } finally {
+      setTrocandoPlano(false);
+    }
+  };
+
+  const handleTrocarFormaPagamento = async () => {
+    if (!assinaturaAtiva?.asaas_subscription_id || !novaFormaPagamento) {
+      toast.error('Selecione uma forma de pagamento');
+      return;
+    }
+
+    setTrocandoPagamento(true);
+
+    try {
+      const result = await asaasService.updatePaymentMethod(
+        assinaturaAtiva.asaas_subscription_id,
+        novaFormaPagamento
+      );
+
+      if (result.success) {
+        toast.success('Forma de pagamento atualizada com sucesso!');
+        setDialogTrocarPagamentoOpen(false);
+        setNovaFormaPagamento(null);
+        // Recarregar dados da assinatura
+        const updatedResult = await asaasService.getSubscription(assinaturaAtiva.asaas_subscription_id);
+        if (updatedResult.success && updatedResult.data) {
+          setAssinaturaAtiva({ ...assinaturaAtiva, asaasData: updatedResult.data });
+        }
+      } else {
+        toast.error(result.error || 'Erro ao atualizar forma de pagamento');
+      }
+    } catch (error: any) {
+      toast.error(error?.message || 'Erro ao atualizar forma de pagamento');
+    } finally {
+      setTrocandoPagamento(false);
+    }
+  };
 
   const handleSubscribe = async (planId: string) => {
     // Verificar se tem CPF/CNPJ e telefone salvos
@@ -146,9 +360,15 @@ export default function Assinatura() {
     }
     
     // Salvar informações do plano no localStorage para detecção posterior
+    const planValues: Record<string, number> = {
+      'monthly-basic': 39.00,
+      'yearly-basic': 390.00,
+      'monthly-professional': 149.00,
+      'yearly-professional': 1488.00
+    };
     const planData = {
       planId,
-      value: planId === 'monthly' ? 39.00 : 390.00,
+      value: planValues[planId] || 39.00,
       timestamp: new Date().toISOString()
     };
     localStorage.setItem('lastPaymentInfo', JSON.stringify(planData));
@@ -190,24 +410,25 @@ export default function Assinatura() {
       const result = await performanceMonitor.measure(
         'createSubscription',
         async () => {
-          if (pendingPlanId === 'monthly') {
-            return await asaasService.createMonthlySubscription(
-              userEmail, 
-              userName, 
-              empresa?.id, 
-              cpfCnpj, 
-              telefone,
-              selectedPaymentMethod
-            );
-          } else {
-            return await asaasService.createYearlySubscription(
-              userEmail, 
-              userName, 
-              empresa?.id, 
-              cpfCnpj, 
-              telefone,
-              selectedPaymentMethod
-            );
+          switch (pendingPlanId) {
+            case 'monthly-basic':
+              return await asaasService.createMonthlySubscription(
+                userEmail, userName, empresa?.id, cpfCnpj, telefone, selectedPaymentMethod
+              );
+            case 'yearly-basic':
+              return await asaasService.createYearlySubscription(
+                userEmail, userName, empresa?.id, cpfCnpj, telefone, selectedPaymentMethod
+              );
+            case 'monthly-professional':
+              return await asaasService.createMonthlyProfessionalSubscription(
+                userEmail, userName, empresa?.id, cpfCnpj, telefone, selectedPaymentMethod
+              );
+            case 'yearly-professional':
+              return await asaasService.createYearlyProfessionalSubscription(
+                userEmail, userName, empresa?.id, cpfCnpj, telefone, selectedPaymentMethod
+              );
+            default:
+              throw new Error('Plano não reconhecido');
           }
         },
         'Assinatura'
@@ -308,6 +529,13 @@ export default function Assinatura() {
           button: "bg-purple-600 hover:bg-purple-700 text-white",
           icon: "text-purple-600"
         };
+      case "green":
+        return {
+          bg: "bg-gradient-to-br from-green-50 to-emerald-100",
+          border: "border-green-200",
+          button: "bg-green-600 hover:bg-green-700 text-white",
+          icon: "text-green-600"
+        };
       default:
         return {
           bg: "bg-gradient-to-br from-gray-50 to-gray-100",
@@ -384,7 +612,9 @@ export default function Assinatura() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <p className="text-sm text-gray-600">Plano Atual</p>
-                  <p className="text-xl font-bold text-green-800">{planName}</p>
+                  <p className="text-xl font-bold text-green-800">
+                    {empresa?.tem_nota_fiscal ? 'Profissional' : 'Básico'} - {planName}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Valor</p>
@@ -396,6 +626,12 @@ export default function Assinatura() {
                     <CheckCircle className="w-3 h-3 mr-1" />
                     Ativo
                   </Badge>
+                  {empresa?.tem_nota_fiscal && (
+                    <Badge className="ml-2 bg-blue-100 text-blue-800 border-blue-200">
+                      <FileText className="w-3 h-3 mr-1" />
+                      Com NF
+                    </Badge>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -420,7 +656,8 @@ export default function Assinatura() {
                   "Suporte prioritário",
                   "Recursos premium",
                   "Relatórios detalhados",
-                  "Backup premium"
+                  "Backup premium",
+                  ...(empresa?.tem_nota_fiscal ? ["Emissão de Notas Fiscais"] : [])
                 ].map((feature, index) => (
                   <div key={index} className="flex items-center gap-3">
                     <Check className="w-5 h-5 text-green-600 flex-shrink-0" />
@@ -441,6 +678,40 @@ export default function Assinatura() {
                 <Button 
                   variant="outline" 
                   className="w-full justify-start"
+                  onClick={async () => {
+                    try {
+                      await refreshEmpresa(true); // Força limpeza de cache
+                      toast.success("Dados atualizados com sucesso!");
+                    } catch (error) {
+                      console.error("Erro ao atualizar dados:", error);
+                      toast.error("Erro ao atualizar dados. Tente novamente.");
+                    }
+                  }}
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Atualizar Dados
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={() => setDialogTrocarPlanoOpen(true)}
+                  disabled={!assinaturaAtiva}
+                >
+                  <ArrowUpDown className="w-4 h-4 mr-2" />
+                  Trocar de Plano
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={() => setDialogTrocarPagamentoOpen(true)}
+                  disabled={!assinaturaAtiva}
+                >
+                  <CreditCard className="w-4 h-4 mr-2" />
+                  Trocar Forma de Pagamento
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start"
                   onClick={() => navigate("/minha-conta")}
                 >
                   <User className="w-4 h-4 mr-2" />
@@ -454,6 +725,16 @@ export default function Assinatura() {
                   <CreditCard className="w-4 h-4 mr-2" />
                   Portal de Pagamentos
                 </Button>
+                {empresa?.tem_nota_fiscal && (
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-start"
+                    onClick={() => navigate("/configuracao-focusnf")}
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    Configurar Notas Fiscais
+                  </Button>
+                )}
               </CardContent>
             </Card>
 
@@ -495,6 +776,160 @@ export default function Assinatura() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Dialog Trocar Plano */}
+        <Dialog open={dialogTrocarPlanoOpen} onOpenChange={setDialogTrocarPlanoOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Trocar de Plano</DialogTitle>
+              <DialogDescription>
+                Selecione o novo plano para sua assinatura. A alteração será aplicada no próximo ciclo de cobrança.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              <div>
+                <Label>Plano Atual</Label>
+                <p className="text-sm font-medium mt-1">{planName} - {planPrice}/{planPeriod}</p>
+              </div>
+
+              <div>
+                <Label>Novo Plano</Label>
+                <Select value={novoPlanoSelecionado || ''} onValueChange={setNovoPlanoSelecionado}>
+                  <SelectTrigger className="mt-2">
+                    <SelectValue placeholder="Selecione um plano" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {plans
+                      .filter(plan => plan.id !== currentPlan)
+                      .map((plan) => (
+                        <SelectItem key={plan.id} value={plan.id}>
+                          {plan.name} - {plan.price === 39.00 ? 'R$ 39' : 
+                                         plan.price === 390.00 ? 'R$ 390' :
+                                         plan.price === 149.00 ? 'R$ 149' :
+                                         plan.price === 1488.00 ? 'R$ 1.488' : plan.price}/{plan.period}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Alert>
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  A alteração do plano será aplicada no próximo ciclo de cobrança. Você continuará com o plano atual até o final do período pago.
+                </AlertDescription>
+              </Alert>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setDialogTrocarPlanoOpen(false);
+                  setNovoPlanoSelecionado(null);
+                }}
+                disabled={trocandoPlano}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleTrocarPlano}
+                disabled={trocandoPlano || !novoPlanoSelecionado}
+              >
+                {trocandoPlano ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Atualizando...
+                  </>
+                ) : (
+                  'Confirmar Troca'
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog Trocar Forma de Pagamento */}
+        <Dialog open={dialogTrocarPagamentoOpen} onOpenChange={(open) => {
+          setDialogTrocarPagamentoOpen(open);
+          if (open && assinaturaAtiva?.asaasData?.billingType) {
+            // Inicializar com valor diferente do atual ao abrir
+            const atual = assinaturaAtiva.asaasData.billingType;
+            setNovaFormaPagamento(atual === 'PIX' ? 'CREDIT_CARD' : 'PIX');
+          }
+        }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Trocar Forma de Pagamento</DialogTitle>
+              <DialogDescription>
+                Selecione a nova forma de pagamento para sua assinatura.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-4 py-4">
+              <div>
+                <Label>Forma de Pagamento Atual</Label>
+                <p className="text-sm font-medium mt-1">
+                  {assinaturaAtiva?.asaasData?.billingType === 'PIX' ? 'PIX' :
+                   assinaturaAtiva?.asaasData?.billingType === 'CREDIT_CARD' ? 'Cartão de Crédito' :
+                   assinaturaAtiva?.asaasData?.billingType === 'BOLETO' ? 'Boleto' :
+                   'Não informado'}
+                </p>
+              </div>
+
+              <div>
+                <Label>Nova Forma de Pagamento</Label>
+                <Select 
+                  value={novaFormaPagamento || ''} 
+                  onValueChange={(value: 'PIX' | 'CREDIT_CARD' | 'BOLETO') => setNovaFormaPagamento(value)}
+                >
+                  <SelectTrigger className="mt-2">
+                    <SelectValue placeholder="Selecione uma forma de pagamento" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PIX">PIX</SelectItem>
+                    <SelectItem value="CREDIT_CARD">Cartão de Crédito</SelectItem>
+                    <SelectItem value="BOLETO">Boleto</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Alert>
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  A forma de pagamento será atualizada imediatamente. A próxima cobrança será feita usando o novo método.
+                </AlertDescription>
+              </Alert>
+            </div>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setDialogTrocarPagamentoOpen(false);
+                  setNovaFormaPagamento(null);
+                }}
+                disabled={trocandoPagamento}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleTrocarFormaPagamento}
+                disabled={trocandoPagamento || !novaFormaPagamento || novaFormaPagamento === assinaturaAtiva?.asaasData?.billingType}
+              >
+                {trocandoPagamento ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Atualizando...
+                  </>
+                ) : (
+                  'Confirmar Troca'
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
@@ -564,8 +999,8 @@ export default function Assinatura() {
         </div>
 
         {/* Plans Grid */}
-        <div className="max-w-6xl mx-auto">
-          <div className="grid gap-6 md:gap-8 grid-cols-1 md:grid-cols-2">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid gap-6 md:gap-8 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
             {plans.map((plan) => {
               const colors = getColorClasses(plan.color);
               const IconComponent = plan.icon;

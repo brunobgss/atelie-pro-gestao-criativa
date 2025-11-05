@@ -119,10 +119,25 @@ class ASAASService {
   // Buscar informações de uma assinatura
   async getSubscription(subscriptionId: string) {
     try {
-      const response = await this.makeRequest(`/subscriptions/${subscriptionId}`);
-      return { success: true, data: response };
+      const response = await this.makeRequest('getSubscription', { subscriptionId });
+      return { success: response.success, data: response.data };
     } catch (error) {
       console.error('Erro ao buscar assinatura ASAAS:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Atualizar assinatura (trocar plano)
+  async updateSubscription(subscriptionId: string, newPlanType: string, temNotaFiscal: boolean = false) {
+    try {
+      const response = await this.makeRequest('updateSubscription', { 
+        subscriptionId, 
+        newPlanType,
+        temNotaFiscal 
+      });
+      return { success: response.success, data: response.data };
+    } catch (error) {
+      console.error('Erro ao atualizar assinatura ASAAS:', error);
       return { success: false, error: error.message };
     }
   }
@@ -130,15 +145,29 @@ class ASAASService {
   // Cancelar assinatura
   async cancelSubscription(subscriptionId: string) {
     try {
-      const response = await this.makeRequest(`/subscriptions/${subscriptionId}`, 'DELETE');
-      return { success: true, data: response };
+      const response = await this.makeRequest('cancelSubscription', { subscriptionId });
+      return { success: response.success, data: response.data };
     } catch (error) {
       console.error('Erro ao cancelar assinatura ASAAS:', error);
       return { success: false, error: error.message };
     }
   }
 
-  // Gerar URL de checkout para plano mensal
+  // Atualizar forma de pagamento
+  async updatePaymentMethod(subscriptionId: string, billingType: 'PIX' | 'CREDIT_CARD' | 'BOLETO') {
+    try {
+      const response = await this.makeRequest('updatePaymentMethod', { 
+        subscriptionId, 
+        billingType 
+      });
+      return { success: response.success, data: response.data };
+    } catch (error) {
+      console.error('Erro ao atualizar forma de pagamento ASAAS:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Gerar URL de checkout para plano mensal básico
   async createMonthlySubscription(userEmail: string, userName: string, companyId?: string, cpfCnpj?: string, telefone?: string, paymentMethod?: string) {
     const customerData = {
       name: userName,
@@ -147,24 +176,23 @@ class ASAASService {
       cpfCnpj: cpfCnpj
     };
 
-    // Criar cliente primeiro
     const customerResult = await this.createCustomer(customerData);
     if (!customerResult.success) {
       return customerResult;
     }
 
-    // Criar pagamento usando nossa API intermediária
     const paymentData = {
       customerId: customerResult.customer.id,
-      planType: 'monthly',
+      planType: 'monthly-basic',
       companyId: companyId,
-      paymentMethod: paymentMethod || 'PIX'
+      paymentMethod: paymentMethod || 'PIX',
+      temNotaFiscal: false
     };
 
     return await this.makeRequest('createPayment', paymentData);
   }
 
-  // Gerar URL de checkout para plano anual
+  // Gerar URL de checkout para plano anual básico
   async createYearlySubscription(userEmail: string, userName: string, companyId?: string, cpfCnpj?: string, telefone?: string, paymentMethod?: string) {
     const customerData = {
       name: userName,
@@ -173,18 +201,67 @@ class ASAASService {
       cpfCnpj: cpfCnpj
     };
 
-    // Criar cliente primeiro
     const customerResult = await this.createCustomer(customerData);
     if (!customerResult.success) {
       return customerResult;
     }
 
-    // Criar pagamento usando nossa API intermediária
     const paymentData = {
       customerId: customerResult.customer.id,
-      planType: 'yearly',
+      planType: 'yearly-basic',
       companyId: companyId,
-      paymentMethod: paymentMethod || 'PIX'
+      paymentMethod: paymentMethod || 'PIX',
+      temNotaFiscal: false
+    };
+
+    return await this.makeRequest('createPayment', paymentData);
+  }
+
+  // Gerar URL de checkout para plano mensal profissional
+  async createMonthlyProfessionalSubscription(userEmail: string, userName: string, companyId?: string, cpfCnpj?: string, telefone?: string, paymentMethod?: string) {
+    const customerData = {
+      name: userName,
+      email: userEmail,
+      phone: telefone,
+      cpfCnpj: cpfCnpj
+    };
+
+    const customerResult = await this.createCustomer(customerData);
+    if (!customerResult.success) {
+      return customerResult;
+    }
+
+    const paymentData = {
+      customerId: customerResult.customer.id,
+      planType: 'monthly-professional',
+      companyId: companyId,
+      paymentMethod: paymentMethod || 'PIX',
+      temNotaFiscal: true
+    };
+
+    return await this.makeRequest('createPayment', paymentData);
+  }
+
+  // Gerar URL de checkout para plano anual profissional
+  async createYearlyProfessionalSubscription(userEmail: string, userName: string, companyId?: string, cpfCnpj?: string, telefone?: string, paymentMethod?: string) {
+    const customerData = {
+      name: userName,
+      email: userEmail,
+      phone: telefone,
+      cpfCnpj: cpfCnpj
+    };
+
+    const customerResult = await this.createCustomer(customerData);
+    if (!customerResult.success) {
+      return customerResult;
+    }
+
+    const paymentData = {
+      customerId: customerResult.customer.id,
+      planType: 'yearly-professional',
+      companyId: companyId,
+      paymentMethod: paymentMethod || 'PIX',
+      temNotaFiscal: true
     };
 
     return await this.makeRequest('createPayment', paymentData);

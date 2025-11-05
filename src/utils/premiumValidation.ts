@@ -48,10 +48,10 @@ export async function checkPremiumStatus(forceRefresh = false): Promise<PremiumS
       return result;
     }
 
-    // Agora buscar os dados da empresa
+    // Agora buscar os dados da empresa (incluindo status para verificar sincronização)
     const { data: empresa, error: empresaError } = await supabase
       .from('empresas')
-      .select('is_premium, trial_end_date, id')
+      .select('is_premium, trial_end_date, id, status')
       .eq('id', userEmpresa.empresa_id)
       .single();
 
@@ -84,6 +84,7 @@ export async function checkPremiumStatus(forceRefresh = false): Promise<PremiumS
       
       if (isExpired) {
         // Premium expirado, desativar
+        // O trigger no banco vai sincronizar automaticamente, mas vamos garantir aqui também
         await supabase
           .from('empresas')
           .update({ is_premium: false, status: 'expired' })
@@ -111,12 +112,43 @@ export async function checkPremiumStatus(forceRefresh = false): Promise<PremiumS
       return result;
     }
 
-    // Se não é premium, verificar trial
+    // Se não é premium, verificar trial baseado em created_at + 7 dias
+    // IMPORTANTE: O trial é calculado a partir da data de criação
     if (empresa.trial_end_date) {
-      const trialEnd = new Date(empresa.trial_end_date);
-      const now = new Date();
-      const isTrialExpired = now > trialEnd;
-      const daysRemaining = isTrialExpired ? 0 : Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+      // Verificar se created_at existe e calcular trial baseado nele
+      const { data: empresaCompleta } = await supabase
+        .from('empresas')
+        .select('created_at')
+        .eq('id', empresa.id)
+        .single();
+      
+      let trialEnd: Date;
+      let isTrialExpired: boolean;
+      
+      if (empresaCompleta?.created_at) {
+        // Calcular trial baseado em created_at + 7 dias
+        const createdDate = new Date(empresaCompleta.created_at);
+        trialEnd = new Date(createdDate);
+        trialEnd.setDate(trialEnd.getDate() + 7);
+        isTrialExpired = new Date() > trialEnd;
+      } else {
+        // Fallback: usar trial_end_date diretamente
+        trialEnd = new Date(empresa.trial_end_date);
+        isTrialExpired = new Date() > trialEnd;
+      }
+      
+      const daysRemaining = isTrialExpired ? 0 : Math.ceil((trialEnd.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+      
+      // Sincronizar status se necessário (o trigger do banco faz isso automaticamente,
+      // mas garantimos aqui também para casos onde o trigger não foi executado)
+      const expectedStatus = isTrialExpired ? 'expired' : 'trial';
+      if (empresa.status !== expectedStatus) {
+        // Atualizar status para sincronizar (o trigger vai validar)
+        await supabase
+          .from('empresas')
+          .update({ status: expectedStatus })
+          .eq('id', empresa.id);
+      }
       
       const result = {
         isPremium: false,

@@ -7,11 +7,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Package, Plus, Edit, Trash2, Copy, Search, Filter, Clock } from "lucide-react";
+import { Package, Plus, Edit, Trash2, Copy, Search, Filter, Clock, Layers } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { toast } from "sonner";
 import { getProducts, createProduct, updateProduct, deleteProduct } from "@/integrations/supabase/products";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { DialogVariacoesProduto } from "@/components/DialogVariacoesProduto";
 import { useSync } from "@/contexts/SyncContext";
 import { useSyncOperations } from "@/hooks/useSyncOperations";
 import { useInternationalization } from "@/contexts/InternationalizationContext";
@@ -50,6 +51,8 @@ export default function CatalogoProdutos() {
     materials: ""
   });
   const [testQuantity, setTestQuantity] = useState(1);
+  const [dialogVariacoesOpen, setDialogVariacoesOpen] = useState(false);
+  const [produtoParaVariacoes, setProdutoParaVariacoes] = useState<Product | null>(null);
 
   const categories = ["all", "Uniforme", "Personalizado", "Bordado", "Estampado"];
 
@@ -536,6 +539,18 @@ _Orçamento gerado pelo Ateliê Pro_
                     <Button
                       variant="ghost"
                       size="sm"
+                      onClick={() => {
+                        setProdutoParaVariacoes(product);
+                        setDialogVariacoesOpen(true);
+                      }}
+                      className="text-purple-600 hover:text-purple-700"
+                      title="Gerenciar Variações"
+                    >
+                      <Layers className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => handleDuplicate(product)}
                       className="text-green-600 hover:text-green-700"
                     >
@@ -594,6 +609,16 @@ _Orçamento gerado pelo Ateliê Pro_
           ))}
         </div>
 
+        )}
+
+        {/* Dialog de Variações */}
+        {produtoParaVariacoes && (
+          <DialogVariacoesProduto
+            open={dialogVariacoesOpen}
+            onOpenChange={setDialogVariacoesOpen}
+            produtoId={produtoParaVariacoes.id}
+            produtoNome={produtoParaVariacoes.name}
+          />
         )}
       </div>
     </div>

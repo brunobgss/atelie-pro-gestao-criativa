@@ -4,13 +4,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getTrialData, saveTrialData, createNewTrial, clearTrialData } from "@/utils/trialPersistence";
 import { Empresa } from "@/types/empresa";
+import { setUserContext, clearUserContext } from "@/utils/errorTracking";
 
 interface AuthContextType {
   user: User | null;
   empresa: Empresa | null;
   loading: boolean;
   signOut: () => Promise<void>;
-  refreshEmpresa: () => Promise<void>;
+  refreshEmpresa: (forceClearCache?: boolean) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -58,6 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               country,
               trial_end_date,
               is_premium,
+              tem_nota_fiscal,
               status,
               created_at,
               updated_at
@@ -77,6 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           console.log("✅ Dados da empresa carregados:", {
             nome: userEmpresa.empresas.nome,
             is_premium: userEmpresa.empresas.is_premium,
+            tem_nota_fiscal: userEmpresa.empresas.tem_nota_fiscal,
             status: userEmpresa.empresas.status,
             trial_end_date: userEmpresa.empresas.trial_end_date
           });
@@ -95,6 +98,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       setUser(session?.user ?? null);
       if (session?.user) {
+        // Configurar contexto do usuário no sistema de rastreamento
+        setUserContext({
+          id: session.user.id,
+          email: session.user.email || undefined,
+          username: session.user.email?.split('@')[0] || undefined,
+        });
+        
         // Carregar empresa de forma assíncrona
         loadEmpresa(session.user.id).finally(() => {
           if (mounted) {
@@ -122,6 +132,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.log("🔄 Auth state change:", event, session?.user?.id);
         setUser(session?.user ?? null);
         if (session?.user) {
+          // Configurar contexto do usuário no sistema de rastreamento
+          setUserContext({
+            id: session.user.id,
+            email: session.user.email || undefined,
+            username: session.user.email?.split('@')[0] || undefined,
+          });
+          
           // Carregar empresa de forma assíncrona
           loadEmpresa(session.user.id).finally(() => {
             if (mounted) {
@@ -137,6 +154,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
           }, 300000); // 5 minutos
         } else {
+          // Limpar contexto do usuário no sistema de rastreamento
+          clearUserContext();
+          
           setEmpresa(null);
           setLoading(false);
           if (intervalId) clearInterval(intervalId);
@@ -151,15 +171,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const fetchEmpresa = useCallback(async (userId: string) => {
+  const fetchEmpresa = useCallback(async (userId: string, retryCount = 0) => {
+    const MAX_RETRIES = 2;
+    const TIMEOUT_MS = 20000; // 20 segundos
+    
     try {
-      console.log("🔍 Buscando dados da empresa para usuário:", userId);
+      console.log("🔍 Buscando dados da empresa para usuário:", userId, retryCount > 0 ? `(tentativa ${retryCount + 1})` : "");
       
-      // Timeout aumentado para 15 segundos para melhor conectividade
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Timeout')), 15000)
-      );
-
+      // Criar promise com timeout
       const fetchPromise = supabase
         .from("user_empresas")
         .select(`
@@ -174,6 +193,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             country,
             trial_end_date,
             is_premium,
+            tem_nota_fiscal,
             status,
             created_at,
             updated_at
@@ -182,10 +202,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .eq("user_id", userId)
         .maybeSingle();
 
-      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as { data: unknown; error: unknown };
+      // Promise com timeout
+      const timeoutPromise = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout: A requisição demorou mais de 20 segundos')), TIMEOUT_MS)
+      );
+
+      let result;
+      try {
+        result = await Promise.race([fetchPromise, timeoutPromise]);
+      } catch (timeoutError: any) {
+        // Se for timeout e ainda houver tentativas, tentar novamente
+        if (timeoutError.message?.includes('Timeout') && retryCount < MAX_RETRIES) {
+          console.warn(`⏱️ Timeout na tentativa ${retryCount + 1}, tentando novamente...`);
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Aguardar 1 segundo antes de retry
+          return fetchEmpresa(userId, retryCount + 1);
+        }
+        throw timeoutError;
+      }
+
+      const { data, error } = result;
 
       if (error) {
         console.warn("⚠️ Erro ao buscar empresa do Supabase:", (error as any).message);
+        
+        // Se não for timeout e ainda houver tentativas, tentar novamente
+        if (retryCount < MAX_RETRIES && !(error as any).message?.includes('Timeout')) {
+          console.log(`🔄 Tentando novamente (tentativa ${retryCount + 2})...`);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          return fetchEmpresa(userId, retryCount + 1);
+        }
         
         // Tentar recuperar dados persistidos
         const trialData = getTrialData();
@@ -193,7 +238,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (trialData && trialData.userId === userId && trialData.empresaData.nome !== "Empresa Temporária") {
           // Usar dados persistidos apenas se não for temporário
           setEmpresa(trialData.empresaData);
-          console.log("📱 Usando dados persistidos do localStorage (timeout)");
+          console.log("📱 Usando dados persistidos do localStorage (erro/timeout)");
+          toast.info("Usando dados em cache devido a problemas de conexão. Clique em 'Atualizar Dados' para sincronizar.");
         } else {
           // Não criar dados temporários, manter estado atual
           console.log("⏳ Aguardando dados reais do Supabase...");
@@ -232,10 +278,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
     } catch (error: unknown) {
+      const errorMessage = (error as any)?.message || 'Erro desconhecido';
+      
       // Log apenas uma vez por sessão para evitar spam
       if (!(window as any).authErrorLogged) {
-        console.warn("Erro ao buscar empresa, usando dados persistidos:", (error as any).message);
+        console.warn("❌ Erro ao buscar empresa:", errorMessage);
         (window as any).authErrorLogged = true;
+      }
+      
+      // Se for timeout e ainda houver tentativas, tentar novamente
+      if (errorMessage.includes('Timeout') && retryCount < MAX_RETRIES) {
+        console.log(`⏱️ Timeout na tentativa ${retryCount + 1}, tentando novamente...`);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return fetchEmpresa(userId, retryCount + 1);
       }
       
       // Tentar recuperar dados persistidos
@@ -246,25 +301,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setEmpresa(trialData.empresaData);
         // Log apenas uma vez por sessão
         if (!(window as any).localStorageUsed) {
-          console.log("Usando dados persistidos do localStorage (catch)");
+          console.log("📱 Usando dados persistidos do localStorage (catch)");
           (window as any).localStorageUsed = true;
+          if (errorMessage.includes('Timeout')) {
+            toast.warning("Conexão lenta detectada. Usando dados em cache. Clique em 'Atualizar Dados' para sincronizar.");
+          }
         }
       } else {
         // NÃO criar novo trial - manter estado atual
         if (!empresa) {
           setEmpresa(null);
         }
+        if (errorMessage.includes('Timeout')) {
+          toast.error("Timeout ao carregar dados. Verifique sua conexão e tente novamente.");
+        }
       }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [empresa]);
 
-  const refreshEmpresa = useCallback(async () => {
+  const refreshEmpresa = useCallback(async (forceClearCache = false) => {
     if (user?.id) {
-      console.log("🔄 Recarregando dados da empresa...");
+      console.log("🔄 Recarregando dados da empresa...", forceClearCache ? "(forçando limpeza de cache)" : "");
+      
+      // Limpar cache local se solicitado
+      if (forceClearCache) {
+        clearTrialData();
+        console.log("🧹 Cache local limpo");
+      }
+      
+      const TIMEOUT_MS = 20000; // 20 segundos
+      
       try {
-        const { data: userEmpresa, error } = await supabase
+        // Buscar dados atualizados do Supabase com timeout
+        const fetchPromise = supabase
           .from("user_empresas")
           .select(`
             empresa_id,
@@ -278,6 +349,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               country,
               trial_end_date,
               is_premium,
+              tem_nota_fiscal,
               status,
               created_at,
               updated_at
@@ -288,17 +360,80 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .limit(1)
           .single();
 
+        const timeoutPromise = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout: A requisição demorou mais de 20 segundos')), TIMEOUT_MS)
+        );
+
+        let result;
+        try {
+          result = await Promise.race([fetchPromise, timeoutPromise]);
+        } catch (timeoutError: any) {
+          if (timeoutError.message?.includes('Timeout')) {
+            console.error("⏱️ Timeout ao recarregar empresa");
+            toast.error("Timeout ao atualizar dados. Verifique sua conexão e tente novamente.");
+            // Tentar usar dados persistidos se houver erro de timeout
+            const trialData = getTrialData();
+            if (trialData && trialData.userId === user.id) {
+              console.log("⚠️ Usando dados persistidos devido ao timeout");
+              setEmpresa(trialData.empresaData);
+            }
+            return;
+          }
+          throw timeoutError;
+        }
+
+        const { data: userEmpresa, error } = result;
+
         if (error) {
           console.error("❌ Erro ao recarregar empresa:", error);
+          toast.error("Erro ao atualizar dados. Tente novamente.");
+          // Tentar usar dados persistidos se houver erro
+          const trialData = getTrialData();
+          if (trialData && trialData.userId === user.id) {
+            console.log("⚠️ Usando dados persistidos devido ao erro");
+            setEmpresa(trialData.empresaData);
+          }
           return;
         }
 
         if (userEmpresa?.empresas) {
-          console.log("✅ Dados da empresa recarregados:", userEmpresa.empresas);
-          setEmpresa(userEmpresa.empresas as unknown as Empresa);
+          const empresaData = userEmpresa.empresas as unknown as Empresa;
+          console.log("✅ Dados da empresa recarregados:", {
+            nome: empresaData.nome,
+            is_premium: empresaData.is_premium,
+            tem_nota_fiscal: empresaData.tem_nota_fiscal,
+            status: empresaData.status
+          });
+          
+          // Atualizar estado
+          setEmpresa(empresaData);
+          
+          // Salvar dados atualizados no localStorage
+          saveTrialData({
+            userId: user.id,
+            empresaData: empresaData,
+            trialEndDate: empresaData.trial_end_date || ''
+          });
+        } else {
+          console.warn("⚠️ Nenhuma empresa encontrada para o usuário");
+          setEmpresa(null);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("❌ Erro ao recarregar empresa:", error);
+        const errorMessage = error?.message || 'Erro desconhecido';
+        
+        if (errorMessage.includes('Timeout')) {
+          toast.error("Timeout ao atualizar dados. Verifique sua conexão e tente novamente.");
+        } else {
+          toast.error("Erro ao atualizar dados. Tente novamente.");
+        }
+        
+        // Tentar usar dados persistidos se houver erro
+        const trialData = getTrialData();
+        if (trialData && trialData.userId === user.id) {
+          console.log("⚠️ Usando dados persistidos devido ao erro");
+          setEmpresa(trialData.empresaData);
+        }
       }
     }
   }, [user?.id]);
@@ -309,6 +444,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       setEmpresa(null);
       clearTrialData();
+      
+      // Limpar contexto do usuário no sistema de rastreamento
+      clearUserContext();
       
       // Tentar logout no Supabase (sem aguardar)
       supabase.auth.signOut().catch(() => {

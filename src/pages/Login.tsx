@@ -28,9 +28,24 @@ export default function Login() {
         password,
       });
 
-      if (error) throw error;
+      if (error) {
+        // Verificar se o erro é de email não confirmado
+        if (error.message.includes("Email not confirmed") || error.message.includes("email_not_confirmed")) {
+          toast.error("Por favor, confirme seu email antes de fazer login. Verifique sua caixa de entrada.");
+          navigate(`/confirmar-email?email=${encodeURIComponent(email)}`);
+          return;
+        }
+        throw error;
+      }
 
       if (data.user) {
+        // Verificar se o email foi confirmado
+        if (!data.user.email_confirmed_at) {
+          toast.error("Por favor, confirme seu email antes de fazer login.");
+          navigate(`/confirmar-email?email=${encodeURIComponent(email)}`);
+          return;
+        }
+
         toast.success("Login realizado com sucesso!");
         navigate("/");
       }

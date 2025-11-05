@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
+import { apiPlugin } from "./vite-plugin-api.js";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -11,7 +12,7 @@ export default defineConfig(({ mode }) => ({
       overlay: false, // Desabilitar overlay de erros para melhor UX
     },
   },
-  plugins: [react()],
+  plugins: [react(), apiPlugin()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -21,7 +22,7 @@ export default defineConfig(({ mode }) => ({
     // Otimizações de build
     target: "esnext",
     minify: "esbuild",
-    sourcemap: false,
+    sourcemap: true, // Habilitar sourcemaps para melhor debugging no Sentry
     rollupOptions: {
       output: {
         manualChunks: {

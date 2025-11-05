@@ -34,6 +34,8 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['quotes'] });
       queryClient.invalidateQueries({ queryKey: ['receitas'] });
+      queryClient.invalidateQueries({ queryKey: ['contas_pagar'] });
+      queryClient.invalidateQueries({ queryKey: ['contas_receber'] });
       
       // Refetch apenas se necessário (não forçar sempre)
       const staleQueries = queryClient.getQueriesData({ stale: true });
@@ -75,17 +77,35 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       'receitas': ['orders', 'dashboard'],
       'empresas': ['dashboard', 'minha-conta'],
       'products': ['quotes', 'orders', 'catalogo'],
-      'medidas': ['customers', 'orders', 'quotes']
+      'medidas': ['customers', 'orders', 'quotes'],
+      // Novas páginas - Fase 1
+      'fornecedores': ['contas_pagar', 'pedidos_compra'],
+      'contas_pagar': ['dashboard'], // Fluxo de caixa será atualizado automaticamente via queryKey ["contas_pagar", "fluxo", ...]
+      'contas_receber': ['dashboard'], // Fluxo de caixa será atualizado automaticamente via queryKey ["contas_receber", "fluxo", ...]
+      'pedidos_compra': ['fornecedores', 'products', 'inventory_items'],
+      'movimentacoes_estoque': ['products', 'variacoes', 'inventory_items'],
+      'variacoes': ['products', 'movimentacoes_estoque'],
+      'fluxo_caixa': [] // Fluxo de caixa é apenas leitura, não precisa invalidar outros
     };
 
     const related = relatedResources[resource] || [];
     
-    // Invalidar o recurso principal
-    queryClient.invalidateQueries({ queryKey: [resource] });
+    // Invalidar o recurso principal (incluindo queries que começam com ele)
+    queryClient.invalidateQueries({ 
+      predicate: (query) => {
+        const key = query.queryKey[0];
+        return key === resource;
+      }
+    });
     
-    // Invalidar recursos relacionados
+    // Invalidar recursos relacionados (incluindo queries que começam com eles)
     related.forEach(relatedResource => {
-      queryClient.invalidateQueries({ queryKey: [relatedResource] });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          return key === relatedResource;
+        }
+      });
     });
   };
 

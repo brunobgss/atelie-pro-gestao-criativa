@@ -1,0 +1,101 @@
+Assunto: Erro 404 "Endpoint não encontrado" ao tentar emitir NFe via API - Ambiente de Homologação
+
+Prezado(a) suporte da Focus NF,
+
+Estou enfrentando um problema ao tentar emitir notas fiscais eletrônicas (NFe) via API no ambiente de homologação e gostaria de solicitar auxílio.
+
+**Dados da Empresa:**
+- CNPJ do Emitente: 47.357.170/0001-91
+- Razão Social: 47.357.170 BRUNA BORGES DE SOUZA
+- Ambiente: Homologação (testes)
+
+**Configurações Realizadas:**
+1. ✅ CNPJ cadastrado como emitente no painel
+2. ✅ Toggle "NFe" ativado na aba "DOCUMENTOS FISCAIS" (está em laranja/ativo)
+3. ✅ Configurações salvas no painel
+4. ✅ Token de homologação configurado e sendo utilizado
+5. ✅ Certificado Digital válido
+6. ✅ Dados da empresa completos (razão social, endereço, inscrições, etc.)
+7. ✅ Série e numeração configuradas (Série: 1, Próximo número: 1)
+
+**Erro Encontrado:**
+Ao tentar emitir uma NFe via API, estou recebendo o seguinte erro:
+
+**Status:** 404 Not Found
+**Código:** nao_encontrado
+**Mensagem:** "Endpoint não encontrado, verifique a documentação desta API em https://focusnfe.com.br/doc/"
+
+**URL da Requisição:**
+POST https://api.focusnfe.com.br/v2/homologacao/nfe/47357170000191/NFE-PED-251017-448-1762353322622
+
+**Headers da Requisição:**
+- Content-Type: application/json
+- Authorization: Token token="[token_de_homologacao]"
+
+**Payload Enviado:**
+```json
+{
+  "data_emissao": "2025-11-05",
+  "natureza_operacao": "VENDA",
+  "tipo_documento": 1,
+  "finalidade": 1,
+  "indicador_presencial": 0,
+  "cliente": {
+    "cpf": "",
+    "nome_completo": "NILVA BORGES",
+    "email": "",
+    "telefone": "",
+    "endereco": {
+      "logradouro": "Não informado",
+      "numero": "0",
+      "complemento": "",
+      "bairro": "Centro",
+      "municipio": "São Paulo",
+      "uf": "SP",
+      "cep": "00000000",
+      "pais": "BR"
+    }
+  },
+  "items": [
+    {
+      "codigo_produto": "1",
+      "descricao": "Pedido PED-251017-448",
+      "ncm": "6204.62.00",
+      "cfop": "5102",
+      "unidade": "UN",
+      "quantidade": 1,
+      "valor_unitario": 98,
+      "valor_total": 98
+    }
+  ],
+  "valor_frete": 0,
+  "valor_seguro": 0,
+  "valor_desconto": 0,
+  "modalidade_frete": 0
+}
+```
+
+**O que já tentei:**
+1. Verificar se o toggle NFe está ativado (está ativo e laranja)
+2. Salvar as configurações novamente no painel
+3. Aguardar alguns minutos após salvar (mais de 5 minutos)
+4. Verificar se o token está correto e foi gerado para este CNPJ
+5. Verificar se o CNPJ está cadastrado corretamente como emitente
+6. Verificar se o certificado digital está válido (está válido)
+7. Verificar se todos os dados obrigatórios estão preenchidos
+
+**Observações:**
+- Estou no período de teste de 30 dias
+- O erro ocorre mesmo após todas as verificações acima
+- A URL parece estar correta conforme a documentação
+- O token de autenticação está sendo enviado corretamente
+
+**Pergunta:**
+Existe alguma configuração adicional necessária que não esteja listada acima? Ou há algum tempo de processamento adicional após ativar o toggle NFe que precise aguardar?
+
+Agradeço antecipadamente pela atenção e aguardo retorno para que possamos resolver esta questão.
+
+Atenciosamente,
+Bruno Borges
+Email: brunobgs1888@gmail.com
+

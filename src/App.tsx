@@ -7,11 +7,13 @@ import { AuthProvider } from "./components/AuthProvider";
 import { SyncProvider } from "./contexts/SyncContext";
 import { InternationalizationProvider } from "./contexts/InternationalizationContext";
 import { Layout } from "./components/Layout";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 // Páginas públicas
 import Login from "./pages/Login";
 import Cadastro from "./pages/Cadastro";
 import ResetPassword from "./pages/ResetPassword";
+import ConfirmarEmail from "./pages/ConfirmarEmail";
 import OrcamentoPublico from "./pages/OrcamentoPublico";
 
 // Páginas protegidas
@@ -41,35 +43,47 @@ import Ajuda from "./pages/Ajuda";
 import Documentacao from "./pages/Documentacao";
 import FAQ from "./pages/FAQ";
 import RelatorioUso from "./pages/RelatorioUso";
+import AdminErros from "./pages/AdminErros";
+import ConfiguracaoFocusNF from "./pages/ConfiguracaoFocusNF";
+import GestaoNotasFiscais from "./pages/GestaoNotasFiscais";
+import Fornecedores from "./pages/Fornecedores";
+import ContasPagar from "./pages/ContasPagar";
+import ContasReceber from "./pages/ContasReceber";
+import PedidosCompra from "./pages/PedidosCompra";
+import MovimentacoesEstoque from "./pages/MovimentacoesEstoque";
+import FluxoCaixa from "./pages/FluxoCaixa";
 
 // QueryClient fora do componente para evitar re-criação
 // Cache buster: 2024-12-19 - Corrigindo Dashboard not defined
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 0, // Sempre buscar dados frescos
-      gcTime: 2 * 60 * 1000, // Cache por 2 minutos
-      retry: 3, // Tentar 3 vezes em caso de erro
+      staleTime: 30000, // Cache por 30 segundos (dados considerados frescos)
+      gcTime: 5 * 60 * 1000, // Manter cache por 5 minutos
+      retry: 2, // Tentar 2 vezes em caso de erro (reduzido de 3)
       retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Backoff exponencial
       refetchOnWindowFocus: false, // Não refetch ao focar na janela
       refetchOnReconnect: true, // Refetch ao reconectar
+      refetchOnMount: false, // Não refetch ao montar componente se dados estão frescos
     },
   },
 });
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <AuthProvider>
-          <InternationalizationProvider>
-            <SyncProvider>
-              <BrowserRouter>
-                <Routes>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <AuthProvider>
+            <InternationalizationProvider>
+              <SyncProvider>
+                <BrowserRouter>
+                  <Routes>
                   {/* Rotas públicas */}
                   <Route path="/login" element={<Login />} />
                   <Route path="/cadastro" element={<Cadastro />} />
                   <Route path="/reset-password" element={<ResetPassword />} />
+                  <Route path="/confirmar-email" element={<ConfirmarEmail />} />
                   <Route path="/orcamento/:id" element={<OrcamentoPublico />} />
                   <Route path="/orcamentos/:id/impressao" element={<OrcamentoImpressaoNovo />} />
                   <Route path="/assinatura-sucesso" element={<AssinaturaSucesso />} />
@@ -100,6 +114,15 @@ function App() {
                     <Route path="documentacao" element={<Documentacao />} />
                     <Route path="faq" element={<FAQ />} />
                     <Route path="admin/relatorio-uso" element={<RelatorioUso />} />
+                    <Route path="admin/erros" element={<AdminErros />} />
+                    <Route path="notas-fiscais" element={<GestaoNotasFiscais />} />
+                    <Route path="configuracao-focusnf" element={<ConfiguracaoFocusNF />} />
+                    <Route path="fornecedores" element={<Fornecedores />} />
+                    <Route path="contas-pagar" element={<ContasPagar />} />
+                    <Route path="contas-receber" element={<ContasReceber />} />
+                    <Route path="pedidos-compra" element={<PedidosCompra />} />
+                    <Route path="movimentacoes-estoque" element={<MovimentacoesEstoque />} />
+                    <Route path="fluxo-caixa" element={<FluxoCaixa />} />
                   </Route>
                 </Routes>
               </BrowserRouter>
@@ -109,6 +132,7 @@ function App() {
       </TooltipProvider>
       <Sonner />
     </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

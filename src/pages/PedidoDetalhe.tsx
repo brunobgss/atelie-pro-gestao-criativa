@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Calendar, CheckCircle2, Clock, Package, Upload, User, Play, Pause, CheckCircle, Truck, Printer, Edit, CreditCard, Users } from "lucide-react";
+import { ArrowLeft, Calendar, CheckCircle2, Clock, Package, Upload, User, Play, Pause, CheckCircle, Truck, Printer, Edit, CreditCard, Users, FileText, Download, Loader2, RefreshCw, Eye } from "lucide-react";
+import { DialogEmitirNota } from "@/components/DialogEmitirNota";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getOrderByCode, updateOrderStatus } from "@/integrations/supabase/orders";
 import { getReceitaByOrderCode } from "@/integrations/supabase/receitas";
@@ -17,6 +18,8 @@ import { useSync } from "@/contexts/SyncContext";
 import { useAuth } from "@/components/AuthProvider";
 import { toast } from "sonner";
 import { ORDER_STATUS_OPTIONS } from "@/utils/statusConstants";
+import { focusNFService } from "@/integrations/focusnf/service";
+import { getCurrentEmpresaId } from "@/integrations/supabase/auth-utils";
 
 type OrderItem = {
   id: string;
@@ -55,8 +58,223 @@ export default function PedidoDetalhe() {
   const [newDescription, setNewDescription] = useState("");
   const [forceUpdate, setForceUpdate] = useState(0); // Para forçar re-render
   const [localStatus, setLocalStatus] = useState<string | null>(null); // Estado local do status
+  const [notasFiscais, setNotasFiscais] = useState<any[]>([]);
+  const [emitindoNota, setEmitindoNota] = useState(false);
+  const [consultandoNota, setConsultandoNota] = useState<string | null>(null);
+  const [dialogEmitirNotaOpen, setDialogEmitirNotaOpen] = useState(false);
+  const [clienteInicial, setClienteInicial] = useState<any>(null);
 
   const code = id as string;
+
+  // Carregar notas fiscais do pedido
+  const loadNotasFiscais = async () => {
+    const notas = await focusNFService.listarNotas(code);
+    setNotasFiscais(notas);
+  };
+
+  const handleConsultarNota = useCallback(async (ref: string, showLoading = true) => {
+    try {
+      if (showLoading) {
+        setConsultandoNota(ref);
+      }
+
+      const empresa_id = await getCurrentEmpresaId();
+      if (!empresa_id) {
+        toast.error('Empresa não encontrada');
+        return;
+      }
+
+      const result = await focusNFService.consultarNota(ref);
+      
+      if (result.ok && result.data) {
+        // Atualizar nota no banco de dados
+        const { supabase } = await import('@/integrations/supabase/client');
+        const notaData = result.data;
+
+        // Buscar a nota atual no banco
+        const { data: notaExistente } = await supabase
+          .from('focusnf_notas')
+          .select('id')
+          .eq('ref', ref)
+          .eq('empresa_id', empresa_id)
+          .single();
+
+        if (notaExistente) {
+          // Atualizar status e dados da nota
+          await supabase
+            .from('focusnf_notas')
+            .update({
+              status: notaData.status || 'processando_autorizacao',
+              numero: notaData.numero,
+              serie: notaData.serie,
+              chave_acesso: notaData.chave_nfe || notaData.chave_acesso,
+              xml_url: notaData.caminho_xml_nota_fiscal,
+              danfe_url: notaData.caminho_danfe,
+              dados_retornados: notaData,
+              // Só salvar como erro se realmente for um erro (não autorizado)
+              erro_mensagem: notaData.status === 'autorizado' || notaData.status === 'processando_autorizacao'
+                ? null // Limpar erro se autorizado
+                : (notaData.erro_mensagem || notaData.mensagem_sefaz || null),
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', notaExistente.id);
+        }
+
+        // Recarregar lista de notas diretamente
+        const notasAtualizadas = await focusNFService.listarNotas(code);
+        setNotasFiscais(notasAtualizadas);
+
+        if (showLoading) {
+          if (notaData.status === 'autorizado') {
+            toast.success('Nota fiscal autorizada!');
+          } else if (notaData.status === 'erro_autorizacao' || notaData.status === 'denegado') {
+            toast.warning(`Status da nota: ${notaData.status}`);
+          } else {
+            toast.info('Status ainda em processamento');
+          }
+        }
+      } else {
+        if (showLoading) {
+          toast.error(result.error || 'Erro ao consultar nota');
+        }
+      }
+    } catch (error: any) {
+      console.error('Erro ao consultar nota:', error);
+      if (showLoading) {
+        toast.error(error.message || 'Erro ao consultar nota');
+      }
+    } finally {
+      if (showLoading) {
+        setConsultandoNota(null);
+      }
+    }
+  }, [code]);
+
+  // Carregar notas fiscais quando o código mudar
+  useEffect(() => {
+    if (code) {
+      loadNotasFiscais();
+    }
+  }, [code]);
+
+  // Polling automático para notas em processamento
+  useEffect(() => {
+    const notasProcessando = notasFiscais.filter(
+      nota => nota.status === 'processando_autorizacao'
+    );
+
+    if (notasProcessando.length === 0) {
+      return; // Não há notas para consultar
+    }
+
+    // Consultar a cada 10 segundos
+    const interval = setInterval(() => {
+      notasProcessando.forEach((nota) => {
+        handleConsultarNota(nota.ref, false); // false = não mostrar loading
+      });
+    }, 10000); // 10 segundos
+
+    return () => clearInterval(interval);
+  }, [notasFiscais, handleConsultarNota]);
+
+  const handleEmitirNota = async () => {
+    if (!order) {
+      toast.error('Pedido não encontrado');
+      return;
+    }
+
+    if (!empresa?.tem_nota_fiscal) {
+      toast.error('Você precisa ter o plano Profissional (com NF) para emitir notas fiscais');
+      navigate('/assinatura');
+      return;
+    }
+
+    // Buscar dados do cliente para preencher o dialog
+    let clienteData: any = {
+      nome: order.client,
+      email: orderDb?.customer_email || undefined,
+      telefone: orderDb?.customer_phone || undefined,
+    };
+
+    // Tentar buscar cliente completo na tabela atelie_customers
+    try {
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { getCurrentEmpresaId } = await import('@/integrations/supabase/auth-utils');
+      const empresa_id = await getCurrentEmpresaId();
+      
+      if (empresa_id && order.client) {
+        const { data: cliente } = await supabase
+          .from('atelie_customers')
+          .select('*')
+          .eq('empresa_id', empresa_id)
+          .ilike('name', order.client)
+          .limit(1)
+          .single();
+
+        if (cliente) {
+          clienteData = {
+            nome: cliente.name || clienteData.nome,
+            email: cliente.email || clienteData.email,
+            telefone: cliente.phone || clienteData.telefone,
+            cpf_cnpj: cliente.cpf_cnpj || undefined,
+            endereco: {
+              logradouro: cliente.endereco_logradouro || undefined,
+              numero: cliente.endereco_numero || undefined,
+              complemento: cliente.endereco_complemento || undefined,
+              bairro: cliente.endereco_bairro || undefined,
+              cidade: cliente.endereco_cidade || undefined,
+              uf: cliente.endereco_uf || undefined,
+              cep: cliente.endereco_cep || undefined,
+            }
+          };
+        }
+      }
+    } catch (error) {
+      console.log('Não foi possível buscar dados completos do cliente:', error);
+      // Continuar com dados básicos do pedido
+    }
+
+    // Armazenar dados do cliente e abrir dialog
+    setClienteInicial(clienteData);
+    setDialogEmitirNotaOpen(true);
+  };
+
+  const handleConfirmarEmitirNota = async (items: any[], tipoNota: 'NFe' | 'NFCe' | 'NFSe', clienteData: any) => {
+    if (!order) {
+      toast.error('Pedido não encontrado');
+      return;
+    }
+
+    try {
+      setEmitindoNota(true);
+      const valorTotal = items.reduce((acc, item) => acc + item.valor_total, 0);
+      
+      // Usar dados do cliente passados do dialog (já coletados/completados pelo usuário)
+      const result = await focusNFService.emitirNota({
+        orderCode: order.code || code,
+        tipoNota: tipoNota,
+        cliente: clienteData,
+        valorTotal: valorTotal,
+        items: items, // Enviar múltiplos itens
+      });
+
+      // Sempre recarregar a lista de notas, mesmo se houver erro
+      await loadNotasFiscais();
+
+      if (result.ok) {
+        toast.success('Nota fiscal emitida com sucesso!');
+        setDialogEmitirNotaOpen(false);
+      } else {
+        toast.error(result.error || 'Erro ao emitir nota fiscal');
+      }
+    } catch (error: any) {
+      // Recarregar lista mesmo em caso de erro para mostrar status atualizado
+      await loadNotasFiscais();
+      toast.error(error.message || 'Erro ao emitir nota fiscal');
+    } finally {
+      setEmitindoNota(false);
+    }
+  };
 
   const handleUpdateStatus = async () => {
     if (!newStatus) {
@@ -943,6 +1161,157 @@ export default function PedidoDetalhe() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Notas Fiscais */}
+        {empresa?.tem_nota_fiscal && (
+          <Card className="bg-white border border-gray-200/50 shadow-sm">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-gray-900 flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-green-600" />
+                  Notas Fiscais
+                </CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigate('/notas-fiscais')}
+                >
+                  Ver Todas
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {notasFiscais.length > 0 ? (
+                  <div className="space-y-2">
+                    {notasFiscais.map((nota) => {
+                      const isErro = nota.status === 'erro_emissao';
+                      const isProcessando = nota.status === 'processando_autorizacao';
+                      
+                      return (
+                        <div 
+                          key={nota.id} 
+                          className={`flex items-start justify-between p-3 border rounded-lg ${
+                            isErro || nota.status === 'erro_autorizacao' || nota.status === 'denegado' ? 'border-red-200 bg-red-50' : 
+                            isProcessando ? 'border-yellow-200 bg-yellow-50' : 
+                            nota.status === 'cancelado' ? 'border-gray-200 bg-gray-50' :
+                            nota.status === 'autorizado' || nota.status === 'autorizada' ? 'border-green-200 bg-green-50' :
+                            'border-gray-200 bg-gray-50'
+                          }`}
+                        >
+                          <div className="flex-1">
+                            <p className="font-medium">NFe {nota.numero || nota.ref}</p>
+                            <p className={`text-sm mt-1 ${
+                              isErro ? 'text-red-700' : 
+                              isProcessando ? 'text-yellow-700' : 
+                              'text-green-700'
+                            }`}>
+                              Status: {
+                                nota.status === 'erro_emissao' || nota.status === 'erro_autorizacao' ? '❌ Erro na Emissão' :
+                                nota.status === 'processando_autorizacao' ? '⏳ Processando Autorização' :
+                                nota.status === 'autorizado' || nota.status === 'autorizada' ? '✅ Autorizada' :
+                                nota.status === 'cancelado' ? '❌ Cancelada' :
+                                nota.status === 'denegado' ? '⚠️ Denegada' :
+                                nota.status
+                              }
+                            </p>
+                            {nota.erro_mensagem && (
+                              <p className="text-xs text-red-600 mt-1 italic">
+                                {nota.erro_mensagem.length > 100 
+                                  ? nota.erro_mensagem.substring(0, 100) + '...' 
+                                  : nota.erro_mensagem}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            {nota.status === 'processando_autorizacao' && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleConsultarNota(nota.ref)}
+                                disabled={consultandoNota === nota.ref}
+                              >
+                                {consultandoNota === nota.ref ? (
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                ) : (
+                                  <RefreshCw className="h-4 w-4 mr-2" />
+                                )}
+                                Consultar
+                              </Button>
+                            )}
+                            {nota.status === 'autorizado' && (
+                              <>
+                                {nota.xml_url && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      const baseUrl = nota.ambiente === 'producao' 
+                                        ? 'https://api.focusnfe.com.br'
+                                        : 'https://homologacao.focusnfe.com.br';
+                                      window.open(`${baseUrl}${nota.xml_url}`, '_blank');
+                                    }}
+                                  >
+                                    <Download className="h-4 w-4 mr-2" />
+                                    XML
+                                  </Button>
+                                )}
+                                {nota.danfe_url && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      const baseUrl = nota.ambiente === 'producao' 
+                                        ? 'https://api.focusnfe.com.br'
+                                        : 'https://homologacao.focusnfe.com.br';
+                                      window.open(`${baseUrl}${nota.danfe_url}`, '_blank');
+                                    }}
+                                  >
+                                    <FileText className="h-4 w-4 mr-2" />
+                                    DANFE
+                                  </Button>
+                                )}
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => navigate('/notas-fiscais')}
+                                >
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  Ver Detalhes
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Nenhuma nota fiscal emitida para este pedido</p>
+                )}
+                <Button
+                  onClick={handleEmitirNota}
+                  disabled={emitindoNota}
+                  className="w-full"
+                >
+                  <FileText className="mr-2 h-4 w-4" />
+                  Emitir Nota Fiscal
+                </Button>
+
+                {/* Dialog para configurar itens */}
+                <DialogEmitirNota
+                  open={dialogEmitirNotaOpen}
+                  onOpenChange={setDialogEmitirNotaOpen}
+                  onEmitir={handleConfirmarEmitirNota}
+                  valorTotalPadrao={order?.value || 0}
+                  orderCode={order?.code || code}
+                  loading={emitindoNota}
+                  clienteInicial={clienteInicial}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Ações */}
         <Card className="bg-white border border-gray-200/50 shadow-sm">
