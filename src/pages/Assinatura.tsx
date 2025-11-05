@@ -455,22 +455,13 @@ export default function Assinatura() {
           companyId: empresa?.id
         });
         
-        toast.success("Pagamento criado com sucesso!");
-        
-        // Mostrar informações do pagamento
-        console.log('✅ Pagamento criado:', paymentData);
+        // Salvar informações do pagamento
+        setPaymentInfo(paymentData);
         
         // Determinar a URL de pagamento (pode ser invoiceUrl ou paymentLink)
-        const paymentUrl = paymentData.invoiceUrl || paymentData.paymentLink;
+        const paymentUrl = paymentData.invoiceUrl || paymentData.paymentLink || paymentData.bankSlipUrl;
         
-        // Se não tiver URL de pagamento, mostrar instruções
-        if (!paymentUrl) {
-          setPaymentInfo(paymentData);
-          setShowPixInstructions(true); // Reutiliza o mesmo modal para ambos os métodos
-          return;
-        }
-        
-        // Redirecionar para o link de pagamento do ASAAS
+        // Se tiver URL de pagamento, tentar abrir
         if (paymentUrl) {
           // Tentar abrir em nova aba, se falhar, redirecionar na mesma aba
           const newWindow = window.open(paymentUrl, '_blank');
@@ -479,14 +470,19 @@ export default function Assinatura() {
           if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
             // Se não conseguiu abrir nova aba, redirecionar na mesma aba
             window.location.href = paymentUrl;
-            toast.success(`Pagamento ${pendingPlanId?.includes('yearly') ? 'Anual' : 'Mensal'} criado! Redirecionando para pagamento...`);
+            toast.success(`Assinatura criada! Redirecionando para pagamento...`);
           } else {
-            toast.success(`Pagamento ${pendingPlanId?.includes('yearly') ? 'Anual' : 'Mensal'} criado! Abra o link para pagar via ${selectedPaymentMethod === 'PIX' ? 'PIX' : 'cartão'}.`);
+            toast.success(`Assinatura criada! Abra o link para pagar via ${selectedPaymentMethod === 'PIX' ? 'PIX' : selectedPaymentMethod === 'BOLETO' ? 'Boleto' : 'cartão'}.`);
           }
         }
         
-        // Aqui você pode redirecionar ou mostrar mais informações
-        // Por enquanto, apenas mostra sucesso
+        // SEMPRE mostrar modal com instruções (mesmo que tenha URL)
+        // Isso garante que o usuário saiba o que fazer
+        setShowPixInstructions(true);
+        
+        // Mostrar informações do pagamento
+        console.log('✅ Assinatura criada:', paymentData);
+        console.log('🔗 URL de pagamento:', paymentUrl);
       } else {
         const appError = errorHandler.handleSupabaseError(
           { message: 'Erro ao criar pagamento', code: 'CREATE_SUBSCRIPTION_ERROR' },
@@ -1445,8 +1441,10 @@ export default function Assinatura() {
                   <h5 className="font-semibold text-gray-900 mb-1">Verifique seu email</h5>
                   <p className="text-sm text-gray-600">
                     {selectedPaymentMethod === 'PIX' 
-                      ? 'Você receberá um email com o código PIX para pagamento em instantes.'
-                      : 'Você receberá um email com o link de pagamento em instantes.'}
+                      ? 'Você receberá um email com o código PIX para pagamento. O link de pagamento também está disponível acima.'
+                      : selectedPaymentMethod === 'BOLETO'
+                      ? 'Você receberá um email com o boleto bancário. O link de pagamento também está disponível acima.'
+                      : 'Você receberá um email com o link de pagamento. O link também está disponível acima.'}
                   </p>
                 </div>
               </div>
@@ -1495,16 +1493,66 @@ export default function Assinatura() {
               </div>
             </div>
 
+            {/* Link de Pagamento (se disponível) */}
+            {paymentInfo && (paymentInfo.invoiceUrl || paymentInfo.paymentLink || paymentInfo.bankSlipUrl) && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex gap-3">
+                  <div className="text-2xl">🔗</div>
+                  <div className="flex-1">
+                    <h5 className="font-semibold text-blue-900 mb-2">Link de Pagamento Disponível</h5>
+                    <p className="text-sm text-blue-800 mb-3">
+                      Clique no botão abaixo para acessar o pagamento diretamente:
+                    </p>
+                    <Button
+                      onClick={() => {
+                        const url = paymentInfo.invoiceUrl || paymentInfo.paymentLink || paymentInfo.bankSlipUrl;
+                        if (url) {
+                          window.open(url, '_blank');
+                        }
+                      }}
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      <CreditCard className="w-4 h-4 mr-2" />
+                      Abrir Link de Pagamento
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Informações da Assinatura */}
+            {paymentInfo && paymentInfo.id && (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <div className="flex gap-3">
+                  <div className="text-2xl">📋</div>
+                  <div>
+                    <h5 className="font-semibold text-gray-900 mb-1">ID da Assinatura</h5>
+                    <p className="text-sm text-gray-600 font-mono break-all">
+                      {paymentInfo.id}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Guarde este ID para consultas futuras
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Alerta */}
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
               <div className="flex gap-3">
                 <div className="text-2xl">⚠️</div>
                 <div>
                   <h5 className="font-semibold text-yellow-900 mb-1">Importante</h5>
-                  <p className="text-sm text-yellow-800">
+                  <p className="text-sm text-yellow-800 mb-2">
                     {selectedPaymentMethod === 'PIX'
-                      ? 'O código PIX é enviado por email. Verifique sua caixa de entrada e spam.'
-                      : 'O link de pagamento é enviado por email. Verifique sua caixa de entrada e spam.'}
+                      ? 'O código PIX também será enviado por email. Verifique sua caixa de entrada e spam.'
+                      : selectedPaymentMethod === 'BOLETO'
+                      ? 'O boleto também será enviado por email. Verifique sua caixa de entrada e spam.'
+                      : 'O link de pagamento também será enviado por email. Verifique sua caixa de entrada e spam.'}
+                  </p>
+                  <p className="text-sm text-yellow-800">
+                    <strong>Email:</strong> {empresa?.email || user?.email || 'Não informado'}
                   </p>
                 </div>
               </div>
