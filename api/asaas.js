@@ -140,8 +140,8 @@ async function createSubscription(paymentData) {
   const planConfig = {
     'monthly-basic': { value: 39.00, description: 'Assinatura Básica Mensal - Ateliê Pro', cycle: 'MONTHLY' },
     'yearly-basic': { value: 390.00, description: 'Assinatura Básica Anual - Ateliê Pro', cycle: 'YEARLY' },
-    'monthly-professional': { value: 149.00, description: 'Assinatura Profissional Mensal - Ateliê Pro (com NF)', cycle: 'MONTHLY' },
-    'yearly-professional': { value: 1488.00, description: 'Assinatura Profissional Anual - Ateliê Pro (com NF)', cycle: 'YEARLY' }
+    'monthly-professional': { value: 99.90, description: 'Assinatura Profissional Mensal - Ateliê Pro (com NF)', cycle: 'MONTHLY' },
+    'yearly-professional': { value: 1198.00, description: 'Assinatura Profissional Anual - Ateliê Pro (com NF)', cycle: 'YEARLY' }
   };
   
   const config = planConfig[planType];
@@ -238,8 +238,8 @@ async function updateSubscription(data) {
   const planConfig = {
     'monthly-basic': { value: 39.00, description: 'Assinatura Básica Mensal - Ateliê Pro', cycle: 'MONTHLY' },
     'yearly-basic': { value: 390.00, description: 'Assinatura Básica Anual - Ateliê Pro', cycle: 'YEARLY' },
-    'monthly-professional': { value: 149.00, description: 'Assinatura Profissional Mensal - Ateliê Pro (com NF)', cycle: 'MONTHLY' },
-    'yearly-professional': { value: 1488.00, description: 'Assinatura Profissional Anual - Ateliê Pro (com NF)', cycle: 'YEARLY' }
+    'monthly-professional': { value: 99.90, description: 'Assinatura Profissional Mensal - Ateliê Pro (com NF)', cycle: 'MONTHLY' },
+    'yearly-professional': { value: 1198.00, description: 'Assinatura Profissional Anual - Ateliê Pro (com NF)', cycle: 'YEARLY' }
   };
   
   const config = planConfig[newPlanType];

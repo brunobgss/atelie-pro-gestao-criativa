@@ -73,7 +73,7 @@ const plans: Plan[] = [
   {
     id: "monthly-professional",
     name: "Profissional Mensal",
-    price: 149.00,
+    price: 99.90,
     period: "mês",
     popular: true,
     features: [
@@ -91,9 +91,9 @@ const plans: Plan[] = [
   {
     id: "yearly-professional",
     name: "Profissional Anual",
-    price: 1488.00,
+    price: 1198.00,
     period: "ano",
-    originalPrice: 1788.00,
+    originalPrice: 1198.80,
     discount: "2 meses grátis",
     features: [
       "Tudo do plano profissional mensal",
@@ -146,8 +146,8 @@ export default function Assinatura() {
         const planValues: Record<string, { value: number; isProfessional: boolean }> = {
           'monthly-basic': { value: 39.00, isProfessional: false },
           'yearly-basic': { value: 390.00, isProfessional: false },
-          'monthly-professional': { value: 149.00, isProfessional: true },
-          'yearly-professional': { value: 1488.00, isProfessional: true }
+          'monthly-professional': { value: 99.90, isProfessional: true },
+          'yearly-professional': { value: 1198.00, isProfessional: true }
         };
         
         const planInfo = planValues[payment.planId];
@@ -174,14 +174,14 @@ export default function Assinatura() {
           return {
             type: 'monthly-basic',
             name: isProfessional ? 'Profissional Mensal' : 'Básico Mensal',
-            price: formatCurrency(isProfessional ? 149.00 : 39.00),
+            price: formatCurrency(isProfessional ? 99.90 : 39.00),
             period: t.perMonth
           };
         } else if (payment.value === 390.00) {
           return {
             type: 'yearly-basic',
             name: isProfessional ? 'Profissional Anual' : 'Básico Anual',
-            price: formatCurrency(isProfessional ? 1488.00 : 390.00),
+            price: formatCurrency(isProfessional ? 1198.00 : 390.00),
             period: t.perYear
           };
         }
@@ -195,7 +195,7 @@ export default function Assinatura() {
       return {
         type: 'monthly-professional',
         name: 'Profissional Mensal',
-        price: formatCurrency(149.00),
+        price: formatCurrency(99.90),
         period: t.perMonth
       };
     }
@@ -363,8 +363,8 @@ export default function Assinatura() {
     const planValues: Record<string, number> = {
       'monthly-basic': 39.00,
       'yearly-basic': 390.00,
-      'monthly-professional': 149.00,
-      'yearly-professional': 1488.00
+      'monthly-professional': 99.90,
+      'yearly-professional': 1198.00
     };
     const planData = {
       planId,
@@ -806,8 +806,8 @@ export default function Assinatura() {
                         <SelectItem key={plan.id} value={plan.id}>
                           {plan.name} - {plan.price === 39.00 ? 'R$ 39' : 
                                          plan.price === 390.00 ? 'R$ 390' :
-                                         plan.price === 149.00 ? 'R$ 149' :
-                                         plan.price === 1488.00 ? 'R$ 1.488' : plan.price}/{plan.period}
+                                         plan.price === 99.90 ? 'R$ 99,90' :
+                                         plan.price === 1198.00 ? 'R$ 1.198' : plan.price}/{plan.period}
                         </SelectItem>
                       ))}
                   </SelectContent>

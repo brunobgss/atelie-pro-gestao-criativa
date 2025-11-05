@@ -134,8 +134,8 @@ async function activatePremium(payment) {
     const planValues = {
       39.00: { days: 30, type: 'monthly-basic', temNF: false },
       390.00: { days: 365, type: 'yearly-basic', temNF: false },
-      149.00: { days: 30, type: 'monthly-professional', temNF: true },
-      1488.00: { days: 365, type: 'yearly-professional', temNF: true }
+      99.90: { days: 30, type: 'monthly-professional', temNF: true },
+      1198.00: { days: 365, type: 'yearly-professional', temNF: true }
     };
     
     const planInfo = planValues[payment.value];
@@ -308,8 +308,8 @@ async function activatePremiumForSubscription(subscription) {
     const planValues = {
       39: { temNF: false },
       390: { temNF: false },
-      149: { temNF: true },
-      1488: { temNF: true }
+      99.90: { temNF: true },
+      1198.00: { temNF: true }
     };
     
     const planInfo = planValues[subscription.value];
