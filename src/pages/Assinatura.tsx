@@ -479,9 +479,9 @@ export default function Assinatura() {
           if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
             // Se não conseguiu abrir nova aba, redirecionar na mesma aba
             window.location.href = paymentUrl;
-            toast.success(`Pagamento ${pendingPlanId === 'monthly' ? 'Mensal' : 'Anual'} criado! Redirecionando para pagamento...`);
+            toast.success(`Pagamento ${pendingPlanId?.includes('yearly') ? 'Anual' : 'Mensal'} criado! Redirecionando para pagamento...`);
           } else {
-            toast.success(`Pagamento ${pendingPlanId === 'monthly' ? 'Mensal' : 'Anual'} criado! Abra o link para pagar via ${selectedPaymentMethod === 'PIX' ? 'PIX' : 'cartão'}.`);
+            toast.success(`Pagamento ${pendingPlanId?.includes('yearly') ? 'Anual' : 'Mensal'} criado! Abra o link para pagar via ${selectedPaymentMethod === 'PIX' ? 'PIX' : 'cartão'}.`);
           }
         }
         
@@ -1193,18 +1193,26 @@ export default function Assinatura() {
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="font-semibold text-gray-900 text-sm">
-                    {pendingPlanId === 'yearly' ? 'Plano Anual' : 'Plano Mensal'}
+                    {pendingPlanId === 'yearly-basic' || pendingPlanId === 'yearly-professional' 
+                      ? (pendingPlanId === 'yearly-professional' ? 'Profissional Anual' : 'Básico Anual')
+                      : (pendingPlanId === 'monthly-professional' ? 'Profissional Mensal' : 'Básico Mensal')}
                   </h3>
                   <p className="text-xs text-gray-600">
-                    {pendingPlanId === 'yearly' ? 'R$ 390,00/ano' : 'R$ 39,00/mês'}
+                    {pendingPlanId === 'yearly-basic' ? 'R$ 390,00/ano' :
+                     pendingPlanId === 'yearly-professional' ? 'R$ 1.198,00/ano' :
+                     pendingPlanId === 'monthly-professional' ? 'R$ 99,90/mês' :
+                     'R$ 39,00/mês'}
                   </p>
                 </div>
                 <div className="text-right">
                   <div className="text-xl font-bold text-purple-600">
-                    {pendingPlanId === 'yearly' ? 'R$ 390' : 'R$ 39'}
+                    {pendingPlanId === 'yearly-basic' ? 'R$ 390' :
+                     pendingPlanId === 'yearly-professional' ? 'R$ 1.198' :
+                     pendingPlanId === 'monthly-professional' ? 'R$ 99,90' :
+                     'R$ 39'}
                   </div>
                   <div className="text-xs text-gray-500">
-                    {pendingPlanId === 'yearly' ? 'por ano' : 'por mês'}
+                    {pendingPlanId === 'yearly-basic' || pendingPlanId === 'yearly-professional' ? 'por ano' : 'por mês'}
                   </div>
                 </div>
               </div>
@@ -1404,14 +1412,22 @@ export default function Assinatura() {
             {/* Resumo do Plano */}
             <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-lg p-4 border border-green-200">
               <h3 className="font-semibold text-gray-900 mb-2">
-                {pendingPlanId === 'yearly' ? 'Plano Anual' : 'Plano Mensal'}
+                {pendingPlanId === 'yearly-basic' || pendingPlanId === 'yearly-professional' 
+                  ? (pendingPlanId === 'yearly-professional' ? 'Profissional Anual' : 'Básico Anual')
+                  : (pendingPlanId === 'monthly-professional' ? 'Profissional Mensal' : 'Básico Mensal')}
               </h3>
               <div className="flex items-center justify-between">
                 <span className="text-gray-600 text-sm">
-                  {pendingPlanId === 'yearly' ? 'R$ 390,00/ano' : 'R$ 39,00/mês'}
+                  {pendingPlanId === 'yearly-basic' ? 'R$ 390,00/ano' :
+                   pendingPlanId === 'yearly-professional' ? 'R$ 1.198,00/ano' :
+                   pendingPlanId === 'monthly-professional' ? 'R$ 99,90/mês' :
+                   'R$ 39,00/mês'}
                 </span>
                 <span className="text-xl font-bold text-green-600">
-                  {pendingPlanId === 'yearly' ? 'R$ 390' : 'R$ 39'}
+                  {pendingPlanId === 'yearly-basic' ? 'R$ 390' :
+                   pendingPlanId === 'yearly-professional' ? 'R$ 1.198' :
+                   pendingPlanId === 'monthly-professional' ? 'R$ 99,90' :
+                   'R$ 39'}
                 </span>
               </div>
             </div>
