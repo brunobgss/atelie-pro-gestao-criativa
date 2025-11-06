@@ -64,6 +64,31 @@ export const logger = {
     if (isDevelopment) {
       console.table(data);
     }
+  },
+
+  // Registrar ações do usuário (telemetria leve)
+  userAction: (action: string, context: string, payload?: Record<string, unknown>) => {
+    const entry = {
+      timestamp: new Date().toISOString(),
+      action,
+      context,
+      payload
+    };
+
+    if (isDevelopment) {
+      console.info('📝 [USER_ACTION]', entry);
+    }
+
+    try {
+      if (typeof window !== 'undefined') {
+        const history = JSON.parse(localStorage.getItem('app_user_actions') || '[]');
+        history.unshift(entry);
+        if (history.length > 50) history.pop();
+        localStorage.setItem('app_user_actions', JSON.stringify(history));
+      }
+    } catch (error) {
+      console.warn('⚠️ Não foi possível registrar userAction:', error);
+    }
   }
 };
 

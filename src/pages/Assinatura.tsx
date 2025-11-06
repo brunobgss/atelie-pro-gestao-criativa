@@ -1187,9 +1187,9 @@ export default function Assinatura() {
             <DialogTitle className="text-xl font-bold text-gray-900">
               Escolha a Forma de Pagamento
             </DialogTitle>
-            <p className="text-gray-600 text-sm mt-1">
+            <DialogDescription className="text-gray-600 text-sm mt-1">
               Selecione como deseja pagar sua assinatura do Ateliê PRO
-            </p>
+            </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4 py-2">
