@@ -46,7 +46,8 @@ const plans: Plan[] = [
       "Relatórios financeiros",
       "Integração WhatsApp",
       "Suporte por email",
-      "Backup automático"
+      "Backup automático",
+      "Sem emissão de notas fiscais"
     ],
     icon: Zap,
     color: "blue"
@@ -65,7 +66,8 @@ const plans: Plan[] = [
       "Recursos premium",
       "Integração avançada",
       "Relatórios detalhados",
-      "Backup premium"
+      "Backup premium",
+      "Sem emissão de notas fiscais"
     ],
     icon: Crown,
     color: "purple"
@@ -662,7 +664,9 @@ export default function Assinatura() {
                   "Recursos premium",
                   "Relatórios detalhados",
                   "Backup premium",
-                  ...(empresa?.tem_nota_fiscal ? ["Emissão de Notas Fiscais"] : [])
+                ...(empresa?.tem_nota_fiscal
+                  ? ["Emissão de Notas Fiscais"]
+                  : ["Sem emissão de notas fiscais (disponível no plano Profissional)"])
                 ].map((feature, index) => (
                   <div key={index} className="flex items-center gap-3">
                     <Check className="w-5 h-5 text-green-600 flex-shrink-0" />
@@ -700,7 +704,6 @@ export default function Assinatura() {
                   variant="outline" 
                   className="w-full justify-start"
                   onClick={() => setDialogTrocarPlanoOpen(true)}
-                  disabled={!assinaturaAtiva}
                 >
                   <ArrowUpDown className="w-4 h-4 mr-2" />
                   Trocar de Plano
@@ -709,7 +712,6 @@ export default function Assinatura() {
                   variant="outline" 
                   className="w-full justify-start"
                   onClick={() => setDialogTrocarPagamentoOpen(true)}
-                  disabled={!assinaturaAtiva}
                 >
                   <CreditCard className="w-4 h-4 mr-2" />
                   Trocar Forma de Pagamento

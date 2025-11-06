@@ -68,6 +68,11 @@ export default function PedidoDetalhe() {
 
   // Carregar notas fiscais do pedido
   const loadNotasFiscais = async () => {
+    if (!empresa?.tem_nota_fiscal) {
+      setNotasFiscais([]);
+      return;
+    }
+
     const notas = await focusNFService.listarNotas(code);
     setNotasFiscais(notas);
   };
@@ -155,7 +160,7 @@ export default function PedidoDetalhe() {
     if (code) {
       loadNotasFiscais();
     }
-  }, [code]);
+  }, [code, empresa?.tem_nota_fiscal]);
 
   // Polling automático para notas em processamento
   useEffect(() => {
@@ -184,7 +189,7 @@ export default function PedidoDetalhe() {
     }
 
     if (!empresa?.tem_nota_fiscal) {
-      toast.error('Você precisa ter o plano Profissional (com NF) para emitir notas fiscais');
+      toast.info('Funcionalidade disponível no plano Profissional (com NF). Atualize seu plano para emitir notas fiscais.');
       navigate('/assinatura');
       return;
     }
@@ -1163,28 +1168,42 @@ export default function PedidoDetalhe() {
         </div>
 
         {/* Notas Fiscais */}
-        {empresa?.tem_nota_fiscal && (
-          <Card className="bg-white border border-gray-200/50 shadow-sm">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-gray-900 flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-green-600" />
-                  Notas Fiscais
-                </CardTitle>
+        <Card className="bg-white border border-gray-200/50 shadow-sm">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-gray-900 flex items-center gap-2">
+                <FileText className="w-5 h-5 text-green-600" />
+                Notas Fiscais
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                {!empresa?.tem_nota_fiscal && (
+                  <Badge variant="outline" className="border-amber-300 text-amber-700 bg-amber-50">
+                    Exclusivo do plano Profissional
+                  </Badge>
+                )}
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => navigate('/notas-fiscais')}
+                  onClick={() => {
+                    if (!empresa?.tem_nota_fiscal) {
+                      toast.info('Visualize e gerencie suas notas fiscais assinando o plano Profissional (com NF).');
+                      navigate('/assinatura');
+                      return;
+                    }
+                    navigate('/notas-fiscais');
+                  }}
+                  className={!empresa?.tem_nota_fiscal ? 'text-amber-600 hover:text-amber-700 hover:bg-amber-50' : ''}
                 >
                   Ver Todas
                 </Button>
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {notasFiscais.length > 0 ? (
-                  <div className="space-y-2">
-                    {notasFiscais.map((nota) => {
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {empresa?.tem_nota_fiscal && notasFiscais.length > 0 ? (
+                <div className="space-y-2">
+                  {notasFiscais.map((nota) => {
                       const isErro = nota.status === 'erro_emissao';
                       const isProcessando = nota.status === 'processando_autorizacao';
                       
@@ -1284,34 +1303,52 @@ export default function PedidoDetalhe() {
                           </div>
                         </div>
                       );
-                    })}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">Nenhuma nota fiscal emitida para este pedido</p>
-                )}
-                <Button
-                  onClick={handleEmitirNota}
-                  disabled={emitindoNota}
-                  className="w-full"
-                >
-                  <FileText className="mr-2 h-4 w-4" />
-                  Emitir Nota Fiscal
-                </Button>
+                  })}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    {empresa?.tem_nota_fiscal
+                      ? 'Nenhuma nota fiscal emitida para este pedido'
+                      : 'Recurso disponível no plano Profissional (com NF). Atualize seu plano para emitir e acompanhar notas fiscais por aqui.'}
+                  </p>
+                </div>
+              )}
+              <Button
+                onClick={() => {
+                  if (!empresa?.tem_nota_fiscal) {
+                    toast.info('Emita notas fiscais assinando o plano Profissional (com NF).');
+                    navigate('/assinatura');
+                    return;
+                  }
+                  handleEmitirNota();
+                }}
+                disabled={emitindoNota}
+                aria-disabled={!empresa?.tem_nota_fiscal}
+                className={`w-full ${!empresa?.tem_nota_fiscal ? 'bg-gray-100 text-gray-500 hover:bg-gray-100 cursor-pointer border border-dashed border-gray-300' : ''}`}
+              >
+                <FileText className="mr-2 h-4 w-4" />
+                {empresa?.tem_nota_fiscal ? 'Emitir Nota Fiscal' : 'Disponível no plano Profissional'}
+              </Button>
+              {!empresa?.tem_nota_fiscal && (
+                <p className="text-xs text-gray-500 text-center">
+                  Assine o plano Profissional (com NF) para liberar esta funcionalidade.
+                </p>
+              )}
 
-                {/* Dialog para configurar itens */}
-                <DialogEmitirNota
-                  open={dialogEmitirNotaOpen}
-                  onOpenChange={setDialogEmitirNotaOpen}
-                  onEmitir={handleConfirmarEmitirNota}
-                  valorTotalPadrao={order?.value || 0}
-                  orderCode={order?.code || code}
-                  loading={emitindoNota}
-                  clienteInicial={clienteInicial}
-                />
-              </div>
-            </CardContent>
-          </Card>
-        )}
+              {/* Dialog para configurar itens */}
+              <DialogEmitirNota
+                open={dialogEmitirNotaOpen}
+                onOpenChange={setDialogEmitirNotaOpen}
+                onEmitir={handleConfirmarEmitirNota}
+                valorTotalPadrao={order?.value || 0}
+                orderCode={order?.code || code}
+                loading={emitindoNota}
+                clienteInicial={clienteInicial}
+              />
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Ações */}
         <Card className="bg-white border border-gray-200/50 shadow-sm">

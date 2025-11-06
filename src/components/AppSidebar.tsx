@@ -1,5 +1,6 @@
+import type { MouseEvent } from "react";
 import { LayoutDashboard, Package, Calendar, FileText, Users, Archive, LogOut, Calculator, BookOpen, BarChart3, Crown, DollarSign, User, Ruler, HelpCircle, Receipt, Building2, CreditCard, TrendingUp, ShoppingCart, AlertTriangle } from "lucide-react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import logoAteliePro from "@/assets/logo-atelie-pro.png";
 import {
   Sidebar,
@@ -13,6 +14,7 @@ import {
 } from "@/components/ui/sidebar";
 import { useAuth } from "./AuthProvider";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { toast } from "sonner";
 
 const menuItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
@@ -45,6 +47,8 @@ export function AppSidebar() {
   const isCollapsed = state === "collapsed";
   const { empresa, user, signOut } = useAuth();
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
+  const hasNotaFiscal = empresa?.tem_nota_fiscal === true;
 
   // Verificar se o usuário é admin
   // Por padrão, apenas emails configurados como admin podem ver a página de erros
@@ -58,6 +62,29 @@ export function AppSidebar() {
       console.log("🔄 Link clicado no mobile, fechando menu");
       setOpenMobile(false);
     }
+  };
+
+  const handleMenuItemClick = (
+    event: MouseEvent<HTMLAnchorElement>,
+    item: (typeof menuItems)[number]
+  ) => {
+    if (item.requiresNF && !hasNotaFiscal) {
+      event.preventDefault();
+      toast.info('Funcionalidade disponível no plano Profissional (com NF).', {
+        action: {
+          label: 'Ver planos',
+          onClick: () => navigate('/assinatura')
+        }
+      });
+
+      if (isMobile) {
+        setOpenMobile(false);
+      }
+
+      return;
+    }
+
+    handleLinkClick();
   };
 
   return (
@@ -115,36 +142,36 @@ export function AppSidebar() {
             <SidebarMenu className="space-y-1 px-3 py-4">
               {menuItems
                 .filter((item) => {
-                  // Mostrar item de configuração NF para todos os usuários premium (eles podem querer ver/atualizar)
-                  // A página mostrará aviso se não tiverem o plano profissional
-                  if (item.requiresNF && !empresa?.is_premium) {
-                    return false;
-                  }
                   // Ocultar itens admin para usuários não admin
                   if (item.isAdmin && !isAdmin) {
                     return false;
                   }
                   return true;
                 })
-                .map((item) => (
+                .map((item) => {
+                  const isLockedNF = item.requiresNF && !hasNotaFiscal;
+
+                  return (
                   <SidebarMenuItem key={item.title}>
                     <NavLink
                       to={item.url}
                       end={item.url === "/"}
-                      onClick={handleLinkClick}
+                      onClick={(event) => handleMenuItemClick(event, item)}
                       className={({ isActive }) =>
                         `flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
                           isActive
                             ? "bg-gradient-to-r from-purple-100 to-pink-100 text-purple-800 font-semibold shadow-sm border-l-4 border-purple-500"
                             : "text-gray-700 hover:bg-gray-50 hover:text-purple-600"
-                        }`
+                        } ${isLockedNF ? 'opacity-70 border border-dashed border-amber-200 hover:bg-amber-50 hover:text-amber-700 cursor-pointer' : ''}`
                       }
+                      aria-disabled={isLockedNF}
                     >
                       <item.icon className={`w-5 h-5 ${item.title === "Dashboard" ? "text-purple-600" : ""}`} />
                       <span className="text-sm font-medium">{item.title}</span>
                     </NavLink>
                   </SidebarMenuItem>
-                ))}
+                  );
+                })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
