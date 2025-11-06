@@ -120,6 +120,7 @@ export default function Assinatura() {
   const [pendingPlanId, setPendingPlanId] = useState<string | null>(null);
   const [showPixInstructions, setShowPixInstructions] = useState(false);
   const [paymentInfo, setPaymentInfo] = useState<any>(null);
+  const [paymentEmail, setPaymentEmail] = useState<string>("");
   const [dialogTrocarPlanoOpen, setDialogTrocarPlanoOpen] = useState(false);
   const [dialogTrocarPagamentoOpen, setDialogTrocarPagamentoOpen] = useState(false);
   const [trocandoPlano, setTrocandoPlano] = useState(false);
@@ -130,6 +131,7 @@ export default function Assinatura() {
 
   // Verificar se o usuário já tem assinatura ativa
   const isPremium = empresa?.is_premium === true;
+  const instructionPaymentMethod = paymentInfo?.paymentMethod || selectedPaymentMethod;
   
   // Detectar o plano baseado no valor pago (se disponível) ou usar padrão
   const detectPlan = () => {
@@ -383,12 +385,14 @@ export default function Assinatura() {
     
     setIsLoading(true);
     setIsPaymentModalOpen(false);
-    
+    const userName = empresa?.responsavel || empresa?.nome || user?.email || "Usuário";
+    const userEmail = empresa?.email || user?.email || "";
+    const cpfCnpj = empresa?.cpf_cnpj || "";
+    const telefone = cleanPhone(empresa?.telefone || "");
+
+    setPaymentEmail(userEmail);
+
     try {
-      const userName = empresa?.responsavel || empresa?.nome || user?.email || "Usuário";
-      const userEmail = empresa?.email || user?.email || "";
-      const cpfCnpj = empresa?.cpf_cnpj || "";
-      const telefone = cleanPhone(empresa?.telefone || "");
       
       // Validação robusta dos dados necessários
       const validation = validateForm(
@@ -456,7 +460,12 @@ export default function Assinatura() {
         });
         
         // Salvar informações do pagamento
-        setPaymentInfo(paymentData);
+        setPaymentInfo({
+          ...paymentData,
+          userEmail,
+          paymentMethod: selectedPaymentMethod,
+          planType: pendingPlanId
+        });
         
         // Determinar a URL de pagamento (pode ser invoiceUrl ou paymentLink)
         const paymentUrl = paymentData.invoiceUrl || paymentData.paymentLink || paymentData.bankSlipUrl;
@@ -1397,11 +1406,11 @@ export default function Assinatura() {
               <CreditCard className="w-8 h-8 text-white" />
             </div>
             <DialogTitle className="text-2xl font-bold text-gray-900">
-              Instruções de Pagamento {selectedPaymentMethod === 'PIX' ? 'PIX' : 'Cartão'}
+              Instruções de Pagamento {instructionPaymentMethod === 'PIX' ? 'PIX' : instructionPaymentMethod === 'BOLETO' ? 'Boleto' : 'Cartão'}
             </DialogTitle>
-            <p className="text-gray-600 text-sm mt-2">
+            <DialogDescription className="text-gray-600 text-sm mt-2">
               Siga os passos abaixo para concluir sua assinatura
-            </p>
+            </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-6 py-4">
@@ -1440,9 +1449,9 @@ export default function Assinatura() {
                 <div className="flex-1">
                   <h5 className="font-semibold text-gray-900 mb-1">Verifique seu email</h5>
                   <p className="text-sm text-gray-600">
-                    {selectedPaymentMethod === 'PIX' 
+                    {instructionPaymentMethod === 'PIX' 
                       ? 'Você receberá um email com o código PIX para pagamento. O link de pagamento também está disponível acima.'
-                      : selectedPaymentMethod === 'BOLETO'
+                      : instructionPaymentMethod === 'BOLETO'
                       ? 'Você receberá um email com o boleto bancário. O link de pagamento também está disponível acima.'
                       : 'Você receberá um email com o link de pagamento. O link também está disponível acima.'}
                   </p>
@@ -1456,11 +1465,13 @@ export default function Assinatura() {
                 </div>
                 <div className="flex-1">
                   <h5 className="font-semibold text-gray-900 mb-1">
-                    {selectedPaymentMethod === 'PIX' ? 'Pague via PIX' : 'Efetue o pagamento'}
+                    {instructionPaymentMethod === 'PIX' ? 'Pague via PIX' : instructionPaymentMethod === 'BOLETO' ? 'Efetue o pagamento do boleto' : 'Efetue o pagamento'}
                   </h5>
                   <p className="text-sm text-gray-600">
-                    {selectedPaymentMethod === 'PIX'
+                    {instructionPaymentMethod === 'PIX'
                       ? 'Copie o código PIX e efetue o pagamento usando o app do seu banco.'
+                      : instructionPaymentMethod === 'BOLETO'
+                      ? 'Baixe o boleto e realize o pagamento no seu banco ou aplicativo.'
                       : 'Acesse o link e complete o pagamento com seu cartão de crédito.'}
                   </p>
                 </div>
@@ -1545,14 +1556,14 @@ export default function Assinatura() {
                 <div>
                   <h5 className="font-semibold text-yellow-900 mb-1">Importante</h5>
                   <p className="text-sm text-yellow-800 mb-2">
-                    {selectedPaymentMethod === 'PIX'
+                    {instructionPaymentMethod === 'PIX'
                       ? 'O código PIX também será enviado por email. Verifique sua caixa de entrada e spam.'
-                      : selectedPaymentMethod === 'BOLETO'
+                      : instructionPaymentMethod === 'BOLETO'
                       ? 'O boleto também será enviado por email. Verifique sua caixa de entrada e spam.'
                       : 'O link de pagamento também será enviado por email. Verifique sua caixa de entrada e spam.'}
                   </p>
                   <p className="text-sm text-yellow-800">
-                    <strong>Email:</strong> {empresa?.email || user?.email || 'Não informado'}
+                    <strong>Email:</strong> {paymentEmail || paymentInfo?.userEmail || empresa?.email || user?.email || 'Não informado'}
                   </p>
                 </div>
               </div>
