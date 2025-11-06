@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,13 +12,14 @@ import { DialogEmitirNota } from "@/components/DialogEmitirNota";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getOrderByCode, updateOrderStatus } from "@/integrations/supabase/orders";
 import { getReceitaByOrderCode } from "@/integrations/supabase/receitas";
-import { getMedidas } from "@/integrations/supabase/medidas";
 import { useSync } from "@/contexts/SyncContext";
+import { getMedidas } from "@/integrations/supabase/medidas";
 import { useAuth } from "@/components/AuthProvider";
 import { toast } from "sonner";
 import { ORDER_STATUS_OPTIONS } from "@/utils/statusConstants";
-import { focusNFService } from "@/integrations/focusnf/service";
 import { getCurrentEmpresaId } from "@/integrations/supabase/auth-utils";
+
+type FocusNFServiceType = typeof import("@/integrations/focusnf/service")["focusNFService"];
 
 type OrderItem = {
   id: string;
@@ -50,6 +51,7 @@ export default function PedidoDetalhe() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { invalidateRelated } = useSync();
+  const { empresa } = useAuth();
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
   const [isPaidDialogOpen, setIsPaidDialogOpen] = useState(false);
   const [newStatus, setNewStatus] = useState("");
@@ -64,17 +66,37 @@ export default function PedidoDetalhe() {
   const [clienteInicial, setClienteInicial] = useState<any>(null);
 
   const code = id as string;
+  const focusNFServiceRef = useRef<FocusNFServiceType | null>(null);
+
+  const getFocusNFService = useCallback(async () => {
+    if (!focusNFServiceRef.current) {
+      const module = await import("@/integrations/focusnf/service");
+      focusNFServiceRef.current = module.focusNFService;
+    }
+    return focusNFServiceRef.current;
+  }, []);
 
   // Carregar notas fiscais do pedido
-  const loadNotasFiscais = async () => {
-    if (!empresa?.tem_nota_fiscal) {
-      setNotasFiscais([]);
-      return;
-    }
+  const loadNotasFiscais = useCallback(async () => {
+    try {
+      if (!empresa?.tem_nota_fiscal) {
+        setNotasFiscais([]);
+        return;
+      }
 
-    const notas = await focusNFService.listarNotas(code);
-    setNotasFiscais(notas);
-  };
+      const focusNF = await getFocusNFService();
+      if (!focusNF) {
+        setNotasFiscais([]);
+        return;
+      }
+
+      const notas = await focusNF.listarNotas(code);
+      setNotasFiscais(notas);
+    } catch (error) {
+      console.error('[PedidoDetalhe] Erro ao carregar notas fiscais:', error);
+      setNotasFiscais([]);
+    }
+  }, [code, empresa?.tem_nota_fiscal, getFocusNFService]);
 
   const handleConsultarNota = useCallback(async (ref: string, showLoading = true) => {
     try {
@@ -88,7 +110,13 @@ export default function PedidoDetalhe() {
         return;
       }
 
-      const result = await focusNFService.consultarNota(ref);
+      const focusNF = await getFocusNFService();
+      if (!focusNF) {
+        toast.error('Serviço de notas fiscais indisponível');
+        return;
+      }
+
+      const result = await focusNF.consultarNota(ref);
       
       if (result.ok && result.data) {
         // Atualizar nota no banco de dados
@@ -125,7 +153,7 @@ export default function PedidoDetalhe() {
         }
 
         // Recarregar lista de notas diretamente
-        const notasAtualizadas = await focusNFService.listarNotas(code);
+        const notasAtualizadas = await focusNF.listarNotas(code);
         setNotasFiscais(notasAtualizadas);
 
         if (showLoading) {
@@ -152,14 +180,14 @@ export default function PedidoDetalhe() {
         setConsultandoNota(null);
       }
     }
-  }, [code]);
+  }, [code, getFocusNFService]);
 
   // Carregar notas fiscais quando o código mudar
   useEffect(() => {
     if (code) {
       loadNotasFiscais();
     }
-  }, [code, empresa?.tem_nota_fiscal]);
+  }, [code, loadNotasFiscais]);
 
   // Polling automático para notas em processamento
   useEffect(() => {
@@ -252,9 +280,16 @@ export default function PedidoDetalhe() {
     try {
       setEmitindoNota(true);
       const valorTotal = items.reduce((acc, item) => acc + item.valor_total, 0);
+
+      const focusNF = await getFocusNFService();
+      if (!focusNF) {
+        toast.error('Serviço de notas fiscais indisponível');
+        setEmitindoNota(false);
+        return;
+      }
       
       // Usar dados do cliente passados do dialog (já coletados/completados pelo usuário)
-      const result = await focusNFService.emitirNota({
+      const result = await focusNF.emitirNota({
         orderCode: order.code || code,
         tipoNota: tipoNota,
         cliente: clienteData,
@@ -414,7 +449,6 @@ export default function PedidoDetalhe() {
   });
 
   // Buscar medidas do cliente
-  const { empresa } = useAuth();
   const { data: medidas = [] } = useQuery({
     queryKey: ["medidas", empresa?.id],
     queryFn: () => getMedidas(empresa?.id || ''),

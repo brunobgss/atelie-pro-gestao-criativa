@@ -471,9 +471,10 @@ export default function Assinatura() {
         
         // Determinar a URL de pagamento (pode ser invoiceUrl ou paymentLink)
         const paymentUrl = paymentData.invoiceUrl || paymentData.paymentLink || paymentData.bankSlipUrl;
+        const isMockPayment = Boolean(paymentData?.mock);
         
         // Se tiver URL de pagamento, tentar abrir
-        if (paymentUrl) {
+        if (paymentUrl && !isMockPayment) {
           // Tentar abrir em nova aba, se falhar, redirecionar na mesma aba
           const newWindow = window.open(paymentUrl, '_blank');
           
@@ -485,6 +486,8 @@ export default function Assinatura() {
           } else {
             toast.success(`Assinatura criada! Abra o link para pagar via ${selectedPaymentMethod === 'PIX' ? 'PIX' : selectedPaymentMethod === 'BOLETO' ? 'Boleto' : 'cartão'}.`);
           }
+        } else if (isMockPayment) {
+          toast.info('Modo simulado ativo: configure a chave ASAAS para gerar cobranças reais.');
         }
         
         // SEMPRE mostrar modal com instruções (mesmo que tenha URL)

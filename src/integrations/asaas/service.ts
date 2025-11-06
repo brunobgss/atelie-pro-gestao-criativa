@@ -32,15 +32,28 @@ interface ASAASCheckout {
 // Configuração do ASAAS (você deve definir essas variáveis no .env)
 const ASAAS_API_URL = import.meta.env.VITE_ASAAS_API_URL || 'https://www.asaas.com/api/v3';
 const ASAAS_API_KEY = import.meta.env.VITE_ASAAS_API_KEY || '';
+const ASAAS_MOCK_MODE = import.meta.env.VITE_ASAAS_MOCK_MODE === 'true';
 
-// Verificar se a API Key está configurada
-if (!ASAAS_API_KEY) {
-  console.warn('⚠️ ASAAS_API_KEY não configurada! Configure no arquivo .env.local');
+// Avisos úteis apenas em desenvolvimento
+if (import.meta.env.DEV) {
+  if (!ASAAS_API_KEY && !ASAAS_MOCK_MODE) {
+    console.warn('⚠️ ASAAS_API_KEY não configurada! Configure no arquivo .env.local ou defina VITE_ASAAS_MOCK_MODE=true para testes locais.');
+  }
+
+  if (ASAAS_MOCK_MODE) {
+    console.warn('⚠️ ASAAS rodando em modo simulado (VITE_ASAAS_MOCK_MODE=true). Configure VITE_ASAAS_API_KEY para habilitar cobranças reais.');
+  }
 }
 
 class ASAASService {
   private async makeRequest(action: string, data: unknown) {
     console.log(`🔄 ASAAS Request: ${action}`, data);
+
+    if (ASAAS_MOCK_MODE) {
+      const mockResponse = createMockResponse(action, data);
+      console.log(`🧪 [ASAAS MOCK] Response: ${action}`, mockResponse);
+      return mockResponse;
+    }
 
     const response = await fetch('/api/asaas', {
       method: 'POST',
@@ -287,4 +300,111 @@ export const cancelUserSubscription = async (subscriptionId: string) => {
   return await asaasService.cancelSubscription(subscriptionId);
 };
 
+type MockResponse = {
+  success: boolean;
+  action: string;
+  data: Record<string, unknown>;
+  mock: true;
+  message: string;
+};
 
+function createMockResponse(action: string, data: unknown): MockResponse {
+  const timestamp = Date.now();
+  const baseMessage = 'Modo simulado: configure VITE_ASAAS_API_KEY para gerar cobranças reais.';
+
+  if (action === 'createCustomer') {
+    const customer = (data as ASAASCustomer) || {};
+    return {
+      success: true,
+      action,
+      mock: true,
+      message: baseMessage,
+      data: {
+        id: `mock-customer-${timestamp}`,
+        name: customer.name,
+        email: customer.email,
+        phone: customer.phone,
+        cpfCnpj: customer.cpfCnpj,
+        object: 'customer',
+        mock: true,
+        message: baseMessage,
+      },
+    };
+  }
+
+  if (
+    action === 'createPayment' ||
+    action === 'createSubscription' ||
+    action.startsWith('/payments')
+  ) {
+    const payload = (data as Record<string, unknown>) || {};
+    const planType = (payload.planType as string) || 'unknown';
+    const mockUrl = `https://app.ateliepro.online/mock-payment/${planType}/${timestamp}`;
+
+    return {
+      success: true,
+      action,
+      mock: true,
+      message: baseMessage,
+      data: {
+        id: `mock-payment-${timestamp}`,
+        object: 'subscription',
+        status: 'PENDING',
+        planType,
+        invoiceUrl: mockUrl,
+        paymentLink: mockUrl,
+        bankSlipUrl: mockUrl,
+        dueDate: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+        mock: true,
+        message: baseMessage,
+      },
+    };
+  }
+
+  if (action === 'getSubscription') {
+    const subscriptionId =
+      ((data as { subscriptionId?: string }) || {}).subscriptionId ||
+      `mock-subscription-${timestamp}`;
+
+    return {
+      success: true,
+      action,
+      mock: true,
+      message: baseMessage,
+      data: {
+        id: subscriptionId,
+        status: 'PENDING',
+        object: 'subscription',
+        mock: true,
+        message: baseMessage,
+      },
+    };
+  }
+
+  if (action === 'updateSubscription' || action === 'cancelSubscription' || action === 'updatePaymentMethod') {
+    return {
+      success: true,
+      action,
+      mock: true,
+      message: baseMessage,
+      data: {
+        id: `mock-${action}-${timestamp}`,
+        status: 'SUCCESS',
+        mock: true,
+        message: baseMessage,
+      },
+    };
+  }
+
+  return {
+    success: true,
+    action,
+    mock: true,
+    message: baseMessage,
+    data: {
+      id: `mock-${action}-${timestamp}`,
+      mock: true,
+      message: baseMessage,
+    },
+  };
+}

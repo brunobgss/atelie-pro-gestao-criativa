@@ -9,7 +9,8 @@ export async function POST(req) {
     console.log('📝 Data:', data);
 
     // Verificar se a API Key está configurada
-    if (!process.env.VITE_ASAAS_API_KEY) {
+    const apiKey = process.env.ASAAS_API_KEY || process.env.VITE_ASAAS_API_KEY;
+    if (!apiKey) {
       console.error('❌ API Key não configurada');
       return Response.json({ 
         error: 'ASAAS_API_KEY não configurada no Vercel',
@@ -17,28 +18,28 @@ export async function POST(req) {
       }, { status: 500 });
     }
 
-    console.log('🔑 API Key configurada:', process.env.VITE_ASAAS_API_KEY ? 'SIM' : 'NÃO');
+    console.log('🔑 API Key configurada:', 'SIM');
 
     let result;
 
     switch (action) {
       case 'createCustomer':
-        result = await createCustomer(data);
+        result = await createCustomer(data, apiKey);
         break;
       case 'createPayment':
-        result = await createSubscription(data);
+        result = await createSubscription(data, apiKey);
         break;
       case 'getSubscription':
-        result = await getSubscription(data);
+        result = await getSubscription(data, apiKey);
         break;
       case 'updateSubscription':
-        result = await updateSubscription(data);
+        result = await updateSubscription(data, apiKey);
         break;
       case 'cancelSubscription':
-        result = await cancelSubscription(data);
+        result = await cancelSubscription(data, apiKey);
         break;
       case 'updatePaymentMethod':
-        result = await updatePaymentMethod(data);
+        result = await updatePaymentMethod(data, apiKey);
         break;
       default:
         console.error('❌ Ação não reconhecida:', action);
@@ -78,7 +79,7 @@ export async function GET() {
 }
 
 // Função para criar cliente no ASAAS
-async function createCustomer(customerData) {
+async function createCustomer(customerData, apiKey) {
   console.log('🔄 Criando cliente ASAAS:', customerData);
 
   const payload = {
@@ -97,7 +98,7 @@ async function createCustomer(customerData) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'access_token': process.env.VITE_ASAAS_API_KEY
+      'access_token': apiKey
     },
     body: JSON.stringify(payload)
   });
@@ -117,7 +118,7 @@ async function createCustomer(customerData) {
 }
 
 // Função para criar assinatura recorrente
-async function createSubscription(paymentData) {
+async function createSubscription(paymentData, apiKey) {
   console.log('🔄 Criando assinatura recorrente ASAAS:', paymentData);
 
   const { customerId, planType, companyId, paymentMethod = 'PIX' } = paymentData;
@@ -167,13 +168,13 @@ async function createSubscription(paymentData) {
   }
 
   console.log('📤 Payload para ASAAS:', payload);
-  console.log('🔑 API Key presente:', process.env.VITE_ASAAS_API_KEY ? 'SIM' : 'NÃO');
+  console.log('🔑 API Key presente:', 'SIM');
 
   const response = await fetch('https://www.asaas.com/api/v3/subscriptions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'access_token': process.env.VITE_ASAAS_API_KEY
+      'access_token': apiKey
     },
     body: JSON.stringify(payload)
   });
@@ -196,7 +197,7 @@ async function createSubscription(paymentData) {
 }
 
 // Função para buscar assinatura
-async function getSubscription(data) {
+async function getSubscription(data, apiKey) {
   const { subscriptionId } = data;
   
   if (!subscriptionId) {
@@ -209,7 +210,7 @@ async function getSubscription(data) {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
-      'access_token': process.env.VITE_ASAAS_API_KEY
+      'access_token': apiKey
     }
   });
 
@@ -225,7 +226,7 @@ async function getSubscription(data) {
 }
 
 // Função para atualizar assinatura (trocar plano)
-async function updateSubscription(data) {
+async function updateSubscription(data, apiKey) {
   const { subscriptionId, newPlanType, temNotaFiscal } = data;
   
   if (!subscriptionId || !newPlanType) {
@@ -254,7 +255,7 @@ async function updateSubscription(data) {
   };
 
   // Buscar assinatura atual para pegar customerId
-  const currentSubscription = await getSubscription({ subscriptionId });
+  const currentSubscription = await getSubscription({ subscriptionId }, apiKey);
   
   if (currentSubscription) {
     // Extrair companyId do externalReference se existir
@@ -274,7 +275,7 @@ async function updateSubscription(data) {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
-      'access_token': process.env.VITE_ASAAS_API_KEY
+      'access_token': apiKey
     },
     body: JSON.stringify(payload)
   });
@@ -291,7 +292,7 @@ async function updateSubscription(data) {
 }
 
 // Função para cancelar assinatura
-async function cancelSubscription(data) {
+async function cancelSubscription(data, apiKey) {
   const { subscriptionId } = data;
   
   if (!subscriptionId) {
@@ -304,7 +305,7 @@ async function cancelSubscription(data) {
     method: 'DELETE',
     headers: {
       'Content-Type': 'application/json',
-      'access_token': process.env.VITE_ASAAS_API_KEY
+      'access_token': apiKey
     }
   });
 
@@ -320,7 +321,7 @@ async function cancelSubscription(data) {
 }
 
 // Função para atualizar forma de pagamento
-async function updatePaymentMethod(data) {
+async function updatePaymentMethod(data, apiKey) {
   const { subscriptionId, billingType } = data;
   
   if (!subscriptionId || !billingType) {
@@ -337,7 +338,7 @@ async function updatePaymentMethod(data) {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
-      'access_token': process.env.VITE_ASAAS_API_KEY
+      'access_token': apiKey
     },
     body: JSON.stringify(payload)
   });
