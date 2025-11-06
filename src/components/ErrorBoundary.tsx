@@ -2,7 +2,6 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { captureError } from '@/utils/errorTracking';
 
 interface Props {
@@ -113,7 +112,11 @@ interface ErrorFallbackProps {
 }
 
 function ErrorFallback({ error, errorInfo, onReset }: ErrorFallbackProps) {
-  const navigate = useNavigate();
+  const handleGoHome = () => {
+    if (typeof window !== "undefined") {
+      window.location.href = "/";
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100 flex items-center justify-center p-4">
@@ -151,7 +154,7 @@ function ErrorFallback({ error, errorInfo, onReset }: ErrorFallbackProps) {
               Tentar novamente
             </Button>
             <Button
-              onClick={() => navigate('/')}
+              onClick={handleGoHome}
               className="flex items-center gap-2"
             >
               <Home className="w-4 h-4" />
