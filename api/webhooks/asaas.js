@@ -61,14 +61,14 @@ export async function POST(req) {
 
       case 'SUBSCRIPTION_CREATED':
         console.log('🔄 Assinatura criada:', webhookData.subscription.id);
-        // Ativar premium quando assinatura é criada
-        await activatePremiumForSubscription(webhookData.subscription);
+        // Marcar assinatura como pendente até o pagamento ser confirmado
+        await markSubscriptionPending(webhookData.subscription);
         break;
 
       case 'SUBSCRIPTION_UPDATED':
         console.log('🔄 Assinatura atualizada:', webhookData.subscription.id);
-        // Verificar se precisa atualizar status
-        await updatePremiumForSubscription(webhookData.subscription);
+        // Sincronizar status da assinatura sem alterar premium antecipadamente
+        await syncSubscriptionStatus(webhookData.subscription);
         break;
 
       case 'SUBSCRIPTION_DELETED':
@@ -255,14 +255,11 @@ async function deactivatePremiumForDeleted(payment) {
   }
 }
 
-// Função para ativar premium quando assinatura é criada
-async function activatePremiumForSubscription(subscription) {
+// Função para marcar assinatura como pendente até o pagamento ser confirmado
+async function markSubscriptionPending(subscription) {
   try {
-    console.log('🔄 Ativando premium para assinatura:', subscription.id);
-    console.log('🔄 Subscription Value:', subscription.value);
-    console.log('🔄 External Reference:', subscription.externalReference);
+    console.log('🕒 Assinatura pendente de pagamento:', subscription.id);
     
-    // Verificar se a API Key do Supabase está configurada
     if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
       console.error('❌ Variáveis do Supabase não configuradas');
       return;
@@ -273,104 +270,53 @@ async function activatePremiumForSubscription(subscription) {
       process.env.SUPABASE_ANON_KEY
     );
 
-    // Calcular data de expiração baseado no valor
-    let expirationDate;
-    
-    // Função auxiliar para converter data do formato brasileiro (DD/MM/YYYY) para ISO
-    const parseBrazilianDate = (dateStr) => {
-      if (!dateStr) return new Date();
-      
-      // Se já vier em formato ISO ou válido, usar diretamente
-      if (dateStr.includes('T') || dateStr.includes('-')) {
-        return new Date(dateStr);
-      }
-      
-      // Converter formato brasileiro DD/MM/YYYY para YYYY-MM-DD
-      const parts = dateStr.split('/');
-      if (parts.length === 3) {
-        const [day, month, year] = parts;
-        return new Date(`${year}-${month}-${day}`);
-      }
-      
-      return new Date();
-    };
-    
-    // Detectar se tem nota fiscal e extrair empresa ID
-    let empresaId = subscription.externalReference;
-    let temNotaFiscal = false;
-    
-    if (empresaId && empresaId.includes('|NF=true')) {
-      temNotaFiscal = true;
-      empresaId = empresaId.split('|')[0];
-    }
-    
-    // Identificar plano baseado no valor
-    const planValues = {
-      39: { temNF: false },
-      390: { temNF: false },
-      99.90: { temNF: true },
-      1198.00: { temNF: true }
-    };
-    
-    const planInfo = planValues[subscription.value];
-    if (!planInfo) {
-      console.error('❌ Valor de assinatura não reconhecido:', subscription.value);
+    let empresaId = subscription.externalReference || subscription.customer;
+    if (!empresaId) {
+      console.error('❌ Subscription sem externalReference/customer:', subscription);
       return;
     }
-    
-    temNotaFiscal = temNotaFiscal || planInfo.temNF;
-    expirationDate = parseBrazilianDate(subscription.nextDueDate);
 
-    console.log('🔄 Data de expiração calculada:', expirationDate.toISOString());
-    console.log('🔄 Original nextDueDate:', subscription.nextDueDate);
-    console.log('🔄 Tem Nota Fiscal:', temNotaFiscal);
+    if (empresaId.includes('|')) {
+      empresaId = empresaId.split('|')[0];
+    }
 
-    // Buscar empresa pelo externalReference (que é o ID da empresa)
-    const { data: empresaData, error: empresaError } = await supabase
+    const updates = {
+      status: 'pending_payment',
+      updated_at: new Date().toISOString()
+    };
+
+    // Garantir que empresas novas permaneçam sem premium até confirmarem o pagamento
+    const { data: empresaData } = await supabase
       .from('empresas')
-      .select('id, nome')
+      .select('is_premium')
       .eq('id', empresaId)
       .single();
 
-    if (empresaError || !empresaData) {
-      console.error('❌ Erro ao buscar empresa:', empresaError);
-      console.error('❌ External Reference:', empresaId);
-      
-      // Tentar buscar pela empresa pelo nome ou outro campo
-      console.log('🔍 Tentando busca alternativa...');
-      return;
+    if (!empresaData || empresaData.is_premium === false) {
+      updates.is_premium = false;
     }
 
-    console.log('✅ Empresa encontrada:', empresaData.nome);
-
-    // Atualizar empresa como premium
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('empresas')
-      .update({
-        is_premium: true,
-        status: 'active',
-        trial_end_date: expirationDate.toISOString(),
-        tem_nota_fiscal: temNotaFiscal,
-        updated_at: new Date().toISOString()
-      })
+      .update(updates)
       .eq('id', empresaId);
 
     if (error) {
-      console.error('❌ Erro ao ativar premium:', error);
+      console.error('❌ Erro ao marcar assinatura como pendente:', error);
     } else {
-      console.log('✅ Premium ativado com sucesso para empresa:', empresaId);
+      console.log('✅ Assinatura marcada como pendente para empresa:', empresaId);
     }
 
   } catch (error) {
-    console.error('❌ Erro na função activatePremiumForSubscription:', error);
+    console.error('❌ Erro na função markSubscriptionPending:', error);
   }
 }
 
-// Função para atualizar premium quando assinatura é atualizada
-async function updatePremiumForSubscription(subscription) {
+// Função para sincronizar dados da assinatura sem ativar premium antes do pagamento
+async function syncSubscriptionStatus(subscription) {
   try {
-    console.log('🔄 Atualizando premium para assinatura:', subscription.id);
-    
+    console.log('🔄 Sincronizando assinatura:', subscription.id);
+
     if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
       console.error('❌ Variáveis do Supabase não configuradas');
       return;
@@ -381,47 +327,63 @@ async function updatePremiumForSubscription(subscription) {
       process.env.SUPABASE_ANON_KEY
     );
 
-    // Função auxiliar para converter data do formato brasileiro (DD/MM/YYYY) para ISO
+    let empresaId = subscription.externalReference || subscription.customer;
+    if (!empresaId) {
+      console.error('❌ Subscription sem externalReference/customer:', subscription);
+      return;
+    }
+
+    if (empresaId.includes('|')) {
+      empresaId = empresaId.split('|')[0];
+    }
+
     const parseBrazilianDate = (dateStr) => {
-      if (!dateStr) return new Date();
-      
-      // Se já vier em formato ISO ou válido, usar diretamente
+      if (!dateStr) return null;
       if (dateStr.includes('T') || dateStr.includes('-')) {
         return new Date(dateStr);
       }
-      
-      // Converter formato brasileiro DD/MM/YYYY para YYYY-MM-DD
       const parts = dateStr.split('/');
       if (parts.length === 3) {
         const [day, month, year] = parts;
         return new Date(`${year}-${month}-${day}`);
       }
-      
-      return new Date();
+      return null;
     };
-    
-    // Calcular data de expiração
-    const expirationDate = parseBrazilianDate(subscription.nextDueDate);
 
-    // Atualizar empresa
+    const updates = {
+      updated_at: new Date().toISOString()
+    };
+
+    const expirationDate = parseBrazilianDate(subscription.nextDueDate);
+    if (expirationDate) {
+      updates.trial_end_date = expirationDate.toISOString();
+    }
+
+    if (subscription.status) {
+      if (subscription.status === 'SUSPENDED' || subscription.status === 'OVERDUE') {
+        updates.status = 'overdue';
+      } else if (subscription.status === 'CANCELLED') {
+        updates.status = 'cancelled';
+      } else if (subscription.status === 'ACTIVE') {
+        updates.status = 'active';
+      } else {
+        updates.status = subscription.status.toLowerCase();
+      }
+    }
+
     const { error } = await supabase
       .from('empresas')
-      .update({
-        is_premium: true,
-        status: 'active',
-        trial_end_date: expirationDate.toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', subscription.externalReference);
+      .update(updates)
+      .eq('id', empresaId);
 
     if (error) {
-      console.error('❌ Erro ao atualizar premium:', error);
+      console.error('❌ Erro ao sincronizar assinatura:', error);
     } else {
-      console.log('✅ Premium atualizado com sucesso');
+      console.log('✅ Assinatura sincronizada para empresa:', empresaId);
     }
 
   } catch (error) {
-    console.error('❌ Erro ao atualizar premium:', error);
+    console.error('❌ Erro ao sincronizar assinatura:', error);
   }
 }
 
