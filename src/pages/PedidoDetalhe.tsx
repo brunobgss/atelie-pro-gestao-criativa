@@ -2,7 +2,6 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -901,16 +900,16 @@ export default function PedidoDetalhe() {
                   <p className="text-xs text-muted-foreground">Status de Pagamento</p>
                   <div className="flex items-center gap-2 mt-1">
                     <CreditCard className="w-4 h-4 text-muted-foreground" />
-                    <Badge className={`${paymentStatus.color} border-0`}>
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${paymentStatus.color}`}>
                       {paymentStatus.label}
-                    </Badge>
+                    </span>
                   </div>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Status</p>
-                  <Badge variant="outline" className="bg-secondary/20 text-secondary border-secondary/30">
+                  <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold border border-secondary/30 bg-secondary/20 text-secondary">
                     {order.status}
-                  </Badge>
+                  </span>
                 </div>
               </div>
 
@@ -1153,9 +1152,9 @@ export default function PedidoDetalhe() {
                         </div>
                         {isCurrent && (
                           <div className="mt-2">
-                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                            <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold border border-blue-200 bg-blue-50 text-blue-700">
                               Status Atual
-                            </Badge>
+                            </span>
                           </div>
                         )}
                       </div>
@@ -1177,9 +1176,9 @@ export default function PedidoDetalhe() {
               </CardTitle>
               <div className="flex items-center gap-2">
                 {!empresa?.tem_nota_fiscal && (
-                  <Badge variant="outline" className="border-amber-300 text-amber-700 bg-amber-50">
+                  <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold border border-dashed border-amber-300 bg-amber-50 text-amber-700">
                     Exclusivo do plano Profissional
-                  </Badge>
+                  </span>
                 )}
                 <Button
                   variant="ghost"
