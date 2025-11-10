@@ -11,13 +11,14 @@ export type OrderRow = {
   value: number;
   paid: number;
   delivery_date?: string | null;
-  status: "Aguardando aprovação" | "Em produção" | "Pronto" | "Aguardando retirada" | "Entregue" | "Cancelado";
+  status: "Aguardando aprovação" | "Em produção" | "Finalizando" | "Pronto" | "Aguardando retirada" | "Entregue" | "Cancelado";
   file_url?: string | null;
   customer_phone?: string | null;
   customer_email?: string | null;
   observations?: string | null;
   created_at?: string;
   updated_at?: string;
+  empresa_id?: string | null;
 };
 
 export async function listOrders(): Promise<OrderRow[]> {
@@ -65,6 +66,12 @@ export async function listOrders(): Promise<OrderRow[]> {
 function isUUID(str: string): boolean {
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   return uuidRegex.test(str);
+}
+
+function resolveOrderFilter(identifier: string): { column: "id" | "code"; value: string } {
+  const value = identifier.trim();
+  const column = isUUID(value) ? "id" : "code";
+  return { column, value };
 }
 
 export async function getOrderByCode(code: string): Promise<OrderRow | null> {
@@ -182,31 +189,38 @@ export async function updateOrderStatus(
   try {
     console.log(`Atualizando pedido ${code}:`, { status, paid });
     
+    if (!code || code.trim() === "") {
+      console.error("Identificador do pedido inválido");
+      return { ok: false, error: "Pedido inválido" };
+    }
+
     // Verificar se o banco está funcionando
     const isDbWorking = await checkDatabaseHealth();
-    
+
     if (!isDbWorking) {
       console.log("Banco não está funcionando");
       return { ok: false, error: "Banco não está funcionando" };
     }
-    
+
+    const { column, value } = resolveOrderFilter(code);
+
     // Preparar dados para atualização
-    const updateData: unknown = {
+    const updateData: Partial<OrderRow> & { updated_at: string } = {
       updated_at: new Date().toISOString()
     };
-    
+
     if (status !== undefined) {
       updateData.status = status;
     }
-    
+
     if (paid !== undefined) {
       updateData.paid = paid;
     }
-    
+
     if (description !== undefined) {
       updateData.description = description;
     }
-    
+
     // Timeout de 5 segundos
     const timeoutPromise = new Promise((_, reject) => 
       setTimeout(() => reject(new Error('Timeout')), 5000)
@@ -215,26 +229,34 @@ export async function updateOrderStatus(
     const updatePromise = supabase
       .from("atelie_orders")
       .update(updateData)
-      .eq("code", code)
+      .eq(column, value)
       .select()
       .single();
 
     const { data, error } = await Promise.race([updatePromise, timeoutPromise]) as any;
-    
+
     if (error) {
       console.error("Erro ao atualizar pedido:", error);
       return { ok: false, error: error.message };
     }
     
+    if (!data) {
+      console.error("Pedido não encontrado para atualização", { code, column, value });
+      return { ok: false, error: "Pedido não encontrado" };
+    }
+
+    const updatedOrder = data as OrderRow;
+    const effectiveOrderCode = updatedOrder.code;
+
     // Se o campo 'paid' foi alterado, atualizar também a tabela de receitas
     if (paid !== undefined) {
       console.log("Campo 'paid' foi alterado, atualizando tabela de receitas...");
-      
+
       // Buscar se já existe receita para este pedido
       const { data: existingReceita } = await supabase
         .from("atelie_receitas")
         .select("id")
-        .eq("order_code", code)
+        .eq("order_code", effectiveOrderCode)
         .maybeSingle();
 
       if (existingReceita) {
@@ -245,7 +267,7 @@ export async function updateOrderStatus(
             amount: paid,
             updated_at: new Date().toISOString()
           })
-          .eq("order_code", code);
+          .eq("order_code", effectiveOrderCode);
 
         if (updateReceitaError) {
           console.error("Erro ao atualizar receita:", updateReceitaError);
@@ -253,52 +275,34 @@ export async function updateOrderStatus(
         } else {
           console.log("Receita atualizada com sucesso");
         }
-      } else {
-        // Buscar empresa_id do pedido para criar receita
-        const { data: orderData } = await supabase
-          .from("atelie_orders")
-          .select("empresa_id")
-          .eq("code", code)
-          .single();
+      } else if (updatedOrder.empresa_id) {
+        // Criar nova receita com todos os campos obrigatórios
+        const { error: createReceitaError } = await supabase
+          .from("atelie_receitas")
+          .insert({
+            order_code: effectiveOrderCode,
+            customer_name: updatedOrder.customer_name || "Sem nome",
+            description: `Pagamento do pedido ${effectiveOrderCode}`,
+            amount: paid,
+            payment_method: "Dinheiro",
+            payment_date: new Date().toISOString().split('T')[0],
+            status: paid > 0 ? "pago" : "pendente",
+            empresa_id: updatedOrder.empresa_id,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
 
-        if (orderData) {
-          // Buscar dados completos do pedido para criar receita
-          const { data: fullOrderData } = await supabase
-            .from("atelie_orders")
-            .select("customer_name")
-            .eq("code", code)
-            .single();
-
-          if (fullOrderData) {
-            // Criar nova receita com todos os campos obrigatórios
-            const { error: createReceitaError } = await supabase
-              .from("atelie_receitas")
-              .insert({
-                order_code: code,
-                customer_name: fullOrderData.customer_name || "Sem nome",
-                description: `Pagamento do pedido ${code}`, // Campo obrigatório
-                amount: paid,
-                payment_method: "Dinheiro", // Método padrão
-                payment_date: new Date().toISOString().split('T')[0], // Data de hoje
-                status: paid > 0 ? "pago" : "pendente",
-                empresa_id: orderData.empresa_id,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-              });
-
-            if (createReceitaError) {
-              console.error("Erro ao criar receita:", createReceitaError);
-              // Não falhar aqui, apenas logar
-            } else {
-              console.log("Receita criada com sucesso");
-            }
-          }
+        if (createReceitaError) {
+          console.error("Erro ao criar receita:", createReceitaError);
+          // Não falhar aqui, apenas logar
+        } else {
+          console.log("Receita criada com sucesso");
         }
       }
     }
-    
-    console.log("Pedido atualizado com sucesso:", data);
-    return { ok: true, data: data as OrderRow };
+
+    console.log("Pedido atualizado com sucesso:", updatedOrder);
+    return { ok: true, data: updatedOrder };
   } catch (e: unknown) {
     console.error("Erro ao atualizar pedido:", e);
     return { ok: false, error: e.message };
@@ -324,20 +328,31 @@ export async function updateOrder(
   try {
     console.log(`Atualizando pedido completo ${orderCode}:`, updates);
     
+    if (!orderCode || orderCode.trim() === "") {
+      console.error("Identificador do pedido inválido");
+      return { ok: false, error: "Pedido inválido" };
+    }
+
     // Verificar se o banco está funcionando
     const isDbWorking = await checkDatabaseHealth();
-    
+
     if (!isDbWorking) {
       console.log("Banco não está funcionando");
       return { ok: false, error: "Banco não está funcionando" };
     }
-    
+
+    const { column, value } = resolveOrderFilter(orderCode);
+
+    const sanitizedUpdates = Object.fromEntries(
+      Object.entries(updates ?? {}).filter(([, v]) => v !== undefined)
+    ) as typeof updates;
+
     // Preparar dados para atualização
     const updateData = {
-      ...updates,
+      ...sanitizedUpdates,
       updated_at: new Date().toISOString()
     };
-    
+
     // Timeout de 5 segundos
     const timeoutPromise = new Promise((_, reject) => 
       setTimeout(() => reject(new Error('Timeout')), 5000)
@@ -346,26 +361,35 @@ export async function updateOrder(
     const updatePromise = supabase
       .from("atelie_orders")
       .update(updateData)
-      .eq("code", orderCode)
+      .eq(column, value)
       .select()
       .single();
 
     const { data, error } = await Promise.race([updatePromise, timeoutPromise]) as any;
-    
+
     if (error) {
       console.error("Erro ao atualizar pedido:", error);
       return { ok: false, error: error.message };
     }
-    
+
+    if (!data) {
+      console.error("Pedido não encontrado para atualização", { orderCode, column, value });
+      return { ok: false, error: "Pedido não encontrado" };
+    }
+
+    const updatedOrder = data as OrderRow;
+    const effectiveOrderCode = updatedOrder.code;
+    const paidValue = sanitizedUpdates.paid;
+
     // Se o campo 'paid' foi alterado, atualizar também a tabela de receitas
-    if (updates.paid !== undefined) {
+    if (paidValue !== undefined) {
       console.log("Campo 'paid' foi alterado, atualizando tabela de receitas...");
-      
+
       // Buscar se já existe receita para este pedido
       const { data: existingReceita } = await supabase
         .from("atelie_receitas")
         .select("id")
-        .eq("order_code", orderCode)
+        .eq("order_code", effectiveOrderCode)
         .maybeSingle();
 
       if (existingReceita) {
@@ -373,10 +397,10 @@ export async function updateOrder(
         const { error: updateReceitaError } = await supabase
           .from("atelie_receitas")
           .update({ 
-            amount: updates.paid,
+            amount: paidValue,
             updated_at: new Date().toISOString()
           })
-          .eq("order_code", orderCode);
+          .eq("order_code", effectiveOrderCode);
 
         if (updateReceitaError) {
           console.error("Erro ao atualizar receita:", updateReceitaError);
@@ -384,52 +408,34 @@ export async function updateOrder(
         } else {
           console.log("Receita atualizada com sucesso");
         }
-      } else {
-        // Buscar empresa_id do pedido para criar receita
-        const { data: orderData } = await supabase
-          .from("atelie_orders")
-          .select("empresa_id")
-          .eq("code", orderCode)
-          .single();
+      } else if (updatedOrder.empresa_id) {
+        // Criar nova receita com todos os campos obrigatórios
+        const { error: createReceitaError } = await supabase
+          .from("atelie_receitas")
+          .insert({
+            order_code: effectiveOrderCode,
+            customer_name: updatedOrder.customer_name || "Sem nome",
+            description: `Pagamento do pedido ${effectiveOrderCode}`,
+            amount: paidValue,
+            payment_method: "Dinheiro",
+            payment_date: new Date().toISOString().split('T')[0],
+            status: paidValue > 0 ? "pago" : "pendente",
+            empresa_id: updatedOrder.empresa_id,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
 
-        if (orderData) {
-          // Buscar dados completos do pedido para criar receita
-          const { data: fullOrderData } = await supabase
-            .from("atelie_orders")
-            .select("customer_name")
-            .eq("code", orderCode)
-            .single();
-
-          if (fullOrderData) {
-            // Criar nova receita com todos os campos obrigatórios
-            const { error: createReceitaError } = await supabase
-              .from("atelie_receitas")
-              .insert({
-                order_code: orderCode,
-                customer_name: fullOrderData.customer_name || "Sem nome",
-                description: `Pagamento do pedido ${orderCode}`, // Campo obrigatório
-                amount: updates.paid,
-                payment_method: "Dinheiro", // Método padrão
-                payment_date: new Date().toISOString().split('T')[0], // Data de hoje
-                status: updates.paid > 0 ? "pago" : "pendente",
-                empresa_id: orderData.empresa_id,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-              });
-
-            if (createReceitaError) {
-              console.error("Erro ao criar receita:", createReceitaError);
-              // Não falhar aqui, apenas logar
-            } else {
-              console.log("Receita criada com sucesso");
-            }
-          }
+        if (createReceitaError) {
+          console.error("Erro ao criar receita:", createReceitaError);
+          // Não falhar aqui, apenas logar
+        } else {
+          console.log("Receita criada com sucesso");
         }
       }
     }
-    
-    console.log("Pedido atualizado com sucesso:", data);
-    return { ok: true, data: data as OrderRow };
+
+    console.log("Pedido atualizado com sucesso:", updatedOrder);
+    return { ok: true, data: updatedOrder };
   } catch (e: unknown) {
     console.error("Erro ao atualizar pedido:", e);
     return { ok: false, error: e.message };

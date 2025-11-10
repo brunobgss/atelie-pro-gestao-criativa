@@ -14,7 +14,7 @@ import { uploadOrderFile } from "@/integrations/supabase/storage";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSync } from "@/contexts/SyncContext";
 import { useSyncOperations } from "@/hooks/useSyncOperations";
-import { ORDER_STATUS_OPTIONS } from "@/utils/statusConstants";
+import { useOrderStatusConfig } from "@/hooks/useOrderStatusConfig";
 
 export default function EditarPedido() {
   const { id } = useParams<{ id: string }>();
@@ -32,6 +32,8 @@ export default function EditarPedido() {
   const [status, setStatus] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [currentFileUrl, setCurrentFileUrl] = useState<string | null>(null);
+
+  const { statusOptions } = useOrderStatusConfig();
 
   const { data: order, isLoading } = useQuery({
     queryKey: ["order", id],
@@ -266,7 +268,7 @@ export default function EditarPedido() {
                     <SelectValue placeholder="Selecione o status" />
                   </SelectTrigger>
                   <SelectContent>
-                    {ORDER_STATUS_OPTIONS.map((option) => (
+                    {statusOptions.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
                       </SelectItem>

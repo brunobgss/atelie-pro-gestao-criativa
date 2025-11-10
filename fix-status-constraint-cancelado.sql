@@ -8,6 +8,7 @@ ADD CONSTRAINT atelie_orders_status_check
 CHECK (status IN (
     'Aguardando aprovação',
     'Em produção', 
+    'Finalizando',
     'Pronto',
     'Aguardando retirada',
     'Entregue',

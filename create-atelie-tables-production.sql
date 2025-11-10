@@ -43,11 +43,32 @@ CREATE TABLE IF NOT EXISTS atelie_orders (
     value DECIMAL(10,2) NOT NULL DEFAULT 0,
     paid DECIMAL(10,2) DEFAULT 0,
     delivery_date DATE,
-    status VARCHAR(20) DEFAULT 'Pendente' CHECK (status IN ('Pendente', 'Em Produção', 'Aguardando Retirada', 'Entregue', 'Cancelado')),
+    status VARCHAR(30) DEFAULT 'Aguardando aprovação' CHECK (
+        status IN (
+            'Aguardando aprovação',
+            'Em produção',
+            'Finalizando',
+            'Pronto',
+            'Aguardando retirada',
+            'Entregue',
+            'Cancelado'
+        )
+    ),
     observations TEXT,
     empresa_id UUID NOT NULL REFERENCES empresas(id),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS order_status_configs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    empresa_id UUID NOT NULL REFERENCES empresas(id) ON DELETE CASCADE,
+    status_key TEXT NOT NULL,
+    label TEXT NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE (empresa_id, status_key)
 );
 
 -- 4. Tabela de Clientes do Ateliê
@@ -86,6 +107,7 @@ CREATE INDEX IF NOT EXISTS idx_atelie_quote_items_empresa_id ON atelie_quote_ite
 CREATE INDEX IF NOT EXISTS idx_atelie_orders_empresa_id ON atelie_orders(empresa_id);
 CREATE INDEX IF NOT EXISTS idx_atelie_orders_code ON atelie_orders(code);
 CREATE INDEX IF NOT EXISTS idx_atelie_orders_status ON atelie_orders(status);
+CREATE INDEX IF NOT EXISTS idx_order_status_configs_empresa_id ON order_status_configs(empresa_id);
 
 CREATE INDEX IF NOT EXISTS idx_atelie_customers_empresa_id ON atelie_customers(empresa_id);
 
@@ -96,6 +118,7 @@ CREATE INDEX IF NOT EXISTS idx_atelie_receitas_order_code ON atelie_receitas(ord
 ALTER TABLE atelie_quotes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE atelie_quote_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE atelie_orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE order_status_configs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE atelie_customers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE atelie_receitas ENABLE ROW LEVEL SECURITY;
 
@@ -142,6 +165,14 @@ CREATE POLICY "Users can insert orders for their empresa" ON atelie_orders
 
 CREATE POLICY "Users can update orders from their empresa" ON atelie_orders
     FOR UPDATE USING (empresa_id IN (
+        SELECT empresa_id FROM user_empresas WHERE user_id = auth.uid()
+    ));
+
+CREATE POLICY "Users can manage their status configs" ON order_status_configs
+    FOR ALL USING (empresa_id IN (
+        SELECT empresa_id FROM user_empresas WHERE user_id = auth.uid()
+    ))
+    WITH CHECK (empresa_id IN (
         SELECT empresa_id FROM user_empresas WHERE user_id = auth.uid()
     ));
 

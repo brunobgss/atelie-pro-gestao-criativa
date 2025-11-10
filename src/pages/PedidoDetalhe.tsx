@@ -4,9 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Calendar, CheckCircle2, Clock, Package, Upload, User, Play, Pause, CheckCircle, Truck, Printer, Edit, CreditCard, Users, FileText, Download, Loader2, RefreshCw, Eye } from "lucide-react";
 import { DialogEmitirNota } from "@/components/DialogEmitirNota";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -16,8 +17,10 @@ import { useSync } from "@/contexts/SyncContext";
 import { getMedidas } from "@/integrations/supabase/medidas";
 import { useAuth } from "@/components/AuthProvider";
 import { toast } from "sonner";
-import { ORDER_STATUS_OPTIONS } from "@/utils/statusConstants";
+import { DEFAULT_ORDER_STATUS_DETAILS, ORDER_STATUS } from "@/utils/statusConstants";
 import { getCurrentEmpresaId } from "@/integrations/supabase/auth-utils";
+import { useOrderStatusConfig, type OrderStatusDetail } from "@/hooks/useOrderStatusConfig";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 type FocusNFServiceType = typeof import("@/integrations/focusnf/service")["focusNFService"];
 
@@ -29,7 +32,7 @@ type OrderItem = {
   value: number;
   paid: number;
   delivery: string; // ISO
-  status: "Aguardando aprovação" | "Em produção" | "Finalizando" | "Pronto" | "Aguardando retirada" | "Entregue";
+  status: "Aguardando aprovação" | "Em produção" | "Finalizando" | "Pronto" | "Aguardando retirada" | "Entregue" | "Cancelado";
   file?: string;
 };
 
@@ -64,6 +67,118 @@ export default function PedidoDetalhe() {
   const [consultandoNota, setConsultandoNota] = useState<string | null>(null);
   const [dialogEmitirNotaOpen, setDialogEmitirNotaOpen] = useState(false);
   const [clienteInicial, setClienteInicial] = useState<any>(null);
+  const [isCustomizeDialogOpen, setIsCustomizeDialogOpen] = useState(false);
+  const [statusDraft, setStatusDraft] = useState<OrderStatusDetail[]>([]);
+
+  const {
+    statusDetails,
+    statusOptions,
+    saveStatusConfigs,
+    resetStatusConfigs,
+    isSaving: isSavingStatusConfigs,
+    isResetting: isResettingStatusConfigs,
+  } = useOrderStatusConfig();
+
+  const statusDetailsMap = useMemo(
+    () => new Map(statusDetails.map((detail) => [detail.key, detail])),
+    [statusDetails]
+  );
+
+  const handleOpenCustomizeStatuses = useCallback(() => {
+    setStatusDraft(statusDetails.map((detail) => ({ ...detail })));
+    setIsCustomizeDialogOpen(true);
+  }, [statusDetails]);
+
+  const handleStatusDraftChange = useCallback(
+    (key: OrderStatusDetail["key"], field: "label" | "description", value: string) => {
+      setStatusDraft((previous) =>
+        previous.map((detail) => {
+          if (detail.key !== key) {
+            return detail;
+          }
+
+          if (field === "label") {
+            return { ...detail, label: value };
+          }
+
+          return { ...detail, description: value };
+        })
+      );
+    },
+    []
+  );
+
+  const handleStatusDraftRestore = useCallback((key: OrderStatusDetail["key"]) => {
+    setStatusDraft((previous) =>
+      previous.map((detail) =>
+        detail.key === key
+          ? {
+              ...detail,
+              label: detail.defaultLabel,
+              description: detail.defaultDescription,
+            }
+          : detail
+      )
+    );
+  }, []);
+
+  const handleSaveStatusDraft = useCallback(async () => {
+    const hasEmpty = statusDraft.some((detail) => detail.label.trim().length === 0);
+
+    if (hasEmpty) {
+      toast.error("O nome das etapas não pode ficar vazio.");
+      return;
+    }
+
+    try {
+      const payload = statusDraft.map((detail) => {
+        const description = (detail.description ?? "").trim();
+        return {
+          status_key: detail.key,
+          label: detail.label.trim(),
+          description: description.length > 0 ? description : null,
+        };
+      });
+
+      const result = await saveStatusConfigs(payload);
+
+      if (!result.ok) {
+        toast.error(result.error || "Erro ao salvar etapas personalizadas.");
+        return;
+      }
+
+      toast.success("Etapas atualizadas com sucesso!");
+      setIsCustomizeDialogOpen(false);
+    } catch (error) {
+      console.error("Erro ao salvar etapas personalizadas:", error);
+      toast.error("Erro ao salvar etapas personalizadas.");
+    }
+  }, [saveStatusConfigs, statusDraft]);
+
+  const handleResetStatuses = useCallback(async () => {
+    try {
+      const result = await resetStatusConfigs();
+
+      if (!result.ok) {
+        toast.error(result.error || "Erro ao restaurar etapas padrão.");
+        return;
+      }
+
+      const defaultDraft: OrderStatusDetail[] = DEFAULT_ORDER_STATUS_DETAILS.map((detail) => ({
+        key: detail.key as OrderStatusDetail["key"],
+        label: detail.label,
+        description: detail.description,
+        defaultLabel: detail.label,
+        defaultDescription: detail.description,
+      }));
+
+      setStatusDraft(defaultDraft);
+      toast.success("Etapas restauradas para o padrão!");
+    } catch (error) {
+      console.error("Erro ao restaurar etapas padrão:", error);
+      toast.error("Erro ao restaurar etapas padrão.");
+    }
+  }, [resetStatusConfigs]);
 
   const code = id as string;
   const focusNFServiceRef = useRef<FocusNFServiceType | null>(null);
@@ -800,14 +915,28 @@ export default function PedidoDetalhe() {
     }
   };
 
-  const steps: { key: OrderItem["status"]; label: string; icon: any; description: string }[] = [
-    { key: "Aguardando aprovação", label: "Aguardando Aprovação", icon: Clock, description: "Pedido recebido, aguardando confirmação do cliente" },
-    { key: "Em produção", label: "Em Produção", icon: Play, description: "Trabalho iniciado, produção em andamento" },
-    { key: "Finalizando", label: "Finalizando", icon: Package, description: "Produto quase pronto, acabamentos finais" },
-    { key: "Pronto", label: "Pronto", icon: CheckCircle, description: "Produto finalizado, pronto para entrega" },
-    { key: "Aguardando retirada", label: "Aguardando Retirada", icon: Truck, description: "Produto pronto, aguardando retirada pelo cliente" },
-    { key: "Entregue", label: "Entregue", icon: CheckCircle2, description: "Produto entregue ao cliente, pedido finalizado" },
-  ];
+  const steps = useMemo(() => {
+    const defaultMap = new Map(DEFAULT_ORDER_STATUS_DETAILS.map((detail) => [detail.key, detail]));
+    const baseSteps: Array<{ key: OrderItem["status"]; icon: any }> = [
+      { key: ORDER_STATUS.AGUARDANDO_APROVACAO as OrderItem["status"], icon: Clock },
+      { key: ORDER_STATUS.EM_PRODUCAO as OrderItem["status"], icon: Play },
+      { key: ORDER_STATUS.FINALIZANDO as OrderItem["status"], icon: Package },
+      { key: ORDER_STATUS.PRONTO as OrderItem["status"], icon: CheckCircle },
+      { key: ORDER_STATUS.AGUARDANDO_RETIRADA as OrderItem["status"], icon: Truck },
+      { key: ORDER_STATUS.ENTREGUE as OrderItem["status"], icon: CheckCircle2 },
+    ];
+
+    return baseSteps.map((step) => {
+      const detail = statusDetailsMap.get(step.key);
+      const fallback = defaultMap.get(step.key);
+      return {
+        key: step.key,
+        icon: step.icon,
+        label: detail?.label ?? fallback?.label ?? step.key,
+        description: detail?.description ?? fallback?.description ?? "",
+      };
+    });
+  }, [statusDetailsMap]);
 
   if (!order) {
     return (
@@ -1149,12 +1278,123 @@ export default function PedidoDetalhe() {
           </Card>
 
           <Card className="border-gray-200/50 shadow-sm">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <CardTitle className="text-gray-900 flex items-center gap-2">
                 <Clock className="w-5 h-5 text-purple-600" />
                 Timeline de Produção
               </CardTitle>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 rounded-full border border-dashed border-muted-foreground/40 hover:border-muted-foreground/70 hover:bg-muted/40"
+                    onClick={handleOpenCustomizeStatuses}
+                  >
+                    <Edit className="h-4 w-4" />
+                    <span className="sr-only">Personalizar etapas</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="left" align="end">
+                  Personalizar etapas da timeline
+                </TooltipContent>
+              </Tooltip>
             </CardHeader>
+            <Dialog
+              open={isCustomizeDialogOpen}
+              onOpenChange={(open) => {
+                setIsCustomizeDialogOpen(open);
+                if (open) {
+                  setStatusDraft(statusDetails.map((detail) => ({ ...detail })));
+                }
+              }}
+            >
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Personalizar etapas da produção</DialogTitle>
+                  <DialogDescription>
+                    Renomeie as etapas exibidas na timeline e nos menus de status para combinar com o fluxo do seu ateliê.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
+                  {statusDraft.map((status) => {
+                    const baseId = status.key
+                      .normalize("NFD")
+                      .replace(/[\u0300-\u036f]/g, "")
+                      .replace(/[^a-zA-Z0-9]+/g, "-")
+                      .toLowerCase();
+
+                    return (
+                      <div key={status.key} className="rounded-lg border border-border/60 bg-muted/20 p-4 space-y-3">
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Etapa original</p>
+                          <p className="text-sm font-semibold text-foreground">{status.defaultLabel}</p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleStatusDraftRestore(status.key)}
+                          disabled={
+                            status.label === status.defaultLabel &&
+                            status.description === status.defaultDescription
+                          }
+                        >
+                          Restaurar padrão
+                        </Button>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`status-label-${baseId}`}>Nome exibido</Label>
+                        <Input
+                          id={`status-label-${baseId}`}
+                          value={status.label}
+                          onChange={(event) =>
+                            handleStatusDraftChange(status.key, "label", event.target.value)
+                          }
+                          maxLength={60}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={`status-description-${baseId}`}>Descrição (opcional)</Label>
+                        <Textarea
+                          id={`status-description-${baseId}`}
+                          value={status.description}
+                          onChange={(event) =>
+                            handleStatusDraftChange(status.key, "description", event.target.value)
+                          }
+                          maxLength={160}
+                          placeholder={status.defaultDescription}
+                        />
+                      </div>
+                    </div>
+                    );
+                  })}
+                </div>
+                <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <Button
+                    variant="ghost"
+                    onClick={handleResetStatuses}
+                    disabled={isResettingStatusConfigs}
+                  >
+                    {isResettingStatusConfigs && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Restaurar todas
+                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setIsCustomizeDialogOpen(false)}
+                      disabled={isSavingStatusConfigs}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button onClick={handleSaveStatusDraft} disabled={isSavingStatusConfigs}>
+                      {isSavingStatusConfigs && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Salvar alterações
+                    </Button>
+                  </div>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
             <CardContent>
               <div className="space-y-6">
                 {steps.map((step, index) => {
@@ -1392,10 +1632,10 @@ export default function PedidoDetalhe() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex gap-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
               <Button
                 onClick={() => navigate(`/pedidos/${order.id}/producao`)}
-                className="flex-1"
+                className="w-full sm:flex-1"
               >
                 <Printer className="w-4 h-4 mr-2" />
                 Gerar Ordem de Produção
@@ -1403,14 +1643,14 @@ export default function PedidoDetalhe() {
               <Button
                 onClick={generateEmployeeTechnicalSheet}
                 variant="outline"
-                className="flex-1"
+                className="w-full sm:flex-1"
               >
                 <Users className="w-4 h-4 mr-2" />
                 Ficha Técnica Funcionários
               </Button>
               <Dialog open={isStatusDialogOpen} onOpenChange={setIsStatusDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button variant="outline">
+                  <Button variant="outline" className="w-full sm:flex-1">
                     <Upload className="w-4 h-4 mr-2" />
                     Atualizar Status
                   </Button>
@@ -1427,7 +1667,7 @@ export default function PedidoDetalhe() {
                           <SelectValue placeholder="Selecione o status" />
                         </SelectTrigger>
                         <SelectContent>
-                          {ORDER_STATUS_OPTIONS.map((option) => (
+                          {statusOptions.map((option) => (
                             <SelectItem key={option.value} value={option.value}>
                               {option.label}
                             </SelectItem>

@@ -5,6 +5,7 @@
 export const ORDER_STATUS = {
   AGUARDANDO_APROVACAO: 'Aguardando aprovação',
   EM_PRODUCAO: 'Em produção',
+  FINALIZANDO: 'Finalizando',
   PRONTO: 'Pronto',
   AGUARDANDO_RETIRADA: 'Aguardando retirada',
   ENTREGUE: 'Entregue',
@@ -29,6 +30,7 @@ export const PAYMENT_TO_ORDER_STATUS = {
 export const ORDER_STATUS_COLORS = {
   [ORDER_STATUS.AGUARDANDO_APROVACAO]: "bg-muted text-muted-foreground border-muted-foreground/30",
   [ORDER_STATUS.EM_PRODUCAO]: "bg-secondary/20 text-secondary border-secondary/30",
+  [ORDER_STATUS.FINALIZANDO]: "bg-primary/10 text-primary border-primary/30",
   [ORDER_STATUS.PRONTO]: "bg-accent/20 text-accent border-accent/30",
   [ORDER_STATUS.AGUARDANDO_RETIRADA]: "bg-blue-100 text-blue-800 border-blue-200",
   [ORDER_STATUS.ENTREGUE]: "bg-green-100 text-green-800 border-green-200",
@@ -46,6 +48,7 @@ export const PAYMENT_STATUS_COLORS = {
 export const ORDER_STATUS_OPTIONS = [
   { value: ORDER_STATUS.AGUARDANDO_APROVACAO, label: 'Aguardando aprovação' },
   { value: ORDER_STATUS.EM_PRODUCAO, label: 'Em produção' },
+  { value: ORDER_STATUS.FINALIZANDO, label: 'Finalizando' },
   { value: ORDER_STATUS.PRONTO, label: 'Pronto' },
   { value: ORDER_STATUS.AGUARDANDO_RETIRADA, label: 'Aguardando retirada' },
   { value: ORDER_STATUS.ENTREGUE, label: 'Entregue' },
@@ -76,3 +79,36 @@ export function mapPaymentToOrderStatus(paymentStatus: string): string {
   return PAYMENT_TO_ORDER_STATUS[paymentStatus as keyof typeof PAYMENT_TO_ORDER_STATUS] || 
          ORDER_STATUS.AGUARDANDO_APROVACAO;
 }
+
+export const DEFAULT_ORDER_STATUS_DETAILS = [
+  {
+    key: ORDER_STATUS.AGUARDANDO_APROVACAO,
+    label: 'Aguardando Aprovação',
+    description: 'Pedido recebido, aguardando confirmação do cliente',
+  },
+  {
+    key: ORDER_STATUS.EM_PRODUCAO,
+    label: 'Em Produção',
+    description: 'Trabalho iniciado, produção em andamento',
+  },
+  {
+    key: ORDER_STATUS.FINALIZANDO,
+    label: 'Finalizando',
+    description: 'Produto quase pronto, acabamentos finais',
+  },
+  {
+    key: ORDER_STATUS.PRONTO,
+    label: 'Pronto',
+    description: 'Produto finalizado, pronto para entrega',
+  },
+  {
+    key: ORDER_STATUS.AGUARDANDO_RETIRADA,
+    label: 'Aguardando Retirada',
+    description: 'Produto pronto, aguardando retirada pelo cliente',
+  },
+  {
+    key: ORDER_STATUS.ENTREGUE,
+    label: 'Entregue',
+    description: 'Produto entregue ao cliente, pedido finalizado',
+  },
+] as const;

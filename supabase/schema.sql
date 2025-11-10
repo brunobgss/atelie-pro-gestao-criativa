@@ -31,7 +31,15 @@ create table if not exists public.customers (
 );
 
 do $$ begin
-  create type public.order_status as enum ('Aguardando aprovação','Em produção','Pronto','Aguardando retirada');
+  create type public.order_status as enum (
+    'Aguardando aprovação',
+    'Em produção',
+    'Finalizando',
+    'Pronto',
+    'Aguardando retirada',
+    'Entregue',
+    'Cancelado'
+  );
 exception when duplicate_object then null; end $$;
 
 create table if not exists public.orders (
@@ -49,6 +57,17 @@ create table if not exists public.orders (
   file_url text,
   created_at timestamptz not null default now(),
   unique(empresa_id, code)
+);
+
+create table if not exists public.order_status_configs (
+  id uuid primary key default gen_random_uuid(),
+  empresa_id uuid references public.empresas(id) on delete cascade,
+  status_key text not null,
+  label text not null,
+  description text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique(empresa_id, status_key)
 );
 
 create table if not exists public.quotes (
@@ -91,6 +110,7 @@ alter table public.orders enable row level security;
 alter table public.quotes enable row level security;
 alter table public.quote_items enable row level security;
 alter table public.inventory_items enable row level security;
+alter table public.order_status_configs enable row level security;
 
 -- Policies para empresas
 drop policy if exists "users_select_empresas" on public.empresas;
@@ -147,6 +167,39 @@ create policy "users_insert_orders" on public.orders for insert with check (
     select 1 from public.user_empresas 
     where user_empresas.user_id = auth.uid() 
     and user_empresas.empresa_id = orders.empresa_id
+  )
+);
+
+drop policy if exists "users_select_order_status_configs" on public.order_status_configs;
+create policy "users_select_order_status_configs" on public.order_status_configs for select using (
+  exists (
+    select 1 from public.user_empresas 
+    where user_empresas.user_id = auth.uid() 
+    and user_empresas.empresa_id = order_status_configs.empresa_id
+  )
+);
+
+drop policy if exists "users_insert_order_status_configs" on public.order_status_configs;
+create policy "users_insert_order_status_configs" on public.order_status_configs for insert with check (
+  exists (
+    select 1 from public.user_empresas 
+    where user_empresas.user_id = auth.uid() 
+    and user_empresas.empresa_id = order_status_configs.empresa_id
+  )
+);
+
+drop policy if exists "users_update_order_status_configs" on public.order_status_configs;
+create policy "users_update_order_status_configs" on public.order_status_configs for update using (
+  exists (
+    select 1 from public.user_empresas 
+    where user_empresas.user_id = auth.uid() 
+    and user_empresas.empresa_id = order_status_configs.empresa_id
+  )
+) with check (
+  exists (
+    select 1 from public.user_empresas 
+    where user_empresas.user_id = auth.uid() 
+    and user_empresas.empresa_id = order_status_configs.empresa_id
   )
 );
 
