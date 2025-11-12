@@ -15,6 +15,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSync } from "@/contexts/SyncContext";
 import { useSyncOperations } from "@/hooks/useSyncOperations";
 import { useOrderStatusConfig } from "@/hooks/useOrderStatusConfig";
+import { PersonalizationListEditor, PersonalizationEntry, createEmptyPersonalization } from "@/components/PersonalizationListEditor";
 
 export default function EditarPedido() {
   const { id } = useParams<{ id: string }>();
@@ -32,6 +33,7 @@ export default function EditarPedido() {
   const [status, setStatus] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [currentFileUrl, setCurrentFileUrl] = useState<string | null>(null);
+  const [personalizations, setPersonalizations] = useState<PersonalizationEntry[]>([]);
 
   const { statusOptions } = useOrderStatusConfig();
 
@@ -51,6 +53,15 @@ export default function EditarPedido() {
       setDelivery(order.delivery_date || "");
       setStatus(order.status || "");
       setCurrentFileUrl(order.file_url || null);
+      setPersonalizations(
+        (order.personalizations ?? []).map((item) => ({
+          id: item.id ?? createEmptyPersonalization().id,
+          personName: item.person_name ?? "",
+          size: item.size ?? "",
+          quantity: item.quantity ?? 1,
+          notes: item.notes ?? "",
+        }))
+      );
     }
   }, [order]);
 
@@ -99,7 +110,15 @@ export default function EditarPedido() {
         delivery_date: delivery,
         status: status,
         observations: order?.observations || "",
-        file_url: fileUrl
+        file_url: fileUrl,
+        personalizations: personalizations
+          .filter((p) => p.personName.trim())
+          .map((p) => ({
+            person_name: p.personName.trim(),
+            size: p.size?.trim() || undefined,
+            quantity: p.quantity ?? 1,
+            notes: p.notes?.trim() || undefined,
+          })),
       });
       
       if (result.ok) {
@@ -306,10 +325,17 @@ export default function EditarPedido() {
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-4 border-t border-border">
+              <PersonalizationListEditor
+                entries={personalizations}
+                onChange={setPersonalizations}
+                showNotes
+                description="Atualize aqui os nomes, tamanhos e observações de cada peça personalizada deste pedido."
+              />
+
+              <div className="flex flex-col-reverse gap-3 pt-4 border-t border-border sm:flex-row sm:items-center">
                 <Button
                   type="submit"
-                  className="bg-primary hover:bg-primary/90 flex-1"
+                  className="bg-primary hover:bg-primary/90 flex-1 w-full sm:w-auto"
                 >
                   <Save className="w-4 h-4 mr-2" />
                   Salvar Alterações
@@ -318,7 +344,7 @@ export default function EditarPedido() {
                   type="button"
                   variant="outline"
                   onClick={() => navigate("/pedidos")}
-                  className="border-border"
+                  className="border-border w-full sm:w-auto"
                 >
                   Cancelar
                 </Button>

@@ -59,6 +59,17 @@ create table if not exists public.orders (
   unique(empresa_id, code)
 );
 
+create table if not exists public.order_personalizations (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid not null references public.orders(id) on delete cascade,
+  empresa_id uuid references public.empresas(id) on delete cascade,
+  person_name text not null,
+  size text,
+  quantity integer not null default 1 check (quantity > 0),
+  notes text,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists public.order_status_configs (
   id uuid primary key default gen_random_uuid(),
   empresa_id uuid references public.empresas(id) on delete cascade,
@@ -91,6 +102,17 @@ create table if not exists public.quote_items (
   value numeric(12,2) not null check (value >= 0)
 );
 
+create table if not exists public.quote_personalizations (
+  id uuid primary key default gen_random_uuid(),
+  quote_id uuid not null references public.quotes(id) on delete cascade,
+  empresa_id uuid references public.empresas(id) on delete cascade,
+  person_name text not null,
+  size text,
+  quantity integer not null default 1 check (quantity > 0),
+  notes text,
+  created_at timestamptz not null default now()
+);
+
 create table if not exists public.inventory_items (
   id uuid primary key default gen_random_uuid(),
   empresa_id uuid references public.empresas(id) on delete cascade,
@@ -109,8 +131,10 @@ alter table public.customers enable row level security;
 alter table public.orders enable row level security;
 alter table public.quotes enable row level security;
 alter table public.quote_items enable row level security;
+alter table public.quote_personalizations enable row level security;
 alter table public.inventory_items enable row level security;
 alter table public.order_status_configs enable row level security;
+alter table public.order_personalizations enable row level security;
 
 -- Policies para empresas
 drop policy if exists "users_select_empresas" on public.empresas;
@@ -203,6 +227,43 @@ create policy "users_update_order_status_configs" on public.order_status_configs
   )
 );
 
+drop policy if exists "users_select_order_personalizations" on public.order_personalizations;
+create policy "users_select_order_personalizations" on public.order_personalizations for select using (
+  exists (
+    select 1 from public.user_empresas ue
+    join public.orders o on o.empresa_id = ue.empresa_id
+    where ue.user_id = auth.uid()
+    and o.id = order_personalizations.order_id
+  )
+);
+
+drop policy if exists "users_insert_order_personalizations" on public.order_personalizations;
+create policy "users_insert_order_personalizations" on public.order_personalizations for insert with check (
+  exists (
+    select 1 from public.user_empresas ue
+    join public.orders o on o.empresa_id = ue.empresa_id
+    where ue.user_id = auth.uid()
+    and o.id = order_personalizations.order_id
+  )
+);
+
+drop policy if exists "users_update_order_personalizations" on public.order_personalizations;
+create policy "users_update_order_personalizations" on public.order_personalizations for update using (
+  exists (
+    select 1 from public.user_empresas ue
+    join public.orders o on o.empresa_id = ue.empresa_id
+    where ue.user_id = auth.uid()
+    and o.id = order_personalizations.order_id
+  )
+) with check (
+  exists (
+    select 1 from public.user_empresas ue
+    join public.orders o on o.empresa_id = ue.empresa_id
+    where ue.user_id = auth.uid()
+    and o.id = order_personalizations.order_id
+  )
+);
+
 -- Policies para quotes
 drop policy if exists "users_select_quotes" on public.quotes;
 create policy "users_select_quotes" on public.quotes for select using (
@@ -240,6 +301,43 @@ create policy "users_insert_quote_items" on public.quote_items for insert with c
     join public.quotes q on q.empresa_id = ue.empresa_id
     where ue.user_id = auth.uid() 
     and q.id = quote_items.quote_id
+  )
+);
+
+drop policy if exists "users_select_quote_personalizations" on public.quote_personalizations;
+create policy "users_select_quote_personalizations" on public.quote_personalizations for select using (
+  exists (
+    select 1 from public.user_empresas ue
+    join public.quotes q on q.empresa_id = ue.empresa_id
+    where ue.user_id = auth.uid() 
+    and q.id = quote_personalizations.quote_id
+  )
+);
+
+drop policy if exists "users_insert_quote_personalizations" on public.quote_personalizations;
+create policy "users_insert_quote_personalizations" on public.quote_personalizations for insert with check (
+  exists (
+    select 1 from public.user_empresas ue
+    join public.quotes q on q.empresa_id = ue.empresa_id
+    where ue.user_id = auth.uid() 
+    and q.id = quote_personalizations.quote_id
+  )
+);
+
+drop policy if exists "users_update_quote_personalizations" on public.quote_personalizations;
+create policy "users_update_quote_personalizations" on public.quote_personalizations for update using (
+  exists (
+    select 1 from public.user_empresas ue
+    join public.quotes q on q.empresa_id = ue.empresa_id
+    where ue.user_id = auth.uid() 
+    and q.id = quote_personalizations.quote_id
+  )
+) with check (
+  exists (
+    select 1 from public.user_empresas ue
+    join public.quotes q on q.empresa_id = ue.empresa_id
+    where ue.user_id = auth.uid() 
+    and q.id = quote_personalizations.quote_id
   )
 );
 

@@ -116,7 +116,7 @@ export default function Orcamentos() {
     try {
       // Buscar dados completos do orçamento
       const quoteData = await getQuoteByCode(quote.id);
-      const { items } = quoteData;
+      const { items, personalizations } = quoteData;
       
       // Montar lista de produtos
       let productsList = "";
@@ -129,6 +129,23 @@ export default function Orcamentos() {
         productsList = `• ${quote.description || 'Produto não especificado'}`;
       }
 
+      const personalizationLines = personalizations
+        ?.filter((item) => item.person_name?.trim())
+        .map((item) => {
+          const parts = [
+            item.person_name,
+            item.size ? `(${item.size})` : "",
+            item.quantity && item.quantity !== 1 ? `x${item.quantity}` : "",
+            item.notes ? `- ${item.notes}` : "",
+          ].filter(Boolean);
+          return `• ${parts.join(" ").replace(/\s+/g, " ").trim()}`;
+        })
+        .join("\n");
+
+      const personalizationSection = personalizationLines
+        ? `\n*Personalizações:*\n${personalizationLines}\n`
+        : "";
+
       return `*ORÇAMENTO ${empresa?.nome || 'ATELIÊ'}*
 
 Olá *${quote.client}*!
@@ -137,6 +154,8 @@ Seu orçamento está pronto!
 
 *Produtos:*
 ${productsList}
+
+${personalizationSection}
 
 *Valor Total: ${formatCurrency(Number(quote.total_value || 0))}*
 

@@ -19,6 +19,26 @@ export type OrderRow = {
   created_at?: string;
   updated_at?: string;
   empresa_id?: string | null;
+  personalizations?: OrderPersonalizationRow[];
+};
+
+export type OrderPersonalizationRow = {
+  id: string;
+  order_id: string;
+  empresa_id: string;
+  person_name: string;
+  size?: string | null;
+  quantity: number;
+  notes?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type OrderPersonalizationInput = {
+  person_name: string;
+  size?: string;
+  quantity: number;
+  notes?: string;
 };
 
 export async function listOrders(): Promise<OrderRow[]> {
@@ -119,7 +139,26 @@ export async function getOrderByCode(code: string): Promise<OrderRow | null> {
     }
     
     console.log("Pedido encontrado:", data);
-    return data as OrderRow;
+
+    const personalizationsPromise = supabase
+      .from("atelie_order_personalizations")
+      .select("id, order_id, empresa_id, person_name, size, quantity, notes, created_at, updated_at")
+      .eq("order_id", data.id)
+      .order("created_at", { ascending: true });
+
+    const personalizationsResult = await Promise.race([personalizationsPromise, timeoutPromise]) as any;
+    const personalizationsError = personalizationsResult?.error;
+    const personalizationsData = personalizationsResult?.data as OrderPersonalizationRow[] | undefined;
+
+    if (personalizationsError) {
+      console.error("Erro ao buscar personalizações do pedido:", personalizationsError);
+      throw personalizationsError;
+    }
+
+    return {
+      ...(data as OrderRow),
+      personalizations: personalizationsData ?? [],
+    };
   } catch (e: unknown) {
     console.error("Erro ao buscar pedido:", e);
     return null;
@@ -139,6 +178,7 @@ export async function createOrder(input: {
   status?: string;
   observations?: string;
   file_url?: string;
+  personalizations?: OrderPersonalizationInput[];
 }): Promise<{ ok: boolean; id?: string; error?: string }> {
   try {
     const code = input.code ?? generateOrderCode();
@@ -173,6 +213,30 @@ export async function createOrder(input: {
     }
 
     console.log("Pedido criado com sucesso:", data);
+
+    if (input.personalizations?.length && data?.id) {
+      const personalizations = input.personalizations
+        .filter((p) => p.person_name?.trim())
+        .map((p) => ({
+          order_id: data.id,
+          empresa_id,
+          person_name: p.person_name.trim(),
+          size: p.size?.trim() || null,
+          quantity: p.quantity ?? 1,
+          notes: p.notes?.trim() || null,
+        }));
+
+      if (personalizations.length) {
+        const { error: personalizationsError } = await supabase
+          .from("atelie_order_personalizations")
+          .insert(personalizations);
+
+        if (personalizationsError) {
+          console.error("Erro ao salvar personalizações do pedido:", personalizationsError);
+        }
+      }
+    }
+
     return { ok: true, id: data.id };
   } catch (e: unknown) {
     console.error("Erro ao criar pedido:", e);
@@ -323,6 +387,7 @@ export async function updateOrder(
     status: string;
     observations: string;
     file_url: string;
+    personalizations: OrderPersonalizationInput[];
   }>
 ): Promise<{ ok: boolean; data?: OrderRow; error?: string }> {
   try {
@@ -343,9 +408,11 @@ export async function updateOrder(
 
     const { column, value } = resolveOrderFilter(orderCode);
 
+    const { personalizations, ...restUpdates } = updates ?? {};
+
     const sanitizedUpdates = Object.fromEntries(
-      Object.entries(updates ?? {}).filter(([, v]) => v !== undefined)
-    ) as typeof updates;
+      Object.entries(restUpdates ?? {}).filter(([, v]) => v !== undefined)
+    ) as typeof restUpdates;
 
     // Preparar dados para atualização
     const updateData = {
@@ -432,6 +499,53 @@ export async function updateOrder(
           console.log("Receita criada com sucesso");
         }
       }
+    }
+
+    if (personalizations && updatedOrder.id) {
+      console.log("Atualizando personalizações do pedido:", personalizations.length);
+
+      const { error: deletePersonalizationsError } = await supabase
+        .from("atelie_order_personalizations")
+        .delete()
+        .eq("order_id", updatedOrder.id);
+
+      if (deletePersonalizationsError) {
+        console.error("Erro ao remover personalizações do pedido:", deletePersonalizationsError);
+      } else if (personalizations.length) {
+        const empresa_id = updatedOrder.empresa_id ?? (await getCurrentEmpresaId());
+        const sanitizedPersonalizations = personalizations
+          .filter((p) => p.person_name?.trim())
+          .map((p) => ({
+            order_id: updatedOrder.id,
+            empresa_id,
+            person_name: p.person_name.trim(),
+            size: p.size?.trim() || null,
+            quantity: p.quantity ?? 1,
+            notes: p.notes?.trim() || null,
+          }));
+
+        if (sanitizedPersonalizations.length) {
+          const { error: insertPersonalizationsError } = await supabase
+            .from("atelie_order_personalizations")
+            .insert(sanitizedPersonalizations);
+
+          if (insertPersonalizationsError) {
+            console.error("Erro ao salvar personalizações do pedido:", insertPersonalizationsError);
+          }
+        }
+      }
+    }
+
+    const { data: orderPersonalizations, error: personalizationsError } = await supabase
+      .from("atelie_order_personalizations")
+      .select("id, order_id, empresa_id, person_name, size, quantity, notes, created_at, updated_at")
+      .eq("order_id", updatedOrder.id)
+      .order("created_at", { ascending: true });
+
+    if (personalizationsError) {
+      console.error("Erro ao carregar personalizações atualizadas:", personalizationsError);
+    } else {
+      updatedOrder.personalizations = orderPersonalizations ?? [];
     }
 
     console.log("Pedido atualizado com sucesso:", updatedOrder);

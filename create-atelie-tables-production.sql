@@ -31,6 +31,18 @@ CREATE TABLE IF NOT EXISTS atelie_quote_items (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS atelie_quote_personalizations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    quote_id UUID NOT NULL REFERENCES atelie_quotes(id) ON DELETE CASCADE,
+    empresa_id UUID NOT NULL REFERENCES empresas(id),
+    person_name TEXT NOT NULL,
+    size TEXT,
+    quantity INTEGER NOT NULL DEFAULT 1,
+    notes TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- 3. Tabela de Pedidos do Ateliê
 CREATE TABLE IF NOT EXISTS atelie_orders (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -56,6 +68,18 @@ CREATE TABLE IF NOT EXISTS atelie_orders (
     ),
     observations TEXT,
     empresa_id UUID NOT NULL REFERENCES empresas(id),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS atelie_order_personalizations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    order_id UUID NOT NULL REFERENCES atelie_orders(id) ON DELETE CASCADE,
+    empresa_id UUID NOT NULL REFERENCES empresas(id),
+    person_name TEXT NOT NULL,
+    size TEXT,
+    quantity INTEGER NOT NULL DEFAULT 1,
+    notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -103,10 +127,14 @@ CREATE INDEX IF NOT EXISTS idx_atelie_quotes_status ON atelie_quotes(status);
 
 CREATE INDEX IF NOT EXISTS idx_atelie_quote_items_quote_id ON atelie_quote_items(quote_id);
 CREATE INDEX IF NOT EXISTS idx_atelie_quote_items_empresa_id ON atelie_quote_items(empresa_id);
+CREATE INDEX IF NOT EXISTS idx_atelie_quote_personalizations_quote_id ON atelie_quote_personalizations(quote_id);
+CREATE INDEX IF NOT EXISTS idx_atelie_quote_personalizations_empresa_id ON atelie_quote_personalizations(empresa_id);
 
 CREATE INDEX IF NOT EXISTS idx_atelie_orders_empresa_id ON atelie_orders(empresa_id);
 CREATE INDEX IF NOT EXISTS idx_atelie_orders_code ON atelie_orders(code);
 CREATE INDEX IF NOT EXISTS idx_atelie_orders_status ON atelie_orders(status);
+CREATE INDEX IF NOT EXISTS idx_atelie_order_personalizations_order_id ON atelie_order_personalizations(order_id);
+CREATE INDEX IF NOT EXISTS idx_atelie_order_personalizations_empresa_id ON atelie_order_personalizations(empresa_id);
 CREATE INDEX IF NOT EXISTS idx_order_status_configs_empresa_id ON order_status_configs(empresa_id);
 
 CREATE INDEX IF NOT EXISTS idx_atelie_customers_empresa_id ON atelie_customers(empresa_id);
@@ -117,7 +145,9 @@ CREATE INDEX IF NOT EXISTS idx_atelie_receitas_order_code ON atelie_receitas(ord
 -- Ativar RLS
 ALTER TABLE atelie_quotes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE atelie_quote_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE atelie_quote_personalizations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE atelie_orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE atelie_order_personalizations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE order_status_configs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE atelie_customers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE atelie_receitas ENABLE ROW LEVEL SECURITY;
@@ -153,6 +183,21 @@ CREATE POLICY "Users can update quote items from their empresa" ON atelie_quote_
         SELECT empresa_id FROM user_empresas WHERE user_id = auth.uid()
     ));
 
+CREATE POLICY "Users can view quote personalizations from their empresa" ON atelie_quote_personalizations
+    FOR SELECT USING (empresa_id IN (
+        SELECT empresa_id FROM user_empresas WHERE user_id = auth.uid()
+    ));
+
+CREATE POLICY "Users can insert quote personalizations for their empresa" ON atelie_quote_personalizations
+    FOR INSERT WITH CHECK (empresa_id IN (
+        SELECT empresa_id FROM user_empresas WHERE user_id = auth.uid()
+    ));
+
+CREATE POLICY "Users can update quote personalizations from their empresa" ON atelie_quote_personalizations
+    FOR UPDATE USING (empresa_id IN (
+        SELECT empresa_id FROM user_empresas WHERE user_id = auth.uid()
+    ));
+
 CREATE POLICY "Users can view orders from their empresa" ON atelie_orders
     FOR SELECT USING (empresa_id IN (
         SELECT empresa_id FROM user_empresas WHERE user_id = auth.uid()
@@ -164,6 +209,21 @@ CREATE POLICY "Users can insert orders for their empresa" ON atelie_orders
     ));
 
 CREATE POLICY "Users can update orders from their empresa" ON atelie_orders
+    FOR UPDATE USING (empresa_id IN (
+        SELECT empresa_id FROM user_empresas WHERE user_id = auth.uid()
+    ));
+
+CREATE POLICY "Users can view order personalizations from their empresa" ON atelie_order_personalizations
+    FOR SELECT USING (empresa_id IN (
+        SELECT empresa_id FROM user_empresas WHERE user_id = auth.uid()
+    ));
+
+CREATE POLICY "Users can insert order personalizations for their empresa" ON atelie_order_personalizations
+    FOR INSERT WITH CHECK (empresa_id IN (
+        SELECT empresa_id FROM user_empresas WHERE user_id = auth.uid()
+    ));
+
+CREATE POLICY "Users can update order personalizations from their empresa" ON atelie_order_personalizations
     FOR UPDATE USING (empresa_id IN (
         SELECT empresa_id FROM user_empresas WHERE user_id = auth.uid()
     ));

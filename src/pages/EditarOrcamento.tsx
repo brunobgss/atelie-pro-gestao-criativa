@@ -10,6 +10,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { getQuoteByCode, updateQuote } from "@/integrations/supabase/quotes";
+import { PersonalizationListEditor, PersonalizationEntry, createEmptyPersonalization } from "@/components/PersonalizationListEditor";
 
 interface QuoteItem {
   id: string;
@@ -29,6 +30,7 @@ export default function EditarOrcamento() {
   const [items, setItems] = useState<QuoteItem[]>([
     { id: "1", description: "", quantity: 1, value: 0 }
   ]);
+  const [personalizations, setPersonalizations] = useState<PersonalizationEntry[]>([]);
 
   const { data: quoteData, isLoading } = useQuery({
     queryKey: ["quote", id],
@@ -38,7 +40,7 @@ export default function EditarOrcamento() {
 
   useEffect(() => {
     if (quoteData?.quote) {
-      const { quote, items: quoteItems } = quoteData;
+      const { quote, items: quoteItems, personalizations: quotePersonalizations } = quoteData;
       setCustomerName(quote.customer_name);
       setCustomerPhone(quote.customer_phone || "");
       setObservations(quote.observations || "");
@@ -51,6 +53,16 @@ export default function EditarOrcamento() {
           value: item.unit_value || 0
         })));
       }
+
+      setPersonalizations(
+        (quotePersonalizations ?? []).map((item) => ({
+          id: item.id ?? createEmptyPersonalization().id,
+          personName: item.person_name ?? "",
+          size: item.size ?? "",
+          quantity: item.quantity ?? 1,
+          notes: item.notes ?? "",
+        }))
+      );
     }
   }, [quoteData]);
 
@@ -102,7 +114,15 @@ export default function EditarOrcamento() {
           description: item.description,
           quantity: item.quantity,
           value: item.value
-        }))
+        })),
+        personalizations: personalizations
+          .filter((p) => p.personName.trim())
+          .map((p) => ({
+            person_name: p.personName.trim(),
+            size: p.size?.trim() || undefined,
+            quantity: p.quantity ?? 1,
+            notes: p.notes?.trim() || undefined,
+          })),
       });
       
       if (result.ok) {
@@ -291,6 +311,12 @@ export default function EditarOrcamento() {
                 </div>
               ))}
 
+              <PersonalizationListEditor
+                entries={personalizations}
+                onChange={setPersonalizations}
+                description="Registre aqui cada camiseta ou peça personalizada com nome e tamanho."
+              />
+
               <div className="flex justify-end pt-4 border-t border-border">
                 <div className="text-right">
                   <p className="text-sm text-muted-foreground">Total do Orçamento</p>
@@ -300,10 +326,10 @@ export default function EditarOrcamento() {
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-4 border-t border-border">
+              <div className="flex flex-col-reverse gap-3 pt-4 border-t border-border sm:flex-row sm:items-center">
                 <Button
                   type="submit"
-                  className="bg-primary hover:bg-primary/90 flex-1"
+                  className="bg-primary hover:bg-primary/90 flex-1 w-full sm:w-auto"
                 >
                   <Save className="w-4 h-4 mr-2" />
                   Salvar Alterações
@@ -312,7 +338,7 @@ export default function EditarOrcamento() {
                   type="button"
                   variant="outline"
                   onClick={() => navigate("/orcamentos")}
-                  className="border-border"
+                  className="border-border w-full sm:w-auto"
                 >
                   Cancelar
                 </Button>

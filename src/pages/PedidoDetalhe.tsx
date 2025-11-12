@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, Calendar, CheckCircle2, Clock, Package, Upload, User, Play, Pause, CheckCircle, Truck, Printer, Edit, CreditCard, Users, FileText, Download, Loader2, RefreshCw, Eye } from "lucide-react";
 import { DialogEmitirNota } from "@/components/DialogEmitirNota";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getOrderByCode, updateOrderStatus } from "@/integrations/supabase/orders";
+import { getOrderByCode, updateOrderStatus, type OrderRow } from "@/integrations/supabase/orders";
 import { getReceitaByOrderCode } from "@/integrations/supabase/receitas";
 import { useSync } from "@/contexts/SyncContext";
 import { getMedidas } from "@/integrations/supabase/medidas";
@@ -34,6 +34,7 @@ type OrderItem = {
   delivery: string; // ISO
   status: "Aguardando aprovação" | "Em produção" | "Finalizando" | "Pronto" | "Aguardando retirada" | "Entregue" | "Cancelado";
   file?: string;
+  personalizations?: OrderRow["personalizations"];
 };
 
 
@@ -583,6 +584,7 @@ export default function PedidoDetalhe() {
         delivery: orderDb.delivery_date ?? "",
         status: orderDb.status,
         file: orderDb.file_url ?? undefined,
+        personalizations: orderDb.personalizations ?? [],
       } as OrderItem;
     }
     return null;
@@ -721,6 +723,27 @@ export default function PedidoDetalhe() {
               margin-right: 10px; 
               font-weight: bold; 
             }
+            .personal-table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 15px;
+            }
+            .personal-table th,
+            .personal-table td {
+              border: 1px solid #d1d5db;
+              padding: 8px;
+              font-size: 13px;
+              text-align: left;
+            }
+            .personal-table th {
+              background: #dcfce7;
+              color: #047857;
+              text-transform: uppercase;
+              font-weight: 700;
+            }
+            .personal-table td:first-child {
+              font-weight: 600;
+            }
             .footer { 
               margin-top: 40px; 
               text-align: center; 
@@ -802,6 +825,33 @@ export default function PedidoDetalhe() {
                 </div>
               </div>
             </div>
+
+            ${order.personalizations && order.personalizations.length ? `
+            <div class="section">
+              <h2>🧵 Personalizações Individuais</h2>
+              <p>Detalhamento das peças personalizadas para produção.</p>
+              <table class="personal-table">
+                <thead>
+                  <tr>
+                    <th>Nome / Identificação</th>
+                    <th>Tamanho</th>
+                    <th>Quantidade</th>
+                    <th>Observações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${order.personalizations.map((item: any) => `
+                    <tr>
+                      <td>${item.person_name || ''}</td>
+                      <td>${item.size || '—'}</td>
+                      <td>${item.quantity ?? 1}</td>
+                      <td>${item.notes || ''}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+            ` : ''}
             
             ${(() => {
               // Filtrar medidas do cliente atual
@@ -1113,6 +1163,42 @@ export default function PedidoDetalhe() {
                 </div>
                 <p className="text-foreground mt-1">{order.description}</p>
               </div>
+
+              {order.personalizations && order.personalizations.length > 0 && (
+                <div className="space-y-2 border-t border-dashed pt-4 mt-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      Personalizações
+                    </p>
+                    <span className="text-xs text-muted-foreground">
+                      {order.personalizations.length} peça{order.personalizations.length !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {order.personalizations.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex flex-col gap-1 rounded-md border border-border/80 bg-muted/20 p-3 text-xs sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium text-foreground">{item.person_name}</span>
+                          <span className="text-muted-foreground">
+                            {item.size ? `Tamanho: ${item.size}` : "Tamanho não informado"}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 text-muted-foreground">
+                          <span>Qtd: {item.quantity}</span>
+                          {item.notes && (
+                            <span className="max-w-[240px] truncate text-muted-foreground/90">
+                              {item.notes}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <p className="text-xs text-muted-foreground">Arquivo / Arte</p>

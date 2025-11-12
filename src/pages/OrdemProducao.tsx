@@ -102,7 +102,8 @@ export default function OrdemProducao() {
     observations: order.observations || 'Sem observações',
     file_url: order.file_url || null,
     created_at: order.created_at || new Date().toISOString(),
-    updated_at: order.updated_at || new Date().toISOString()
+    updated_at: order.updated_at || new Date().toISOString(),
+    personalizations: Array.isArray(order.personalizations) ? order.personalizations : [],
   };
 
   console.log("=== ORDEM DE PRODUÇÃO - DADOS SEGUROS ===");
@@ -238,6 +239,27 @@ export default function OrdemProducao() {
               margin-right: 10px; 
               font-weight: bold; 
             }
+            .personal-table { 
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 15px;
+            }
+            .personal-table th,
+            .personal-table td { 
+              border: 1px solid #d1d5db; 
+              padding: 8px; 
+              font-size: 13px; 
+              text-align: left; 
+            }
+            .personal-table th { 
+              background: #e0f2fe; 
+              color: #0369a1; 
+              text-transform: uppercase; 
+              font-weight: 700; 
+            }
+            .personal-table td:first-child { 
+              font-weight: 600; 
+            }
             .footer { 
               margin-top: 40px; 
               text-align: center; 
@@ -301,6 +323,33 @@ export default function OrdemProducao() {
                 </div>
               </div>
             </div>
+
+            ${safeOrder.personalizations.length ? `
+            <div class="section">
+              <h2>🧵 Personalizações Individuais</h2>
+              <p style="margin-bottom: 12px;">Detalhamento das peças personalizadas fornecidas pelo cliente.</p>
+              <table class="personal-table">
+                <thead>
+                  <tr>
+                    <th>Nome / Identificação</th>
+                    <th>Tamanho</th>
+                    <th>Quantidade</th>
+                    <th>Observações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${safeOrder.personalizations.map((item: any) => `
+                    <tr>
+                      <td>${item.person_name || ''}</td>
+                      <td>${item.size || '—'}</td>
+                      <td>${item.quantity ?? 1}</td>
+                      <td>${item.notes || ''}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+            ` : ''}
             
             ${medidasCliente.length > 0 ? `
             <div class="section">
@@ -561,6 +610,41 @@ export default function OrdemProducao() {
             )}
           </CardContent>
         </Card>
+
+        {safeOrder.personalizations.length > 0 && (
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="w-5 h-5" />
+                Personalizações Individuais
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="bg-blue-50 text-blue-700">
+                      <th className="px-4 py-2 text-left font-semibold uppercase tracking-wide">Nome / Identificação</th>
+                      <th className="px-4 py-2 text-center font-semibold uppercase tracking-wide">Tamanho</th>
+                      <th className="px-4 py-2 text-center font-semibold uppercase tracking-wide">Quantidade</th>
+                      <th className="px-4 py-2 text-left font-semibold uppercase tracking-wide">Observações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {safeOrder.personalizations.map((item: any) => (
+                      <tr key={item.id ?? `${item.person_name}-${item.size}`} className="border-b last:border-0">
+                        <td className="px-4 py-2 font-medium text-gray-800">{item.person_name || "—"}</td>
+                        <td className="px-4 py-2 text-center text-gray-600">{item.size || "—"}</td>
+                        <td className="px-4 py-2 text-center text-gray-600">{item.quantity ?? 1}</td>
+                        <td className="px-4 py-2 text-gray-600">{item.notes || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Medidas do Cliente */}
         {medidas.filter(medida => 

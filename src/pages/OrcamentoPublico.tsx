@@ -6,11 +6,13 @@ import logoAteliePro from "@/assets/logo-atelie-pro.png";
 import { getQuoteByCode } from "@/integrations/supabase/quotes";
 
 type QuoteItem = { description: string; quantity: number; value: number };
+type QuotePersonalization = { personName: string; size?: string; quantity: number; notes?: string };
 type Quote = {
   id: string;
   client: string;
   date: string; // ISO
   items: QuoteItem[];
+  personalizations: QuotePersonalization[];
   observations?: string;
 };
 
@@ -32,6 +34,12 @@ export default function OrcamentoPublico() {
         client: data.quote.customer_name,
         date: data.quote.date,
         items: (data.items ?? []).map((it) => ({ description: it.description, quantity: it.quantity, value: it.unit_value || 0 })),
+        personalizations: (data.personalizations ?? []).map((person) => ({
+          personName: person.person_name ?? "",
+          size: person.size ?? "",
+          quantity: person.quantity ?? 1,
+          notes: person.notes ?? "",
+        })),
         observations: data.quote.observations ?? undefined,
       } as Quote;
     }
@@ -97,6 +105,34 @@ export default function OrcamentoPublico() {
                 </tfoot>
               </table>
             </div>
+
+            {quote.personalizations.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">Personalizações</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-2">Nome</th>
+                        <th className="text-center py-2">Tamanho</th>
+                        <th className="text-right py-2">Quantidade</th>
+                        <th className="text-left py-2">Observações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {quote.personalizations.map((item, idx) => (
+                        <tr key={idx} className="border-b">
+                          <td className="py-2 pr-4">{item.personName}</td>
+                          <td className="py-2 text-center">{item.size || "—"}</td>
+                          <td className="py-2 text-right">{item.quantity}</td>
+                          <td className="py-2 text-left">{item.notes || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
 
             {quote.observations && (
               <div className="pt-2">

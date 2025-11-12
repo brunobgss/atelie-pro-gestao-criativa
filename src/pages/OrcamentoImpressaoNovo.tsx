@@ -133,6 +133,8 @@ export default function OrcamentoImpressaoNovo() {
     date: String(quote?.date || new Date().toISOString().split('T')[0])
   };
 
+  const personalizations = quoteData.personalizations || [];
+
   const safeItems = (items || []).map((item: any, index: number) => ({
     index: index + 1,
     description: String(item?.description || 'Produto personalizado'),
@@ -141,9 +143,18 @@ export default function OrcamentoImpressaoNovo() {
     total: Number(item?.quantity || 1) * Number(item?.unit_value || 0)
   }));
 
+  const safePersonalizations = personalizations.map((item: any, index: number) => ({
+    index: index + 1,
+    person_name: String(item?.person_name || "Cliente"),
+    size: item?.size ? String(item.size) : "—",
+    quantity: Number(item?.quantity || 1),
+    notes: item?.notes ? String(item.notes) : "",
+  }));
+
   console.log("=== DADOS FINAIS SERIALIZADOS ===");
   console.log("Safe Quote:", safeQuote);
   console.log("Safe Items:", safeItems);
+  console.log("Safe Personalizations:", safePersonalizations);
 
   return (
     <div className="min-h-screen bg-background">
@@ -490,6 +501,32 @@ export default function OrcamentoImpressaoNovo() {
                           `}
                         </tbody>
                       </table>
+
+                      ${safePersonalizations.length > 0 ? `
+                      <div class="lista-produtos-title" style="margin-top: 16px;">Lista de Personalizações</div>
+                      <table class="produtos-table">
+                        <thead>
+                          <tr>
+                            <th style="width: 8%;">Item</th>
+                            <th style="width: 40%;">Nome</th>
+                            <th style="width: 15%; text-align: center;">Tamanho</th>
+                            <th style="width: 15%; text-align: center;">Quantidade</th>
+                            <th style="width: 22%;">Observações</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          ${safePersonalizations.map(item => `
+                            <tr>
+                              <td style="text-align: center;">${item.index}</td>
+                              <td>${item.person_name}</td>
+                              <td style="text-align: center;">${item.size}</td>
+                              <td style="text-align: center;">${item.quantity}</td>
+                              <td>${item.notes || ""}</td>
+                            </tr>
+                          `).join('')}
+                        </tbody>
+                      </table>
+                      ` : ''}
 
                       <div style="margin-top: 0px; margin-bottom: 10px;">
                         <table style="width: 100%; border-collapse: collapse; font-size: 11px;">

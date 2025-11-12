@@ -21,6 +21,7 @@ import { errorHandler } from "@/utils/errorHandler";
 import { logger } from "@/utils/logger";
 import { performanceMonitor } from "@/utils/performanceMonitor";
 import { ClientSearch } from "@/components/ClientSearch";
+import { PersonalizationListEditor, PersonalizationEntry } from "@/components/PersonalizationListEditor";
 
 export default function NovoOrcamento() {
   const navigate = useNavigate();
@@ -36,6 +37,7 @@ export default function NovoOrcamento() {
   const [selectedQuantity, setSelectedQuantity] = useState(1);
   const [whatsappModalOpen, setWhatsappModalOpen] = useState(false);
   const [customMessage, setCustomMessage] = useState("");
+  const [personalizations, setPersonalizations] = useState<PersonalizationEntry[]>([]);
 
   // Query para buscar produtos do catálogo
   const { data: products = [] } = useQuery({
@@ -95,6 +97,14 @@ export default function NovoOrcamento() {
           date: dateInput,
           observations: (observations || '') + (deliveryDateInput ? `\nData de entrega estimada: ${new Date(deliveryDateInput).toLocaleDateString('pt-BR')}` : ''),
           items,
+          personalizations: personalizations
+            .filter((p) => p.personName.trim())
+            .map((p) => ({
+              person_name: p.personName.trim(),
+              size: p.size?.trim() || undefined,
+              quantity: p.quantity ?? 1,
+              notes: p.notes?.trim() || undefined,
+            })),
         });
       },
       'NovoOrcamento'
@@ -115,7 +125,8 @@ export default function NovoOrcamento() {
       quoteCode: code, 
       client: clientName, 
       itemsCount: items.length, 
-      totalValue: items.reduce((sum, item) => sum + (item.quantity * item.value), 0)
+      totalValue: items.reduce((sum, item) => sum + (item.quantity * item.value), 0),
+      personalizationCount: personalizations.length,
     });
 
     toast.success("Orçamento criado com sucesso!");
@@ -396,6 +407,12 @@ Aguardo seu retorno! 😊`;
                   </div>
                 ))}
 
+                <PersonalizationListEditor
+                  entries={personalizations}
+                  onChange={setPersonalizations}
+                  description="Registre cada peça personalizada com nome e tamanho. Esses dados ficam salvos no orçamento e podem ser reaproveitados no pedido."
+                />
+
                 <div className="flex justify-end p-4 bg-muted/30 rounded-lg">
                   <div className="text-right">
                     <p className="text-sm text-muted-foreground">Total</p>
@@ -416,15 +433,15 @@ Aguardo seu retorno! 😊`;
                 />
               </div>
 
-              <div className="flex gap-3 pt-4 border-t border-border">
+              <div className="flex flex-col-reverse gap-3 pt-4 border-t border-border sm:flex-row sm:items-center">
                 <Button
                   type="submit"
-                  className="bg-secondary hover:bg-secondary/90 text-secondary-foreground"
+                  className="bg-secondary hover:bg-secondary/90 text-secondary-foreground w-full sm:w-auto"
                 >
                   <Save className="w-4 h-4 mr-2" />
                   Salvar Orçamento
                 </Button>
-                <div className="space-y-3">
+                <div className="space-y-3 w-full sm:w-auto">
                   <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
                     <div className="flex items-start gap-2">
                       <div className="w-5 h-5 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -435,41 +452,41 @@ Aguardo seu retorno! 😊`;
                       </p>
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col gap-2 sm:flex-row">
                     <Button
-                    type="button"
-                    variant="outline"
-                    className="border-secondary text-secondary"
-                    onClick={handleOpenPublic}
-                  >
-                    <Share2 className="w-4 h-4 mr-2" />
-                    Visualizar
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="border-border"
-                    onClick={() => window.print()}
-                  >
-                    <Printer className="w-4 h-4 mr-2" />
-                    Imprimir
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="border-green-600 text-green-600 hover:bg-green-600/10"
-                    onClick={handleWhatsApp}
-                  >
-                    <MessageCircle className="w-4 h-4 mr-2" />
-                    WhatsApp
-                  </Button>
+                      type="button"
+                      variant="outline"
+                      className="border-secondary text-secondary w-full sm:w-auto"
+                      onClick={handleOpenPublic}
+                    >
+                      <Share2 className="w-4 h-4 mr-2" />
+                      Visualizar
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="border-border w-full sm:w-auto"
+                      onClick={() => window.print()}
+                    >
+                      <Printer className="w-4 h-4 mr-2" />
+                      Imprimir
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="border-green-600 text-green-600 hover:bg-green-600/10 w-full sm:w-auto"
+                      onClick={handleWhatsApp}
+                    >
+                      <MessageCircle className="w-4 h-4 mr-2" />
+                      WhatsApp
+                    </Button>
                   </div>
                 </div>
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => navigate("/orcamentos")}
-                  className="border-border"
+                  className="border-border w-full sm:w-auto"
                 >
                   Cancelar
                 </Button>

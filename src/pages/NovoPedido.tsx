@@ -22,6 +22,7 @@ import { validateName, validateMoney, validateDate, validateDescription, validat
 import { errorHandler } from "@/utils/errorHandler";
 import { logger } from "@/utils/logger";
 import { performanceMonitor } from "@/utils/performanceMonitor";
+import { PersonalizationListEditor, PersonalizationEntry } from "@/components/PersonalizationListEditor";
 
 export default function NovoPedido() {
   const navigate = useNavigate();
@@ -53,6 +54,7 @@ export default function NovoPedido() {
     { size: "G", quantity: 0 },
     { size: "GG", quantity: 0 }
   ]);
+  const [personalizations, setPersonalizations] = useState<PersonalizationEntry[]>([]);
   
   // Estados para controle de upload
   const [isUploading, setIsUploading] = useState<boolean>(false);
@@ -277,6 +279,17 @@ export default function NovoPedido() {
       finalDescription = `${finalDescription}\nQtd: ${quantity}${sizeInfo}${colorInfo}`;
     }
 
+    if (personalizations.length) {
+      const personalizationLines = personalizations
+        .filter((p) => p.personName.trim())
+        .map((p) => `- ${p.personName}${p.size ? ` (${p.size})` : ""}${p.quantity && p.quantity !== 1 ? ` x${p.quantity}` : ""}${p.notes ? ` — ${p.notes}` : ""}`)
+        .join("\n");
+
+      if (personalizationLines) {
+        finalDescription = `${finalDescription}\nPersonalizações:\n${personalizationLines}`;
+      }
+    }
+
     console.log("Dados do pedido a serem enviados:", {
       code,
       customer_name: client,
@@ -301,6 +314,14 @@ export default function NovoPedido() {
           paid,
           delivery_date: delivery,
           file_url,
+          personalizations: personalizations
+            .filter((p) => p.personName.trim())
+            .map((p) => ({
+              person_name: p.personName.trim(),
+              size: p.size?.trim() || undefined,
+              quantity: p.quantity ?? 1,
+              notes: p.notes?.trim() || undefined,
+            })),
         });
       },
       'NovoPedido'
@@ -324,7 +345,8 @@ export default function NovoPedido() {
       client, 
       type, 
       value, 
-      quantity: isKitMode ? getTotalKitQuantity() : quantity 
+      quantity: isKitMode ? getTotalKitQuantity() : quantity,
+      personalizationCount: personalizations.length,
     });
     
     console.log("Pedido criado com sucesso! Redirecionando para:", `/pedidos/${code}`);
@@ -759,11 +781,18 @@ export default function NovoPedido() {
                 )}
               </div>
 
-              <div className="flex gap-3 pt-4 border-t border-border">
+              <PersonalizationListEditor
+                entries={personalizations}
+                onChange={setPersonalizations}
+                showNotes
+                description="Liste as peças personalizadas com nome, tamanho e observações. Esses dados aparecem no pedido e podem ser reutilizados depois."
+              />
+
+              <div className="flex flex-col gap-3 pt-4 border-t border-border sm:flex-row sm:items-center">
                 <Button
                   type="submit"
                   disabled={isUploading}
-                  className="bg-primary hover:bg-primary/90 flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-primary hover:bg-primary/90 flex-1 disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
                 >
                   {isUploading ? (
                     <>
@@ -781,7 +810,7 @@ export default function NovoPedido() {
                   type="button"
                   variant="outline"
                   onClick={() => navigate("/pedidos")}
-                  className="border-border"
+                  className="border-border w-full sm:w-auto"
                   disabled={isUploading}
                 >
                   Cancelar

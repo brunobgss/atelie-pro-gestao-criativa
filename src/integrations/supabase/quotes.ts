@@ -19,6 +19,25 @@ export type QuoteItemRow = {
   unit_value: number;
 };
 
+export type QuotePersonalizationRow = {
+  id: string;
+  quote_id: string;
+  empresa_id: string;
+  person_name: string;
+  size?: string | null;
+  quantity: number;
+  notes?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type QuotePersonalizationInput = {
+  person_name: string;
+  size?: string;
+  quantity: number;
+  notes?: string;
+};
+
 export async function listQuotes(): Promise<QuoteRow[]> {
   try {
     console.log("Buscando lista de orçamentos...");
@@ -91,7 +110,7 @@ function isUUID(str: string): boolean {
   return uuidRegex.test(str);
 }
 
-export async function getQuoteByCode(code: string): Promise<{ quote: QuoteRow | null; items: QuoteItemRow[] }> {
+export async function getQuoteByCode(code: string): Promise<{ quote: QuoteRow | null; items: QuoteItemRow[]; personalizations: QuotePersonalizationRow[] }> {
   try {
     console.log("Buscando orçamento por código:", code);
     
@@ -104,7 +123,7 @@ export async function getQuoteByCode(code: string): Promise<{ quote: QuoteRow | 
     
     if (!userEmpresa?.empresa_id) {
       console.error("Usuário não tem empresa associada");
-      return { quote: null, items: [] };
+      return { quote: null, items: [], personalizations: [] };
     }
     
     // Verificar se o banco está funcionando
@@ -112,7 +131,7 @@ export async function getQuoteByCode(code: string): Promise<{ quote: QuoteRow | 
     
     if (!isDbWorking) {
       console.log("Banco não está funcionando para orçamento:", code);
-      return { quote: null, items: [] };
+      return { quote: null, items: [], personalizations: [] };
     }
     
     // Timeout de 10 segundos
@@ -140,7 +159,7 @@ export async function getQuoteByCode(code: string): Promise<{ quote: QuoteRow | 
     
     if (!quote) {
       console.log("Orçamento não encontrado no banco");
-      return { quote: null, items: [] };
+      return { quote: null, items: [], personalizations: [] };
     }
 
     console.log("Orçamento encontrado:", quote);
@@ -159,10 +178,24 @@ export async function getQuoteByCode(code: string): Promise<{ quote: QuoteRow | 
     }
     
     console.log("Itens encontrados:", items);
-    return { quote, items: items ?? [] };
+
+    const personalizationsPromise = supabase
+      .from("atelie_quote_personalizations")
+      .select("id, quote_id, empresa_id, person_name, size, quantity, notes, created_at, updated_at")
+      .eq("quote_id", quote.id)
+      .order("created_at", { ascending: true });
+
+    const { data: personalizations, error: personalizationsError } = await Promise.race([personalizationsPromise, timeoutPromise]) as any;
+
+    if (personalizationsError) {
+      console.error("Erro ao buscar personalizações do orçamento:", personalizationsError);
+      throw personalizationsError;
+    }
+
+    return { quote, items: items ?? [], personalizations: personalizations ?? [] };
   } catch (error) {
     console.error(`Erro ao buscar orçamento ${code}:`, error);
-    return { quote: null, items: [] };
+    return { quote: null, items: [], personalizations: [] };
   }
 }
 
@@ -174,6 +207,7 @@ export async function createQuote(input: {
   date: string;
   observations?: string;
   items: { description: string; quantity: number; value: number }[];
+  personalizations?: QuotePersonalizationInput[];
 }): Promise<{ ok: boolean; id?: string; error?: string }> {
   try {
     const code = input.code ?? generateQuoteCode();
@@ -207,6 +241,26 @@ export async function createQuote(input: {
       }));
       const { error: itemsError } = await supabase.from("atelie_quote_items").insert(items);
       if (itemsError) throw itemsError;
+    }
+
+    if (input.personalizations?.length) {
+      const personalizations = input.personalizations
+        .filter((p) => p.person_name?.trim())
+        .map((p) => ({
+          quote_id: quote.id,
+          empresa_id,
+          person_name: p.person_name.trim(),
+          size: p.size?.trim() || null,
+          quantity: p.quantity ?? 1,
+          notes: p.notes?.trim() || null,
+        }));
+
+      if (personalizations.length) {
+        const { error: personalizationError } = await supabase
+          .from("atelie_quote_personalizations")
+          .insert(personalizations);
+        if (personalizationError) throw personalizationError;
+      }
     }
 
     return { ok: true, id: code };
@@ -266,7 +320,7 @@ export async function approveQuote(quoteCode: string): Promise<{ ok: boolean; er
     console.log("Iniciando aprovação do orçamento:", quoteCode);
     
     // Buscar dados do orçamento e itens separadamente
-    const { quote, items } = await getQuoteByCode(quoteCode);
+    const { quote, items, personalizations } = await getQuoteByCode(quoteCode);
     
     if (!quote) {
       throw new Error("Orçamento não encontrado");
@@ -368,6 +422,26 @@ export async function approveQuote(quoteCode: string): Promise<{ ok: boolean; er
 
     console.log("Pedido criado com sucesso:", order.id);
 
+    // Inserir personalizações no pedido, se houver
+    if (personalizations.length && order.id) {
+      const orderPersonalizations = personalizations.map((p) => ({
+        order_id: order.id,
+        empresa_id,
+        person_name: p.person_name,
+        size: p.size ?? null,
+        quantity: p.quantity ?? 1,
+        notes: p.notes ?? null,
+      }));
+
+      const { error: insertOrderPersonalizationsError } = await supabase
+        .from("atelie_order_personalizations")
+        .insert(orderPersonalizations);
+
+      if (insertOrderPersonalizationsError) {
+        console.error("Erro ao copiar personalizações para o pedido:", insertOrderPersonalizationsError);
+      }
+    }
+
     // Marcar orçamento como aprovado
     console.log("Marcando orçamento como aprovado...");
     const { error: updateError } = await supabase
@@ -397,6 +471,7 @@ export async function updateQuote(quoteCode: string, input: {
   date?: string;
   observations?: string;
   items?: { description: string; quantity: number; value: number }[];
+  personalizations?: QuotePersonalizationInput[];
 }): Promise<{ ok: boolean; error?: string }> {
   try {
     // Buscar o orçamento pelo código
@@ -459,6 +534,36 @@ export async function updateQuote(quoteCode: string, input: {
       }
     }
 
+    // Atualizar personalizações se fornecidas
+    if (input.personalizations) {
+      const { error: deletePersonalizationsError } = await supabase
+        .from("atelie_quote_personalizations")
+        .delete()
+        .eq("quote_id", quote.id);
+
+      if (deletePersonalizationsError) throw deletePersonalizationsError;
+
+      const empresa_id = await getCurrentEmpresaId();
+      const personalizations = input.personalizations
+        .filter((p) => p.person_name?.trim())
+        .map((p) => ({
+          quote_id: quote.id,
+          empresa_id,
+          person_name: p.person_name.trim(),
+          size: p.size?.trim() || null,
+          quantity: p.quantity ?? 1,
+          notes: p.notes?.trim() || null,
+        }));
+
+      if (personalizations.length) {
+        const { error: insertPersonalizationsError } = await supabase
+          .from("atelie_quote_personalizations")
+          .insert(personalizations);
+
+        if (insertPersonalizationsError) throw insertPersonalizationsError;
+      }
+    }
+
     // Se o orçamento foi aprovado, sincronizar com o pedido
     if (quote.status === 'approved') {
       await syncQuoteToOrder(quoteCode, input);
@@ -478,6 +583,7 @@ async function syncQuoteToOrder(quoteCode: string, input: {
   date?: string;
   observations?: string;
   items?: { description: string; quantity: number; value: number }[];
+  personalizations?: QuotePersonalizationInput[];
 }): Promise<void> {
   try {
     console.log("Sincronizando orçamento aprovado com pedido:", quoteCode);
@@ -510,7 +616,10 @@ async function syncQuoteToOrder(quoteCode: string, input: {
     }
 
     // Atualizar o pedido
-    if (Object.keys(orderUpdateData).length > 0) {
+    const updatesPending = Object.keys(orderUpdateData).length > 0;
+    const hasPersonalizations = Array.isArray(input.personalizations);
+
+    if (updatesPending) {
       const { error: updateOrderError } = await supabase
         .from("atelie_orders")
         .update(orderUpdateData)
@@ -520,6 +629,40 @@ async function syncQuoteToOrder(quoteCode: string, input: {
         console.error("Erro ao sincronizar pedido:", updateOrderError);
       } else {
         console.log("Pedido sincronizado com sucesso:", order.code);
+      }
+    }
+
+    if (hasPersonalizations) {
+      const { error: deleteOrderPersonalizationsError } = await supabase
+        .from("atelie_order_personalizations")
+        .delete()
+        .eq("order_id", order.id);
+
+      if (deleteOrderPersonalizationsError) {
+        console.error("Erro ao limpar personalizações do pedido:", deleteOrderPersonalizationsError);
+        return;
+      }
+
+      const empresa_id = await getCurrentEmpresaId();
+      const orderPersonalizations = input.personalizations!
+        .filter((p) => p.person_name?.trim())
+        .map((p) => ({
+          order_id: order.id,
+          empresa_id,
+          person_name: p.person_name.trim(),
+          size: p.size?.trim() || null,
+          quantity: p.quantity ?? 1,
+          notes: p.notes?.trim() || null,
+        }));
+
+      if (orderPersonalizations.length) {
+        const { error: insertOrderPersonalizationsError } = await supabase
+          .from("atelie_order_personalizations")
+          .insert(orderPersonalizations);
+
+        if (insertOrderPersonalizationsError) {
+          console.error("Erro ao sincronizar personalizações com o pedido:", insertOrderPersonalizationsError);
+        }
       }
     }
   } catch (error) {
