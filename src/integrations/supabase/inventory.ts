@@ -1,5 +1,7 @@
 import { supabase } from "./client";
 
+export type InventoryItemType = "materia_prima" | "tecido" | "produto_acabado";
+
 export type InventoryRow = {
   id: string;
   name: string;
@@ -7,28 +9,47 @@ export type InventoryRow = {
   unit: string;
   min_quantity: number;
   status: string;
+  item_type: InventoryItemType;
+  category?: string | null;
+  supplier?: string | null;
+  cost_per_unit?: number | null;
+  total_cost?: number | null;
+  metadata?: Record<string, unknown> | null;
+  updated_at?: string | null;
   empresa_id?: string;
+};
+
+export type InventoryUpdateInput = {
+  name?: string;
+  quantity?: number;
+  unit?: string;
+  min_quantity?: number;
+  item_type?: InventoryItemType;
+  category?: string | null;
+  supplier?: string | null;
+  cost_per_unit?: number | null;
+  metadata?: Record<string, unknown> | null;
 };
 
 export async function listInventory(): Promise<InventoryRow[]> {
   try {
-    // Obter empresa_id do usuário logado
     const { data: userEmpresa } = await supabase
       .from("user_empresas")
       .select("empresa_id")
       .eq("user_id", (await supabase.auth.getUser()).data.user?.id)
       .single();
-    
+
     if (!userEmpresa?.empresa_id) {
       console.error("Usuário não tem empresa associada");
       return [];
     }
-    
+
     const { data, error } = await supabase
       .from("inventory_items")
-      .select("id, name, quantity, unit, min_quantity, status, empresa_id")
+      .select("id, name, quantity, unit, min_quantity, status, item_type, category, supplier, cost_per_unit, total_cost, metadata, updated_at, empresa_id")
       .eq("empresa_id", userEmpresa.empresa_id)
       .order("name", { ascending: true });
+
     if (error) throw error;
     return (data ?? []) as InventoryRow[];
   } catch (error) {
@@ -37,116 +58,91 @@ export async function listInventory(): Promise<InventoryRow[]> {
   }
 }
 
-export async function updateInventoryItem(id: string, input: { name?: string; quantity?: number; unit?: string; min_quantity?: number }): Promise<{ ok: boolean; data?: InventoryRow; error?: string }> {
+export async function updateInventoryItem(id: string, input: InventoryUpdateInput): Promise<{ ok: boolean; data?: InventoryRow; error?: string }> {
   try {
-    // NORMALIZAR ID - REMOVER ESPAÇOS E GARANTIR FORMATO
     const normalizedId = String(id).trim();
-    
-    console.log("🔄 Atualizando item do estoque:", { id: normalizedId, input });
-    console.log("🔍 Tipo do ID:", typeof normalizedId);
-    console.log("🔍 ID original:", id);
-    console.log("🔍 ID normalizado:", normalizedId);
-    console.log("🔍 IDs são iguais:", id === normalizedId);
-    
-    // Verificar se o ID é válido
-    if (!normalizedId || normalizedId === '') {
-      console.error("❌ ID inválido ou vazio");
+
+    if (!normalizedId) {
       return { ok: false, error: "ID inválido" };
     }
-    
-    // Verificar formato UUID
+
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(normalizedId)) {
-      console.error("❌ ID não é um UUID válido:", normalizedId);
       return { ok: false, error: "ID não é um UUID válido" };
     }
-    
-    // Preparar dados de forma mais segura
+
     const updateData: Record<string, unknown> = {};
     if (input.name !== undefined) updateData.name = String(input.name);
     if (input.quantity !== undefined) updateData.quantity = Number(input.quantity);
     if (input.unit !== undefined) updateData.unit = String(input.unit);
     if (input.min_quantity !== undefined) updateData.min_quantity = Number(input.min_quantity);
-    
-    console.log("📝 Dados para atualização:", updateData);
-    
-    // Primeiro, verificar se o item existe especificamente
-    console.log("🔍 DEBUG: Verificando se item existe...");
+    if (input.item_type !== undefined) updateData.item_type = input.item_type;
+    if (input.category !== undefined) updateData.category = input.category ?? null;
+    if (input.supplier !== undefined) updateData.supplier = input.supplier ?? null;
+    if (input.cost_per_unit !== undefined) updateData.cost_per_unit = input.cost_per_unit !== null ? Number(input.cost_per_unit) : null;
+    if (input.metadata !== undefined) updateData.metadata = input.metadata ?? {};
+    updateData.updated_at = new Date().toISOString();
+
     const { data: existingItem, error: checkError } = await supabase
       .from("inventory_items")
-      .select("id, name, quantity, unit, min_quantity, empresa_id")
+      .select("id, quantity, min_quantity, cost_per_unit, empresa_id")
       .eq("id", normalizedId)
       .single();
-    
-    console.log("🔍 Resultado da verificação:", { existingItem, checkError });
-    
-    // Verificar se o item tem empresa_id
-    if (existingItem && !existingItem.empresa_id) {
-      console.error("❌ Item não tem empresa_id definido!");
-      return { ok: false, error: "Item não tem empresa associada" };
-    }
-    
+
     if (checkError) {
-      console.error("❌ Erro ao verificar item:", checkError);
       return { ok: false, error: `Item não encontrado: ${checkError.message}` };
     }
-    
-    if (!existingItem) {
-      console.error("❌ Item não existe no banco de dados");
-      return { ok: false, error: "Item não encontrado no banco de dados" };
+
+    if (!existingItem?.empresa_id) {
+      return { ok: false, error: "Item não tem empresa associada" };
     }
-    
-    console.log("✅ Item encontrado, prosseguindo com atualização...");
-    console.log("🔍 Item details:", existingItem);
-    
-    // Verificar se usuário tem acesso à empresa do item
-    console.log("🔍 Verificando acesso do usuário à empresa...");
-    const { data: userEmpresas, error: userError } = await supabase
+
+    const { data: userEmpresas } = await supabase
       .from("user_empresas")
       .select("empresa_id")
       .eq("user_id", (await supabase.auth.getUser()).data.user?.id);
-    
-    console.log("🔍 Empresas do usuário:", userEmpresas);
-    console.log("🔍 Empresa do item:", existingItem.empresa_id);
-    
-    const hasAccess = userEmpresas?.some(ue => ue.empresa_id === existingItem.empresa_id);
-    console.log("🔍 Usuário tem acesso?", hasAccess);
-    
+
+    const hasAccess = userEmpresas?.some((ue) => ue.empresa_id === existingItem.empresa_id);
     if (!hasAccess) {
-      console.error("❌ Usuário não tem acesso à empresa do item!");
       return { ok: false, error: "Usuário não tem permissão para editar este item" };
     }
-    
-    // Atualizar diretamente
-    console.log("🔄 Executando atualização direta...");
-    console.log("🔍 Query: UPDATE inventory_items SET", updateData, "WHERE id =", normalizedId);
-    
+
+    const finalQuantity = input.quantity !== undefined ? Number(input.quantity) : Number(existingItem.quantity ?? 0);
+    const finalMinQuantity = input.min_quantity !== undefined ? Number(input.min_quantity) : Number(existingItem.min_quantity ?? 0);
+    const finalCostPerUnit = input.cost_per_unit !== undefined
+      ? (input.cost_per_unit !== null ? Number(input.cost_per_unit) : null)
+      : (existingItem.cost_per_unit ?? null);
+
+    // Calcular status baseado na quantidade e mínimo
+    let newStatus = "ok";
+    if (finalQuantity <= 0) {
+      newStatus = "critical";
+    } else if (finalQuantity < finalMinQuantity) {
+      newStatus = "low";
+    }
+    updateData.status = newStatus;
+
+    if (finalCostPerUnit !== null) {
+      updateData.total_cost = Number((finalCostPerUnit || 0) * (finalQuantity || 0));
+    }
+
     const { data, error } = await supabase
       .from("inventory_items")
       .update(updateData)
       .eq("id", normalizedId)
-      .select("*");
-    
-    console.log("📊 Resultado da query:", { data, error });
-    
+      .select("id, name, quantity, unit, min_quantity, status, item_type, category, supplier, cost_per_unit, total_cost, metadata, updated_at, empresa_id");
+
     if (error) {
-      console.error("❌ Erro do Supabase:", error);
       return { ok: false, error: `Erro do banco: ${error.message}` };
     }
-    
+
     if (!data || data.length === 0) {
-      console.error("❌ Nenhum item encontrado para atualizar");
-      console.error("❌ ID usado na query:", normalizedId);
-      console.error("❌ Dados enviados:", updateData);
-      console.error("❌ Resultado da query:", { data, error });
       return { ok: false, error: "Item não encontrado para atualização" };
     }
-    
-    console.log("✅ Item atualizado com sucesso:", data[0]);
+
     return { ok: true, data: data[0] as InventoryRow };
   } catch (e: unknown) {
-    console.error("❌ Erro na atualização:", e);
-    return { ok: false, error: e?.message ?? "Erro ao atualizar item do estoque" };
+    return { ok: false, error: (e as { message?: string })?.message ?? "Erro ao atualizar item do estoque" };
   }
 }
 
@@ -170,8 +166,6 @@ export async function saveProduct(productData: {
   profitMargin: number;
 }): Promise<{ ok: boolean; id?: string; error?: string }> {
   try {
-    console.log("🔍 Tentando salvar produto:", productData);
-    
     const { data, error } = await supabase
       .from("atelie_products")
       .insert({
@@ -181,42 +175,34 @@ export async function saveProduct(productData: {
         work_hours: productData.workHours,
         unit_price: productData.unitPrice,
         profit_margin: productData.profitMargin,
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
       })
       .select("id")
       .single();
-    
+
     if (error) {
-      console.error("❌ Erro ao salvar produto:", error);
       throw error;
     }
-    
-    console.log("✅ Produto salvo com sucesso:", data);
+
     return { ok: true, id: data?.id };
   } catch (e: unknown) {
-    console.error("❌ Erro na função saveProduct:", e);
-    return { ok: false, error: e?.message ?? "Erro ao salvar produto" };
+    return { ok: false, error: (e as { message?: string })?.message ?? "Erro ao salvar produto" };
   }
 }
 
 export async function getProducts(): Promise<ProductRow[]> {
   try {
-    console.log("🔍 Buscando produtos do catálogo...");
-    
     const { data, error } = await supabase
       .from("atelie_products")
       .select("*")
       .order("created_at", { ascending: false });
-    
+
     if (error) {
-      console.error("❌ Erro ao buscar produtos:", error);
       throw error;
     }
-    
-    console.log("✅ Produtos encontrados:", data?.length || 0);
+
     return (data ?? []) as ProductRow[];
   } catch (e: unknown) {
-    console.error("❌ Erro na função getProducts:", e);
     return [];
   }
 }

@@ -1,405 +1,1145 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { listInventory, updateInventoryItem, InventoryItemType, InventoryRow } from "@/integrations/supabase/inventory";
+import { supabase } from "@/integrations/supabase/client";
+import { useSync } from "@/contexts/SyncContext";
+import { performanceMonitor } from "@/utils/performanceMonitor";
+import { logger } from "@/utils/logger";
+import { validateForm, validateMoney, validateName, validateQuantity } from "@/utils/validators";
+import { formatCurrency } from "@/utils/formatCurrency";
+import {
+  getInventoryAlertPreferences,
+  listInventoryAlertLogs,
+  triggerInventoryAlertsJob,
+  upsertInventoryAlertPreferences,
+  InventoryAlertPreferences,
+  InventoryAlertLog,
+} from "@/integrations/supabase/inventoryAlerts";
+import {
+  AlertTriangle,
+  BellRing,
+  Download,
+  Filter,
+  History,
+  PackageSearch,
+  Plus,
+  TrendingDown,
+  TrendingUp,
+  Trash2,
+  Edit,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Plus, AlertTriangle, TrendingDown, Edit, Trash2 } from "lucide-react";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { listInventory, updateInventoryItem } from "@/integrations/supabase/inventory";
-import { useSync } from "@/contexts/SyncContext";
-import { useState } from "react";
-import { validateName, validateMoney, validateQuantity, validateForm } from "@/utils/validators";
-import { errorHandler } from "@/utils/errorHandler";
-import { logger } from "@/utils/logger";
-import { performanceMonitor } from "@/utils/performanceMonitor";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+
+const ITEM_TYPE_OPTIONS: Array<{
+  value: InventoryItemType;
+  label: string;
+  description: string;
+  defaultUnit: string;
+}> = [
+  { value: "materia_prima", label: "Matéria-prima", description: "Linhas, botões, aviamentos, etc.", defaultUnit: "unidades" },
+  { value: "tecido", label: "Tecido", description: "Rolôs, metros, retalhos", defaultUnit: "metros" },
+  { value: "produto_acabado", label: "Produto acabado", description: "Peças prontas para venda", defaultUnit: "unidades" },
+];
+
+type NewItemState = {
+  name: string;
+  quantity: string;
+  unit: string;
+  minQuantity: string;
+  itemType: InventoryItemType;
+  category: string;
+  supplier: string;
+  costPerUnit: string;
+  notes: string;
+  lengthMeters: string;
+  color: string;
+};
+
+type EditItemState = NewItemState & { id?: string };
+
+type AlertFormState = {
+  email: string;
+  whatsapp: string;
+  send_email: boolean;
+  send_whatsapp: boolean;
+  notify_low: boolean;
+  notify_critical: boolean;
+  frequency: "daily" | "weekly";
+};
+
+const ALERT_DEFAULTS: AlertFormState = {
+  email: "",
+  whatsapp: "",
+  send_email: true,
+  send_whatsapp: false,
+  notify_low: true,
+  notify_critical: true,
+  frequency: "daily",
+};
+
+function getItemTypeLabel(type: InventoryItemType) {
+  return ITEM_TYPE_OPTIONS.find((option) => option.value === type)?.label ?? "Item";
+}
+
+function computeStatusInfo(status: string) {
+  switch (status) {
+    case "critical":
+      return {
+        tone: "danger",
+        badge: <Badge className="bg-destructive/15 text-destructive border border-destructive/30">Crítico</Badge>,
+        icon: <AlertTriangle className="h-5 w-5 text-destructive" />,
+        message: "Reposição urgente",
+      };
+    case "low":
+      return {
+        tone: "warning",
+        badge: <Badge className="bg-amber-500/15 text-amber-600 border border-amber-500/40">Baixo</Badge>,
+        icon: <TrendingDown className="h-5 w-5 text-amber-600" />,
+        message: "Planeje reposição",
+      };
+    default:
+      return {
+        tone: "ok",
+        badge: <Badge className="bg-emerald-500/15 text-emerald-600 border border-emerald-500/30">Ok</Badge>,
+        icon: <TrendingUp className="h-5 w-5 text-emerald-600" />,
+        message: "Estoque saudável",
+      };
+  }
+}
+
+function exportInventoryToCSV(items: InventoryRow[]) {
+  const headers = [
+    "Nome",
+    "Tipo",
+    "Quantidade",
+    "Unidade",
+    "Mínimo",
+    "Custo Unitário",
+    "Valor Total",
+    "Fornecedor",
+    "Categoria",
+    "Status",
+  ];
+
+  const rows = items.map((item) => [
+    item.name,
+    getItemTypeLabel(item.item_type),
+    String(item.quantity ?? 0),
+    item.unit ?? "",
+    String(item.min_quantity ?? 0),
+    item.cost_per_unit ? Number(item.cost_per_unit).toFixed(2) : "",
+    item.total_cost ? Number(item.total_cost).toFixed(2) : "",
+    item.supplier ?? "",
+    item.category ?? "",
+    item.status ?? "",
+  ]);
+
+  const csv = [headers, ...rows].map((line) => line.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(";")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.setAttribute("download", `estoque_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
 
 export default function Estoque() {
   const queryClient = useQueryClient();
   const { invalidateRelated } = useSync();
+  const [newItemModalOpen, setNewItemModalOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [editingItem, setEditingItem] = useState<unknown>(null);
-  const [editForm, setEditForm] = useState({
+  const [editingItem, setEditingItem] = useState<InventoryRow | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [typeFilter, setTypeFilter] = useState<InventoryItemType | "all">("all");
+  const [isAlertsDialogOpen, setIsAlertsDialogOpen] = useState(false);
+  const [alertForm, setAlertForm] = useState<AlertFormState>(ALERT_DEFAULTS);
+
+  const [newItemState, setNewItemState] = useState<NewItemState>({
+    name: "",
+    quantity: "0",
+    unit: "unidades",
+    minQuantity: "0",
+    itemType: "materia_prima",
+    category: "",
+    supplier: "",
+    costPerUnit: "",
+    notes: "",
+    lengthMeters: "",
+    color: "",
+  });
+
+  const [editForm, setEditForm] = useState<EditItemState>({
     name: "",
     quantity: "",
     unit: "",
-    minQuantity: ""
+    minQuantity: "",
+    itemType: "materia_prima",
+    category: "",
+    supplier: "",
+    costPerUnit: "",
+    notes: "",
+    lengthMeters: "",
+    color: "",
   });
 
-  const handleEditItem = (item: unknown) => {
-    console.log("Editando item:", item);
-    if (!item || !item.id) {
-      toast.error("Item inválido para edição");
+  const {
+    data: alertPreferencesData,
+    isLoading: isLoadingAlertPreferences,
+    isFetching: isFetchingAlertPreferences,
+  } = useQuery({
+    queryKey: ["inventoryAlertPreferences"],
+    queryFn: getInventoryAlertPreferences,
+    enabled: isAlertsDialogOpen,
+  });
+
+  const {
+    data: alertLogs = [],
+    isLoading: isLoadingAlertLogs,
+    refetch: refetchAlertLogs,
+  } = useQuery({
+    queryKey: ["inventoryAlertLogs"],
+    queryFn: () => listInventoryAlertLogs(40),
+    enabled: isAlertsDialogOpen,
+  });
+
+  useEffect(() => {
+    if (!isAlertsDialogOpen) {
+      return;
+    }
+    if (alertPreferencesData) {
+      setAlertForm({
+        email: alertPreferencesData.email ?? "",
+        whatsapp: alertPreferencesData.whatsapp ?? "",
+        send_email: alertPreferencesData.send_email,
+        send_whatsapp: alertPreferencesData.send_whatsapp,
+        notify_low: alertPreferencesData.notify_low,
+        notify_critical: alertPreferencesData.notify_critical,
+        frequency: alertPreferencesData.frequency,
+      });
+    } else {
+      setAlertForm(ALERT_DEFAULTS);
+    }
+  }, [alertPreferencesData, isAlertsDialogOpen]);
+
+  const saveAlertsMutation = useMutation({
+    mutationFn: upsertInventoryAlertPreferences,
+    onSuccess: (result) => {
+      if (result.ok) {
+        toast.success("Preferências de alertas salvas!");
+        queryClient.invalidateQueries({ queryKey: ["inventoryAlertPreferences"] });
+      } else {
+        toast.error(result.error || "Não foi possível salvar as preferências");
+      }
+    },
+    onError: (error: unknown) => {
+      toast.error((error as Error)?.message ?? "Erro ao salvar preferências");
+    },
+  });
+
+  const triggerAlertsMutation = useMutation({
+    mutationFn: triggerInventoryAlertsJob,
+    onSuccess: (result) => {
+      if (result.ok) {
+        toast.success(result.message ?? "Alertas executados com sucesso");
+        refetchAlertLogs();
+      } else {
+        toast.error(result.message ?? "Não foi possível executar os alertas");
+      }
+    },
+    onError: (error: unknown) => {
+      toast.error((error as Error)?.message ?? "Erro ao executar alertas");
+    },
+  });
+
+  const { data: items = [], isLoading } = useQuery({
+    queryKey: ["inventory"],
+    queryFn: listInventory,
+  });
+
+  const filteredItems = useMemo(() => {
+    return items.filter((item) => {
+      const matchesType = typeFilter === "all" || item.item_type === typeFilter;
+      const matchesSearch =
+        item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (item.supplier ?? "").toLowerCase().includes(searchTerm.toLowerCase());
+      return matchesType && matchesSearch;
+    });
+  }, [items, typeFilter, searchTerm]);
+
+  const summary = useMemo(() => {
+    const totalItems = filteredItems.length;
+    const totalQuantity = filteredItems.reduce((acc, item) => acc + Number(item.quantity ?? 0), 0);
+    const totalValue = filteredItems.reduce((acc, item) => acc + Number(item.total_cost ?? (item.cost_per_unit ?? 0) * (item.quantity ?? 0)), 0);
+    const criticalCount = filteredItems.filter((item) => item.status === "critical").length;
+    const lowCount = filteredItems.filter((item) => item.status === "low").length;
+
+    const byType = filteredItems.reduce<Record<InventoryItemType, { count: number; value: number }>>(
+      (acc, item) => {
+        const current = acc[item.item_type] ?? { count: 0, value: 0 };
+        current.count += 1;
+        current.value += Number(item.total_cost ?? (item.cost_per_unit ?? 0) * (item.quantity ?? 0));
+        acc[item.item_type] = current;
+        return acc;
+      },
+      {
+        materia_prima: { count: 0, value: 0 },
+        tecido: { count: 0, value: 0 },
+        produto_acabado: { count: 0, value: 0 },
+      }
+    );
+
+    return { totalItems, totalQuantity, totalValue, criticalCount, lowCount, byType };
+  }, [filteredItems]);
+
+  const resetNewItemState = () =>
+    setNewItemState({
+      name: "",
+      quantity: "0",
+      unit: "unidades",
+      minQuantity: "0",
+      itemType: "materia_prima",
+      category: "",
+      supplier: "",
+      costPerUnit: "",
+      notes: "",
+      lengthMeters: "",
+      color: "",
+    });
+
+  const handleCreateItem = async () => {
+    const numericQuantity = parseFloat(newItemState.quantity.replace(",", ".")) || 0;
+    const numericMin = parseFloat(newItemState.minQuantity.replace(",", ".")) || 0;
+    const numericCost = newItemState.costPerUnit ? parseFloat(newItemState.costPerUnit.replace(",", ".")) : null;
+    const numericLength = newItemState.lengthMeters ? parseFloat(newItemState.lengthMeters.replace(",", ".")) : null;
+
+    const validation = validateForm(
+      {
+        name: newItemState.name,
+        quantity: numericQuantity,
+        min: numericMin,
+        cost: numericCost ?? 0,
+      },
+      {
+        name: validateName,
+        quantity: validateQuantity,
+        min: (value) =>
+          value >= 0 ? { isValid: true, errors: [] } : { isValid: false, errors: ["Quantidade mínima não pode ser negativa"] },
+        cost: validateMoney,
+      }
+    );
+
+    if (!validation.isValid) {
+      validation.errors.forEach((error) => toast.error(error));
+      return;
+    }
+
+    const metadata: Record<string, unknown> = {};
+    if (newItemState.itemType === "tecido") {
+      if (numericLength && numericLength > 0) metadata.length_meters = numericLength;
+      if (newItemState.color) metadata.color = newItemState.color;
+    }
+    if (newItemState.notes) metadata.notes = newItemState.notes;
+
+    const { data: userEmpresa, error: empresaError } = await supabase
+      .from("user_empresas")
+      .select("empresa_id")
+      .eq("user_id", (await supabase.auth.getUser()).data.user?.id)
+      .single();
+
+    if (empresaError || !userEmpresa?.empresa_id) {
+      toast.error("Não foi possível identificar a empresa do usuário");
       return;
     }
     
-    // FORÇAR ID COMO STRING E PRESERVAR EXATAMENTE
-    const itemWithSafeId = {
-      ...item,
-      id: String(item.id).trim() // Garantir que é string e sem espaços
-    };
-    
-    console.log("ID original:", item.id);
-    console.log("ID como string:", String(item.id));
-    console.log("ID safe:", itemWithSafeId.id);
-    
-    setEditingItem(itemWithSafeId);
+    try {
+      const result = await performanceMonitor.measure(
+        "createInventoryItem",
+        async () => {
+          const payload = {
+            empresa_id: userEmpresa.empresa_id,
+            name: newItemState.name.trim(),
+            unit:
+              newItemState.unit.trim() ||
+              ITEM_TYPE_OPTIONS.find((i) => i.value === newItemState.itemType)?.defaultUnit ||
+              "unidades",
+            quantity: numericQuantity,
+            min_quantity: numericMin,
+            status: numericQuantity <= 0 ? "critical" : numericQuantity < numericMin ? "low" : "ok",
+            item_type: newItemState.itemType,
+            category: newItemState.category?.trim() || null,
+            supplier: newItemState.supplier?.trim() || null,
+            cost_per_unit: numericCost,
+            total_cost: numericCost !== null ? numericCost * numericQuantity : null,
+            metadata,
+          };
+
+          const { error } = await supabase.from("inventory_items").insert(payload);
+          if (error) throw error;
+          return { success: true };
+        },
+        "Estoque"
+      );
+
+      if (result?.success) {
+        toast.success("Item adicionado com sucesso!");
+        logger.userAction("inventory_item_created", "ESTOQUE", {
+          name: newItemState.name,
+          type: newItemState.itemType,
+          quantity: numericQuantity,
+        });
+        resetNewItemState();
+        setNewItemModalOpen(false);
+        invalidateRelated("inventory_items");
+        queryClient.invalidateQueries({ queryKey: ["inventory"] });
+      } else {
+        toast.error("Não foi possível salvar o item. Tente novamente.");
+      }
+    } catch (error: unknown) {
+      console.error("Erro ao criar item de estoque:", error);
+      const message = error instanceof Error ? error.message : "Erro inesperado ao salvar item";
+      toast.error(message);
+    }
+  };
+
+  const handleEditItem = (item: InventoryRow) => {
+    setEditingItem(item);
+    const metadata = (item.metadata ?? {}) as Record<string, unknown>;
     setEditForm({
-      name: String(item.name || ""),
-      quantity: String(item.quantity || ""),
-      unit: String(item.unit || ""),
-      minQuantity: String(item.min_quantity || "")
+      id: item.id,
+      name: item.name,
+      quantity: String(item.quantity ?? 0),
+      unit: item.unit ?? "",
+      minQuantity: String(item.min_quantity ?? 0),
+      itemType: item.item_type,
+      category: item.category ?? "",
+      supplier: item.supplier ?? "",
+      costPerUnit: item.cost_per_unit ? String(item.cost_per_unit) : "",
+      notes: typeof metadata?.notes === "string" ? metadata.notes : "",
+      lengthMeters: typeof metadata?.length_meters === "number" ? String(metadata.length_meters) : "",
+      color: typeof metadata?.color === "string" ? metadata.color : "",
     });
     setIsEditDialogOpen(true);
   };
 
   const handleSaveEdit = async () => {
-    if (!editingItem || !editingItem.id) {
+    if (!editingItem || !editForm.id) {
       toast.error("Item inválido para edição");
       return;
     }
     
-    // PRESERVAR ID EXATAMENTE COMO ESTÁ
-    const safeId = String(editingItem.id).trim();
-    
-    console.log("Salvando edição do item:", safeId, editForm);
-    console.log("Tipo do ID:", typeof safeId);
-    console.log("ID final:", safeId);
-    console.log("ID length:", safeId.length);
-    
-    // Verificar se o ID tem o formato correto de UUID
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(safeId)) {
-      console.error("❌ ID não é um UUID válido:", safeId);
-      toast.error("ID inválido para edição");
-      return;
+    const numericQuantity = parseFloat(editForm.quantity.replace(",", ".")) || 0;
+    const numericMin = parseFloat(editForm.minQuantity.replace(",", ".")) || 0;
+    const numericCost = editForm.costPerUnit ? parseFloat(editForm.costPerUnit.replace(",", ".")) : null;
+    const numericLength = editForm.lengthMeters ? parseFloat(editForm.lengthMeters.replace(",", ".")) : null;
+
+    const metadata: Record<string, unknown> = {};
+    if (editForm.itemType === "tecido") {
+      if (numericLength && numericLength > 0) metadata.length_meters = numericLength;
+      if (editForm.color) metadata.color = editForm.color;
     }
-    
-    try {
-      const result = await updateInventoryItem(safeId, {
+    if (editForm.notes) metadata.notes = editForm.notes;
+
+    const result = await updateInventoryItem(editForm.id, {
         name: editForm.name,
-        quantity: parseFloat(editForm.quantity) || 0,
+      quantity: numericQuantity,
         unit: editForm.unit,
-        min_quantity: parseFloat(editForm.minQuantity) || 0
+      min_quantity: numericMin,
+      item_type: editForm.itemType,
+      category: editForm.category || null,
+      supplier: editForm.supplier || null,
+      cost_per_unit: numericCost,
+      metadata,
       });
       
       if (result.ok) {
-        toast.success("Item atualizado com sucesso!");
+      toast.success("Item atualizado com sucesso");
         setIsEditDialogOpen(false);
         setEditingItem(null);
-        // Invalidar cache e recursos relacionados
-        invalidateRelated('inventory_items');
-        // Refetch automático
-        queryClient.refetchQueries({ queryKey: ["inventory"] });
+      invalidateRelated("inventory_items");
+      queryClient.invalidateQueries({ queryKey: ["inventory"] });
       } else {
         toast.error(result.error || "Erro ao atualizar item");
       }
-    } catch (error) {
-      console.error("Erro ao atualizar item:", error);
-      toast.error("Erro ao atualizar item");
-    }
   };
 
-  const handleDeleteItem = async (item: unknown) => {
-    if (confirm(`Tem certeza que deseja excluir "${item.name}"?`)) {
-      try {
-        // Buscar o ID do item no banco
-        const { data: inventoryItems, error: fetchError } = await supabase
-          .from("inventory_items")
-          .select("id")
-          .eq("name", item.name)
-          .limit(1);
+  const handleDeleteItem = async (item: InventoryRow) => {
+    if (!item.id) {
+      toast.error("Item inválido");
+          return;
+        }
+    if (!confirm(`Tem certeza que deseja excluir "${item.name}"?`)) return;
 
-        if (fetchError) {
-          console.error("Erro ao buscar item:", fetchError);
-          toast.error("Erro ao buscar item para exclusão");
+    const { error } = await supabase.from("inventory_items").delete().eq("id", item.id);
+    if (error) {
+      toast.error("Erro ao excluir item");
           return;
         }
 
-        if (!inventoryItems || inventoryItems.length === 0) {
-          toast.error("Item não encontrado");
-          return;
-        }
-
-        // Excluir o item
-        const { error: deleteError } = await supabase
-          .from("inventory_items")
-          .delete()
-          .eq("id", inventoryItems[0].id);
-
-        if (deleteError) {
-          console.error("Erro ao excluir item:", deleteError);
-          toast.error("Erro ao excluir item: " + deleteError.message);
-          return;
-        }
-
-        toast.success("Item excluído com sucesso!");
-        
-        // Invalidar cache e recursos relacionados
-        invalidateRelated('inventory_items');
-        // Refetch automático
-        queryClient.refetchQueries({ queryKey: ["inventory"] });
-      } catch (error) {
-        console.error("Erro ao excluir item:", error);
-        toast.error("Erro ao excluir item");
-      }
-    }
+    toast.success("Item excluído com sucesso");
+    invalidateRelated("inventory_items");
+    queryClient.invalidateQueries({ queryKey: ["inventory"] });
   };
-
-  const { data: items = [], isLoading } = useQuery({
-    queryKey: ["inventory"],
-    queryFn: async () => {
-      const rows = await listInventory();
-      return rows.map((r) => ({
-        id: r.id, // ADICIONAR ID PARA EDIÇÃO
-        name: r.name,
-        quantity: Number(r.quantity || 0),
-        unit: r.unit,
-        min: Number(r.min_quantity || 0),
-        min_quantity: Number(r.min_quantity || 0), // ADICIONAR min_quantity PARA COMPATIBILIDADE
-        status: r.status,
-      }));
-    },
-  });
-
-  const getStatusInfo = (status: string, quantity: number, min: number) => {
-    switch (status) {
-      case "critical":
-        return {
-          badge: <Badge className="bg-destructive/20 text-destructive border-destructive/30">Crítico</Badge>,
-          icon: <AlertTriangle className="w-5 h-5 text-destructive" />,
-          message: "Estoque crítico!",
-        };
-      case "low":
-        return {
-          badge: <Badge className="bg-orange-500/20 text-orange-600 border-orange-500/30">Baixo</Badge>,
-          icon: <TrendingDown className="w-5 h-5 text-orange-600" />,
-          message: "Estoque baixo",
-        };
-      default:
-        return {
-          badge: <Badge className="bg-accent/20 text-accent border-accent/30">Normal</Badge>,
-          icon: null,
-          message: "",
-        };
-    }
-  };
-
-  const criticalItems = items.filter((item) => item.status === "critical").length;
-  const lowItems = items.filter((item) => item.status === "low").length;
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-10">
-        <div className="flex items-center justify-between p-4">
+    <div className="min-h-screen bg-muted/20">
+      <header className="border-b border-border bg-card/60 backdrop-blur supports-[backdrop-filter]:bg-card/70 sticky top-0 z-20">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-4">
             <SidebarTrigger />
             <div>
-              <h1 className="text-2xl font-semibold text-foreground">Controle de Estoque</h1>
-              <p className="text-sm text-muted-foreground">Gerencie materiais e insumos</p>
+              <h1 className="text-2xl font-semibold text-foreground">Estoque</h1>
+              <p className="text-sm text-muted-foreground">Controle centralizado de matéria-prima, tecidos e produtos</p>
             </div>
           </div>
-          <Dialog>
+          <div className="flex flex-wrap gap-2">
+            <Dialog
+              open={isAlertsDialogOpen}
+              onOpenChange={(open) => {
+                setIsAlertsDialogOpen(open);
+                if (!open) {
+                  setAlertForm(ALERT_DEFAULTS);
+                }
+              }}
+            >
             <DialogTrigger asChild>
-              <Button className="bg-secondary hover:bg-secondary/90 text-secondary-foreground">
-                <Plus className="w-4 h-4 mr-2" />
-                Adicionar Item
+                <Button variant="outline" size="sm">
+                  <BellRing className="mr-2 h-4 w-4" />
+                  Alertas
               </Button>
             </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Novo Item de Estoque</DialogTitle>
+              <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-0">
+                <div className="flex min-h-full flex-col">
+                  <DialogHeader className="sticky top-0 z-10 bg-card px-6 pt-6 pb-4">
+                    <DialogTitle>Alertas automáticos de estoque</DialogTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Receba por e-mail os itens que atingirem níveis baixo ou crítico.
+                    </p>
               </DialogHeader>
-              <div className="grid gap-4 py-2">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="iname" className="text-right">
-                    Nome <span className="text-red-500">*</span>
-                  </Label>
-                  <Input id="iname" className="col-span-3" placeholder="Nome do item" />
+                  <div className="flex-1 px-6">
+                    <div className="space-y-6 pb-6">
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="space-y-3 rounded-lg border border-border/60 bg-muted/10 p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="font-semibold text-foreground">Enviar por e-mail</p>
+                              <p className="text-sm text-muted-foreground">
+                                Um resumo com o estoque baixo ou crítico será enviado automaticamente.
+                              </p>
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="iunit" className="text-right">
-                    Unidade <span className="text-red-500">*</span>
-                  </Label>
-                  <Input id="iunit" defaultValue="unidades" className="col-span-3" placeholder="un, kg, m, etc" />
+                            <Switch
+                              checked={alertForm.send_email}
+                              onCheckedChange={(checked) => setAlertForm((prev) => ({ ...prev, send_email: checked }))}
+                              disabled={isLoadingAlertPreferences || saveAlertsMutation.isPending}
+                            />
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="iqty" className="text-right">
-                    Quantidade <span className="text-red-500">*</span>
-                  </Label>
-                  <Input id="iqty" type="number" defaultValue={0} className="col-span-3" placeholder="0" />
+                          <div className="space-y-2">
+                            <Label htmlFor="alert-email">E-mail principal</Label>
+                            <Input
+                              id="alert-email"
+                              type="email"
+                              placeholder="contato@empresa.com.br"
+                              value={alertForm.email}
+                              onChange={(event) => setAlertForm((prev) => ({ ...prev, email: event.target.value }))}
+                              disabled={!alertForm.send_email}
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Você receberá um único resumo com todos os itens em atenção.
+                            </p>
                 </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="imin" className="text-right">
-                    Mínimo <span className="text-gray-400">(opcional)</span>
-                  </Label>
-                  <Input id="imin" type="number" defaultValue={0} className="col-span-3" placeholder="0" />
                 </div>
+                        <div className="space-y-3 rounded-lg border border-border/60 bg-muted/10 p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="font-semibold text-foreground">WhatsApp (em breve)</p>
+                              <p className="text-sm text-muted-foreground">Alertas instantâneos pelo WhatsApp chegam na próxima versão.</p>
               </div>
-              <DialogFooter>
-                <Button
-                  onClick={async () => {
-                    const name = (document.getElementById("iname") as HTMLInputElement)?.value;
-                    const unit = (document.getElementById("iunit") as HTMLInputElement)?.value;
-                    const quantity = Number((document.getElementById("iqty") as HTMLInputElement)?.value || 0);
-                    const min = Number((document.getElementById("imin") as HTMLInputElement)?.value || 0);
-                    
-                    // Validação robusta
-                    const validation = validateForm(
-                      { name, unit, quantity, min },
-                      {
-                        name: validateName,
-                        unit: (value) => value ? { isValid: true, errors: [] } : { isValid: true, errors: [] },
-                        quantity: validateQuantity,
-                        min: (value) => value >= 0 ? { isValid: true, errors: [] } : { isValid: false, errors: ['Quantidade mínima não pode ser negativa'] }
-                      }
-                    );
-                    
-                    if (!validation.isValid) {
-                      validation.errors.forEach(error => toast.error(error));
-                      return;
-                    }
-                    
-                    // Medir performance
-                    const result = await performanceMonitor.measure(
-                      'createInventoryItem',
-                      async () => {
-                        // Obter empresa_id do usuário logado
-                        const { data: userEmpresa } = await supabase
-                          .from("user_empresas")
-                          .select("empresa_id")
-                          .eq("user_id", (await supabase.auth.getUser()).data.user?.id)
-                          .single();
-                        
-                        if (!userEmpresa?.empresa_id) {
-                          throw new Error("Usuário não tem empresa associada");
-                        }
-                        
-                        const { error } = await supabase.from("inventory_items").insert({ 
-                          name, 
-                          unit, 
-                          quantity, 
-                          min_quantity: min, 
-                          status: quantity <= 0 ? "critical" : quantity < min ? "low" : "ok",
-                          empresa_id: userEmpresa.empresa_id
-                        });
-                        if (error) throw error;
-                        return { success: true };
-                      },
-                      'Estoque'
-                    );
-                    
-                    if (result.success) {
-                      logger.userAction('inventory_item_created', 'ESTOQUE', { name, quantity, min });
-                      toast.success("Item adicionado com sucesso!");
-                      queryClient.refetchQueries({ queryKey: ["inventory"] });
-                    }
-                  }}
-                >
-                  Salvar
+                            <Switch checked={false} disabled />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="alert-whatsapp">Número com DDD</Label>
+                            <Input
+                              id="alert-whatsapp"
+                              placeholder="(11) 99999-9999"
+                              value={alertForm.whatsapp}
+                              onChange={(event) => setAlertForm((prev) => ({ ...prev, whatsapp: event.target.value }))}
+                              disabled
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4 rounded-lg border border-border/60 bg-muted/10 p-4">
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="font-semibold text-foreground">Alertar estoque baixo</p>
+                              <p className="text-sm text-muted-foreground">
+                                Envia quando a quantidade ficar abaixo do mínimo que você definiu.
+                              </p>
+                            </div>
+                            <Switch
+                              checked={alertForm.notify_low}
+                              onCheckedChange={(checked) => setAlertForm((prev) => ({ ...prev, notify_low: checked }))}
+                            />
+                          </div>
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="font-semibold text-foreground">Alertar estoque crítico</p>
+                              <p className="text-sm text-muted-foreground">
+                                Envia quando o item zerar ou ficar negativo.
+                              </p>
+                            </div>
+                            <Switch
+                              checked={alertForm.notify_critical}
+                              onCheckedChange={(checked) =>
+                                setAlertForm((prev) => ({ ...prev, notify_critical: checked }))
+                              }
+                            />
+                          </div>
+                        </div>
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <div className="space-y-2">
+                            <Label>Frequência</Label>
+                            <Select
+                              value={alertForm.frequency}
+                              onValueChange={(value: "daily" | "weekly") =>
+                                setAlertForm((prev) => ({ ...prev, frequency: value }))
+                              }
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Selecione uma opção" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="daily">Diariamente às 08h</SelectItem>
+                                <SelectItem value="weekly">Semanalmente (segunda-feira)</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground">
+                              O horário considera o fuso de Brasília. Ajustes finos estarão disponíveis em breve.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-3 pb-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                              Eventos recentes
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Últimos alertas disparados automaticamente.
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => refetchAlertLogs()}
+                            disabled={isLoadingAlertLogs}
+                          >
+                            Atualizar
+                          </Button>
+                        </div>
+                        {isLoadingAlertLogs ? (
+                          <div className="rounded-md border border-border/60 bg-muted/20 p-4 text-sm text-muted-foreground">
+                            Carregando eventos...
+                          </div>
+                        ) : alertLogs.length === 0 ? (
+                          <div className="rounded-md border border-border/60 bg-muted/20 p-4 text-sm text-muted-foreground">
+                            Nenhum alerta enviado até agora.
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            {alertLogs.map((log) => {
+                              const payload = (log.payload ?? {}) as Record<string, unknown>;
+                              const quantity = payload.quantity ?? payload.quantidade ?? "?";
+                              const minQuantity = payload.min_quantity ?? payload.min ?? "?";
+                              return (
+                                <div key={log.id} className="rounded-lg border border-border/60 bg-background p-3">
+                                  <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <div className="flex items-center gap-2">
+                                      <Badge
+                                        className={
+                                          log.status === "critical"
+                                            ? "bg-destructive/15 text-destructive border border-destructive/30"
+                                            : "bg-amber-500/15 text-amber-600 border border-amber-500/30"
+                                        }
+                                      >
+                                        {log.status === "critical" ? "Estoque crítico" : "Estoque baixo"}
+                                      </Badge>
+                                      <span className="text-xs text-muted-foreground">
+                                        {new Date(log.sent_at).toLocaleString("pt-BR")}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <p className="mt-2 text-sm font-semibold text-foreground">
+                                    {(payload.name as string) ?? "Item sem nome"}
+                                  </p>
+                                  <p className="text-sm text-muted-foreground">
+                                    Saldo atual: {quantity} • Mínimo: {minQuantity}
+                                  </p>
+                                  {payload.supplier && (
+                                    <p className="text-xs text-muted-foreground/80">
+                                      Fornecedor: {payload.supplier as string}
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <DialogFooter className="sticky bottom-0 z-10 border-t border-border/70 bg-card px-6 py-4">
+                    <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                      <Button
+                        variant="ghost"
+                        type="button"
+                        onClick={() => {
+                          setIsAlertsDialogOpen(false);
+                          setAlertForm(ALERT_DEFAULTS);
+                        }}
+                        className="w-full sm:w-auto"
+                      >
+                        Fechar
+                      </Button>
+                      <div className="flex w-full flex-col gap-2 sm:flex-row sm:justify-end">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={async () => {
+                            await triggerAlertsMutation.mutateAsync();
+                          }}
+                          disabled={
+                            triggerAlertsMutation.isPending ||
+                            isLoadingAlertPreferences ||
+                            isFetchingAlertPreferences
+                          }
+                          className="w-full sm:w-auto"
+                        >
+                          {triggerAlertsMutation.isPending ? (
+                            "Executando..."
+                          ) : (
+                            <>
+                              <History className="mr-2 h-4 w-4" />
+                              Executar agora
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={async () => {
+                            const payload: InventoryAlertPreferences = {
+                              ...(alertPreferencesData ?? {}),
+                              ...alertForm,
+                            };
+                            await saveAlertsMutation.mutateAsync(payload);
+                          }}
+                          disabled={
+                            saveAlertsMutation.isPending ||
+                            triggerAlertsMutation.isPending ||
+                            isLoadingAlertPreferences ||
+                            isFetchingAlertPreferences ||
+                            (!alertForm.notify_low && !alertForm.notify_critical)
+                          }
+                          className="w-full sm:w-auto"
+                        >
+                          {saveAlertsMutation.isPending ? "Salvando..." : "Salvar alertas"}
                 </Button>
+                      </div>
+                    </div>
               </DialogFooter>
+                </div>
             </DialogContent>
           </Dialog>
+            <Button variant="outline" size="sm" onClick={() => exportInventoryToCSV(filteredItems)}>
+              <Download className="mr-2 h-4 w-4" />
+              Exportar CSV
+            </Button>
+            <Dialog open={newItemModalOpen} onOpenChange={(open) => (open ? setNewItemModalOpen(true) : setNewItemModalOpen(false))}>
+              <DialogTrigger asChild>
+                <Button onClick={() => setNewItemModalOpen(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Novo item
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader className="sticky top-0 z-10 bg-card pb-4">
+                  <DialogTitle>Novo item de estoque</DialogTitle>
+                </DialogHeader>
+                <div className="grid gap-6 py-2">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Nome *</Label>
+                      <Input
+                        value={newItemState.name}
+                        onChange={(event) => setNewItemState((prev) => ({ ...prev, name: event.target.value }))}
+                        placeholder="Ex: Tecido algodão azul"
+                      />
+        </div>
+                    <div className="space-y-2">
+                      <Label>Categoria</Label>
+                      <Input
+                        value={newItemState.category}
+                        onChange={(event) => setNewItemState((prev) => ({ ...prev, category: event.target.value }))}
+                        placeholder="Tecidos, Aviamentos..."
+                      />
+                </div>
+              </div>
+
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Tipo *</Label>
+                      <Select
+                        value={newItemState.itemType}
+                        onValueChange={(value: InventoryItemType) =>
+                          setNewItemState((prev) => ({
+                            ...prev,
+                            itemType: value,
+                            unit: value === "tecido" ? "metros" : prev.unit,
+                          }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ITEM_TYPE_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              <div className="flex flex-col">
+                                <span>{option.label}</span>
+                                <span className="text-xs text-muted-foreground">{option.description}</span>
+                    </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                  </div>
+                    <div className="space-y-2">
+                      <Label>Fornecedor</Label>
+                      <Input
+                        value={newItemState.supplier}
+                        onChange={(event) => setNewItemState((prev) => ({ ...prev, supplier: event.target.value }))}
+                        placeholder="Opcional"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <div className="space-y-2">
+                      <Label>Quantidade *</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={newItemState.quantity}
+                        onChange={(event) => setNewItemState((prev) => ({ ...prev, quantity: event.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Unidade *</Label>
+                      <Input
+                        value={newItemState.unit}
+                        onChange={(event) => setNewItemState((prev) => ({ ...prev, unit: event.target.value }))}
+                        placeholder="un, kg, m..."
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Mínimo</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={newItemState.minQuantity}
+                        onChange={(event) => setNewItemState((prev) => ({ ...prev, minQuantity: event.target.value }))}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Custo unitário</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={newItemState.costPerUnit}
+                        onChange={(event) => setNewItemState((prev) => ({ ...prev, costPerUnit: event.target.value }))}
+                        placeholder="Ex: 45,90"
+                      />
+                    </div>
+                    {newItemState.itemType === "tecido" && (
+                      <div className="space-y-2">
+                        <Label>Metragem total (m)</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={newItemState.lengthMeters}
+                          onChange={(event) => setNewItemState((prev) => ({ ...prev, lengthMeters: event.target.value }))}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {newItemState.itemType === "tecido" && (
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Cor</Label>
+                        <Input
+                          value={newItemState.color}
+                          onChange={(event) => setNewItemState((prev) => ({ ...prev, color: event.target.value }))}
+                        />
+                    </div>
+                  </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label>Observações</Label>
+                    <Textarea
+                      value={newItemState.notes}
+                      onChange={(event) => setNewItemState((prev) => ({ ...prev, notes: event.target.value }))}
+                      placeholder="Informações adicionais sobre o item"
+                      rows={3}
+                    />
+                  </div>
+                </div>
+                <DialogFooter className="sticky bottom-0 z-10 bg-card pt-4">
+                  <div className="flex w-full flex-col gap-2 sm:flex-row sm:justify-end">
+                    <Button variant="outline" onClick={() => setNewItemModalOpen(false)} className="w-full sm:w-auto">
+                      Cancelar
+                    </Button>
+                    <Button onClick={handleCreateItem} className="w-full sm:w-auto">
+                      Salvar item
+                    </Button>
+                  </div>
+                </DialogFooter>
+            </DialogContent>
+          </Dialog>
+          </div>
         </div>
       </header>
 
-      <div className="p-6 space-y-6">
-        {/* Alerts */}
-        {(criticalItems > 0 || lowItems > 0) && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
-            {criticalItems > 0 && (
-              <Card className="border-destructive/50 bg-destructive/5">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <AlertTriangle className="w-5 h-5 text-destructive" />
-                    <div>
-                      <p className="font-medium text-destructive">
-                        {criticalItems} {criticalItems === 1 ? "item" : "itens"} em estoque crítico
-                      </p>
-                      <p className="text-sm text-muted-foreground">Reposição urgente necessária</p>
-                    </div>
-                  </div>
+      <main className="mx-auto max-w-6xl space-y-6 px-6 py-6">
+        <section className="grid gap-4 md:grid-cols-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Valor total</CardDescription>
+              <CardTitle className="text-2xl">
+                {summary.totalValue > 0 ? formatCurrency({ value: summary.totalValue, currency: "BRL" }) : "R$ 0,00"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground">Somatório considerando custo unitário informado</p>
                 </CardContent>
               </Card>
-            )}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Itens cadastrados</CardDescription>
+              <CardTitle className="text-2xl">{summary.totalItems}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground">{summary.totalQuantity.toFixed(2)} unidades no estoque</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Estoque baixo</CardDescription>
+              <CardTitle className="text-2xl text-amber-600">{summary.lowCount}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground">Itens abaixo do nível mínimo</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Estoque crítico</CardDescription>
+              <CardTitle className="text-2xl text-destructive">{summary.criticalCount}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground">Itens zerados ou negativos</p>
+                </CardContent>
+              </Card>
+        </section>
 
-            {lowItems > 0 && (
-              <Card className="border-orange-500/50 bg-orange-500/5">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <TrendingDown className="w-5 h-5 text-orange-600" />
-                    <div>
-                      <p className="font-medium text-orange-600">
-                        {lowItems} {lowItems === 1 ? "item" : "itens"} com estoque baixo
-                      </p>
-                      <p className="text-sm text-muted-foreground">Planeje reposição em breve</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+        <section className="grid gap-4 md:grid-cols-3">
+          {ITEM_TYPE_OPTIONS.map((option) => {
+            const info = summary.byType[option.value];
+            return (
+              <Card key={option.value} className="border-dashed">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base font-semibold">{option.label}</CardTitle>
+                    <Badge variant="outline" className="bg-muted/30">
+                      {info.count} itens
+                    </Badge>
           </div>
-        )}
+                  <CardDescription>{option.description}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-muted-foreground">
+                    Valor estimado{" "}
+                    <span className="font-semibold text-foreground">
+                      {info.value > 0 ? formatCurrency({ value: info.value, currency: "BRL" }) : "R$ 0,00"}
+                    </span>
+                  </p>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </section>
 
-        {/* Items List */}
-        <div className="grid gap-3">
-          {isLoading && (
-            <Card className="border-border animate-shimmer"><CardContent className="h-20" /></Card>
-          )}
-          {items.map((item, index) => {
-            const statusInfo = getStatusInfo(item.status, item.quantity, item.min);
+        <section className="rounded-lg border border-border bg-card p-4 shadow-sm">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-1 items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Input
+                className="max-w-sm"
+                placeholder="Buscar por nome ou fornecedor..."
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+              />
+            </div>
+            <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as InventoryItemType | "all")}>
+              <SelectTrigger className="w-[220px]">
+                <SelectValue placeholder="Tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os tipos</SelectItem>
+                {ITEM_TYPE_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Separator className="my-4" />
+
+          {isLoading ? (
+            <div className="flex min-h-[240px] items-center justify-center">
+              <PackageSearch className="mr-2 h-5 w-5 animate-spin text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Carregando estoque...</p>
+            </div>
+          ) : filteredItems.length === 0 ? (
+            <div className="flex min-h-[240px] flex-col items-center justify-center gap-3 text-center">
+              <PackageSearch className="h-10 w-10 text-muted-foreground" />
+              <div>
+                <p className="font-medium text-foreground">Nenhum item encontrado</p>
+                <p className="text-sm text-muted-foreground">Cadastre um item ou ajuste os filtros de busca</p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredItems.map((item) => {
+                const statusInfo = computeStatusInfo(item.status);
+                const metadata = (item.metadata ?? {}) as Record<string, unknown>;
+                const totalValue = item.total_cost ?? (item.cost_per_unit ?? 0) * (item.quantity ?? 0);
             
             return (
               <Card
-                key={index}
-                className={`border-border hover:shadow-md transition-all animate-fade-in ${
-                  item.status === "critical"
-                    ? "border-l-4 border-l-destructive"
-                    : item.status === "low"
-                    ? "border-l-4 border-l-orange-500"
-                    : ""
-                }`}
+                    key={item.id}
+                    className="border border-border/70 transition-all hover:border-primary/60 hover:shadow-md"
               >
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      {statusInfo.icon}
-                      <div>
-                        <h3 className="font-medium text-foreground">{item.name}</h3>
+                    <CardContent className="space-y-4 p-4">
+                      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                        <div className="space-y-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-lg font-semibold text-foreground">{item.name}</h3>
+                            <Badge variant="secondary">{getItemTypeLabel(item.item_type)}</Badge>
+                            {statusInfo.badge}
+                          </div>
                         <p className="text-sm text-muted-foreground">
-                          Mínimo: {item.min} {item.unit}
+                            Unidade mínima: <span className="font-medium text-foreground">{item.min_quantity ?? 0}</span>{" "}
+                            {item.unit}
                         </p>
-                      </div>
+                          {item.supplier && (
+                            <p className="text-sm text-muted-foreground">
+                              Fornecedor: <span className="font-medium text-foreground">{item.supplier}</span>
+                            </p>
+                          )}
+                          {item.category && (
+                        <p className="text-sm text-muted-foreground">
+                              Categoria: <span className="font-medium text-foreground">{item.category}</span>
+                        </p>
+                          )}
+                          {metadata?.notes && (
+                            <p className="text-xs text-muted-foreground/90">Obs.: {String(metadata.notes)}</p>
+                          )}
                     </div>
 
-                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-6">
                       <div className="text-right">
-                        <p className="text-2xl font-bold text-foreground">{item.quantity}</p>
+                            <p className="text-2xl font-semibold text-foreground">
+                              {Number(item.quantity ?? 0).toFixed(2)}
+                            </p>
                         <p className="text-xs text-muted-foreground">{item.unit}</p>
+                            {item.cost_per_unit && (
+                              <p className="text-xs text-muted-foreground/90">
+                                {formatCurrency({ value: item.cost_per_unit, currency: "BRL" })}/un
+                              </p>
+                            )}
+                            {totalValue > 0 && (
+                              <p className="text-xs font-medium text-foreground">
+                                Total: {formatCurrency({ value: totalValue, currency: "BRL" })}
+                              </p>
+                            )}
                       </div>
-                      {statusInfo.badge}
-                      <div className="flex gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEditItem(item)}
-                          className="h-8 w-8 p-0"
-                        >
-                          <Edit className="w-4 h-4" />
+                          <div className="flex flex-col items-end gap-2">
+                            <Button variant="outline" size="icon" onClick={() => handleEditItem(item)}>
+                              <Edit className="h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteItem(item)}
-                          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="w-4 h-4" />
+                            <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteItem(item)}>
+                              <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
+                    </div>
+                  </div>
+
+                      <Separator />
+
+                      <div className="grid gap-4 md:grid-cols-4">
+                        <div className="space-y-1">
+                          <p className="text-xs text-muted-foreground">Status</p>
+                          <p className="flex items-center gap-2 text-sm font-medium text-foreground">
+                            {statusInfo.icon}
+                            {statusInfo.message}
+                          </p>
+                        </div>
+                        {item.item_type === "tecido" && (
+                          <div className="space-y-1">
+                            <p className="text-xs text-muted-foreground">Metragem disponível</p>
+                            <p className="text-sm font-medium text-foreground">
+                              {metadata?.length_meters ? `${metadata.length_meters} m` : "-"}
+                            </p>
+                          </div>
+                        )}
+                        <div className="space-y-1">
+                          <p className="text-xs text-muted-foreground">Atualizado</p>
+                          <p className="text-sm font-medium text-foreground">
+                            {item.updated_at ? new Date(item.updated_at).toLocaleString("pt-BR") : "-"}
+                          </p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-xs text-muted-foreground">Código interno</p>
+                          <p className="text-sm font-mono text-muted-foreground/80">{item.id}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -407,71 +1147,150 @@ export default function Estoque() {
             );
           })}
         </div>
-      </div>
+          )}
+        </section>
+      </main>
 
-      {/* Modal de Edição de Item */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Editar Item do Estoque</DialogTitle>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="sticky top-0 z-10 bg-card pb-4">
+            <DialogTitle>Editar item</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="grid gap-6 py-2">
+            <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="edit-item-name">
-                Nome do Item <span className="text-red-500">*</span>
-              </Label>
+                <Label>Nome *</Label>
               <Input
-                id="edit-item-name"
                 value={editForm.name}
-                onChange={(e) => setEditForm({...editForm, name: e.target.value})}
-                placeholder="Nome do item"
+                  onChange={(event) => setEditForm((prev) => ({ ...prev, name: event.target.value }))}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-quantity">
-                  Quantidade <span className="text-red-500">*</span>
-                </Label>
+                <Label>Categoria</Label>
                 <Input
-                  id="edit-quantity"
-                  type="number"
-                  value={editForm.quantity}
-                  onChange={(e) => setEditForm({...editForm, quantity: e.target.value})}
-                  placeholder="0"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-unit">
-                  Unidade <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="edit-unit"
-                  value={editForm.unit}
-                  onChange={(e) => setEditForm({...editForm, unit: e.target.value})}
-                  placeholder="un, kg, m, etc"
+                  value={editForm.category}
+                  onChange={(event) => setEditForm((prev) => ({ ...prev, category: event.target.value }))}
                 />
               </div>
             </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Tipo *</Label>
+                <Select
+                  value={editForm.itemType}
+                  onValueChange={(value: InventoryItemType) =>
+                    setEditForm((prev) => ({
+                      ...prev,
+                      itemType: value,
+                      unit: value === "tecido" ? "metros" : prev.unit,
+                    }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ITEM_TYPE_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Fornecedor</Label>
+                <Input
+                  value={editForm.supplier}
+                  onChange={(event) => setEditForm((prev) => ({ ...prev, supplier: event.target.value }))}
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="space-y-2">
+                <Label>Quantidade *</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={editForm.quantity}
+                  onChange={(event) => setEditForm((prev) => ({ ...prev, quantity: event.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Unidade *</Label>
+                <Input
+                  value={editForm.unit}
+                  onChange={(event) => setEditForm((prev) => ({ ...prev, unit: event.target.value }))}
+                />
+            </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-min-quantity">
-                Quantidade Mínima <span className="text-gray-400">(opcional)</span>
-              </Label>
+                <Label>Mínimo</Label>
               <Input
-                id="edit-min-quantity"
                 type="number"
+                  min="0"
+                  step="0.01"
                 value={editForm.minQuantity}
-                onChange={(e) => setEditForm({...editForm, minQuantity: e.target.value})}
-                placeholder="0"
+                  onChange={(event) => setEditForm((prev) => ({ ...prev, minQuantity: event.target.value }))}
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>Custo unitário</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={editForm.costPerUnit}
+                  onChange={(event) => setEditForm((prev) => ({ ...prev, costPerUnit: event.target.value }))}
+                />
+              </div>
+              {editForm.itemType === "tecido" && (
+                <div className="space-y-2">
+                  <Label>Metragem total (m)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={editForm.lengthMeters}
+                    onChange={(event) => setEditForm((prev) => ({ ...prev, lengthMeters: event.target.value }))}
+                  />
+                </div>
+              )}
+            </div>
+
+            {editForm.itemType === "tecido" && (
+              <div className="space-y-2">
+                <Label>Cor</Label>
+                <Input
+                  value={editForm.color}
+                  onChange={(event) => setEditForm((prev) => ({ ...prev, color: event.target.value }))}
+                />
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>Observações</Label>
+              <Textarea
+                rows={3}
+                value={editForm.notes}
+                onChange={(event) => setEditForm((prev) => ({ ...prev, notes: event.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter className="sticky bottom-0 z-10 bg-card pt-4">
+            <div className="flex w-full flex-col gap-2 sm:flex-row sm:justify-end">
+              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)} className="w-full sm:w-auto">
               Cancelar
             </Button>
-            <Button onClick={handleSaveEdit}>
-              Salvar
+              <Button onClick={handleSaveEdit} className="w-full sm:w-auto">
+                Salvar alterações
             </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
