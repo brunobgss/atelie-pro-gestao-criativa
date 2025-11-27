@@ -5,8 +5,10 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Plus, FileText, Calendar, DollarSign, Share2, Printer, MessageCircle, Edit, CheckCircle, Trash2 } from "lucide-react";
+import { Plus, FileText, Calendar, DollarSign, Share2, Printer, MessageCircle, Edit, CheckCircle, Trash2, Eye, Search, Filter } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listQuotes, deleteQuote, approveQuote, getQuoteByCode } from "@/integrations/supabase/quotes";
@@ -28,6 +30,10 @@ export default function Orcamentos() {
   const [whatsappModalOpen, setWhatsappModalOpen] = useState(false);
   const [customMessage, setCustomMessage] = useState("");
   const [selectedQuote, setSelectedQuote] = useState<any>(null);
+  
+  // Estados para filtros e pesquisa
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
   
   const { data: quotes = [], isLoading, error, refetch } = useQuery({
     queryKey: ["quotes"],
@@ -66,7 +72,15 @@ export default function Orcamentos() {
             total_value: value, // Adicionar total_value para compatibilidade
             date: r.date || new Date().toISOString().split('T')[0],
             status: r.status || "Pendente",
+            created_at: (r as any).created_at || new Date().toISOString(),
           };
+        });
+        
+        // Garantir ordenação por data de criação (mais recentes primeiro)
+        processedQuotes.sort((a, b) => {
+          const dateA = new Date(a.created_at || a.date).getTime();
+          const dateB = new Date(b.created_at || b.date).getTime();
+          return dateB - dateA; // Decrescente (mais recente primeiro)
         });
         
         console.log("Orçamentos processados:", processedQuotes);
@@ -272,6 +286,42 @@ ${empresa?.nome || 'Ateliê'}`;
   console.log("Orçamentos após filtro:", safeQuotes.length, "de", quotes.length);
   console.log("Orçamentos válidos:", safeQuotes);
 
+  // Aplicar filtros e pesquisa
+  const filteredQuotes = safeQuotes.filter((quote) => {
+    // Filtro por status
+    if (statusFilter !== "all") {
+      const quoteStatus = (quote.status || "pending").toLowerCase();
+      const filterStatus = statusFilter.toLowerCase();
+      
+      // Mapear status traduzidos para valores do banco
+      const statusMap: Record<string, string[]> = {
+        "pending": ["pending", "pendente"],
+        "approved": ["approved", "aprovado"],
+        "rejected": ["rejected", "rejeitado", "reprovado"],
+        "completed": ["completed", "concluído", "concluido"],
+      };
+      
+      const allowedStatuses = statusMap[filterStatus] || [filterStatus];
+      if (!allowedStatuses.includes(quoteStatus)) {
+        return false;
+      }
+    }
+
+    // Filtro por pesquisa
+    if (searchTerm.trim()) {
+      const search = searchTerm.toLowerCase();
+      const matchesClient = quote.client?.toLowerCase().includes(search);
+      const matchesCode = quote.id?.toLowerCase().includes(search) || quote.code?.toLowerCase().includes(search);
+      const matchesDescription = quote.description?.toLowerCase().includes(search);
+      
+      if (!matchesClient && !matchesCode && !matchesDescription) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
   // Se houver erro, mostrar mensagem
   if (error) {
     console.warn("Erro ao carregar orçamentos:", error);
@@ -298,6 +348,63 @@ ${empresa?.nome || 'Ateliê'}`;
       </header>
 
       <div className="p-6">
+        {/* Filtros e Pesquisa */}
+        <Card className="mb-6">
+          <CardContent className="pt-6">
+            <div className="flex flex-col sm:flex-row gap-4">
+              {/* Campo de Pesquisa */}
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                  <Input
+                    placeholder="Pesquisar por cliente, código ou descrição..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+              
+              {/* Filtro por Status */}
+              <div className="w-full sm:w-48">
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger>
+                    <Filter className="w-4 h-4 mr-2" />
+                    <SelectValue placeholder="Filtrar por status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos os status</SelectItem>
+                    <SelectItem value="pending">Pendente</SelectItem>
+                    <SelectItem value="approved">Aprovado</SelectItem>
+                    <SelectItem value="rejected">Rejeitado</SelectItem>
+                    <SelectItem value="completed">Concluído</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            {/* Contador de resultados */}
+            {searchTerm || statusFilter !== "all" ? (
+              <div className="mt-3 text-sm text-muted-foreground">
+                {filteredQuotes.length} {filteredQuotes.length === 1 ? 'orçamento encontrado' : 'orçamentos encontrados'}
+                {(searchTerm || statusFilter !== "all") && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSearchTerm("");
+                      setStatusFilter("all");
+                    }}
+                    className="ml-2 h-auto p-0 text-xs"
+                  >
+                    Limpar filtros
+                  </Button>
+                )}
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+
         <div className="grid gap-4">
           {isLoading && (
             <Card className="border-border animate-shimmer">
@@ -314,7 +421,24 @@ ${empresa?.nome || 'Ateliê'}`;
               </CardContent>
             </Card>
           )}
-          {safeQuotes.map((quote) => (
+          {!isLoading && safeQuotes.length > 0 && filteredQuotes.length === 0 && (
+            <Card className="border-border">
+              <CardContent className="text-center py-8">
+                <p className="text-muted-foreground">Nenhum orçamento encontrado com os filtros aplicados</p>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSearchTerm("");
+                    setStatusFilter("all");
+                  }}
+                  className="mt-4"
+                >
+                  Limpar filtros
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+          {filteredQuotes.map((quote) => (
             <Card
               key={quote.id}
               className="border-border hover:shadow-md transition-all animate-fade-in"
@@ -334,82 +458,74 @@ ${empresa?.nome || 'Ateliê'}`;
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <p className="text-foreground">{quote.description}</p>
                   
-                  <div className="flex items-center justify-between pt-3 border-t border-border">
-                    <div className="flex items-center gap-6">
-                      <div className="flex items-center gap-2">
-                        <DollarSign className="w-4 h-4 text-muted-foreground" />
-                        <div>
-                          <p className="text-xs text-muted-foreground">Valor</p>
-                          <p className="text-sm font-medium text-foreground">
-                            {formatCurrency(Number(quote.total_value || 0))}
-                          </p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-muted-foreground" />
-                        <div>
-                          <p className="text-xs text-muted-foreground">Data</p>
-                          <p className="text-sm font-medium text-foreground">
-                            {new Date(quote.date).toLocaleDateString('pt-BR')}
-                          </p>
-                        </div>
+                  <div className="flex items-center gap-6 pt-2 border-t border-border">
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="w-4 h-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Valor</p>
+                        <p className="text-sm font-medium text-foreground">
+                          {formatCurrency(Number(quote.total_value || 0))}
+                        </p>
                       </div>
                     </div>
-
-                    <div className="flex gap-2 flex-wrap">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="border-secondary text-secondary hover:bg-secondary/10 min-h-[40px] touch-manipulation"
-                        onClick={() => openPublicView(quote.id)}
-                      >
-                        <Share2 className="w-4 h-4 mr-2" />
-                        Abrir
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="border-border min-h-[40px] touch-manipulation"
-                        onClick={() => navigate(`/orcamentos/${quote.id}/impressao`)}
-                      >
-                        <Printer className="w-4 h-4 mr-2" />
-                        Imprimir
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="border-green-600 text-green-600 hover:bg-green-600/10 min-h-[40px] touch-manipulation active:bg-green-600/20"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          console.log("Botão WhatsApp clicado no mobile");
-                          openWhatsApp(quote);
-                        }}
-                        onTouchStart={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          console.log("Touch start no botão WhatsApp");
-                        }}
-                        onTouchEnd={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          console.log("Touch end no botão WhatsApp");
-                          openWhatsApp(quote);
-                        }}
-                      >
-                        <MessageCircle className="w-4 h-4 mr-2" />
-                        <span className="hidden sm:inline">Enviar WhatsApp</span>
-                        <span className="sm:hidden">WhatsApp</span>
-                      </Button>
+                    
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Data</p>
+                        <p className="text-sm font-medium text-foreground">
+                          {new Date(quote.date).toLocaleDateString('pt-BR')}
+                        </p>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Ações Principais */}
-                  <div className="flex gap-2 pt-3 border-t border-border">
+                  {/* Ações - Agrupadas em uma única linha */}
+                  <div className="flex flex-wrap gap-2 pt-2 border-t border-border">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-blue-600 text-blue-600 hover:bg-blue-600/10"
+                      onClick={() => navigate(`/orcamentos/${quote.id}/visualizar`)}
+                    >
+                      <Eye className="w-4 h-4 mr-2" />
+                      Visualizar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-secondary text-secondary hover:bg-secondary/10"
+                      onClick={() => openPublicView(quote.id)}
+                    >
+                      <Share2 className="w-4 h-4 mr-2" />
+                      Abrir
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-border"
+                      onClick={() => navigate(`/orcamentos/${quote.id}/impressao`)}
+                    >
+                      <Printer className="w-4 h-4 mr-2" />
+                      Imprimir
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-green-600 text-green-600 hover:bg-green-600/10"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        openWhatsApp(quote);
+                      }}
+                    >
+                      <MessageCircle className="w-4 h-4 mr-2" />
+                      <span className="hidden sm:inline">WhatsApp</span>
+                      <span className="sm:hidden">WA</span>
+                    </Button>
                     <Button
                       variant="outline"
                       size="sm"

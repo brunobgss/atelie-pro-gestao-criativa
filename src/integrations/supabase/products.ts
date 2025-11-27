@@ -9,6 +9,7 @@ export interface ProductRow {
   work_hours: number;
   unit_price: number;
   profit_margin: number;
+  image_url?: string;
   created_at: string;
   updated_at: string;
   empresa_id?: string;
@@ -21,6 +22,7 @@ export async function createProduct(input: {
   work_hours: number;
   unit_price: number;
   profit_margin: number;
+  image_url?: string;
 }): Promise<{ ok: boolean; id?: string; data?: ProductRow; error?: string }> {
   try {
     console.log("🔍 Criando produto:", input);
@@ -40,6 +42,7 @@ export async function createProduct(input: {
         work_hours: input.work_hours,
         unit_price: input.unit_price,
         profit_margin: input.profit_margin,
+        image_url: input.image_url || null,
         empresa_id: empresaId,
         created_at: new Date().toISOString()
       })
@@ -66,6 +69,7 @@ export async function updateProduct(id: string, input: {
   work_hours?: number;
   unit_price?: number;
   profit_margin?: number;
+  image_url?: string;
 }): Promise<{ ok: boolean; data?: ProductRow; error?: string }> {
   try {
     console.log("🔍 Atualizando produto:", { id, input });

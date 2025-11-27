@@ -1200,17 +1200,77 @@ export default function PedidoDetalhe() {
                 </div>
               )}
 
-              <div className="space-y-2">
-                <p className="text-xs text-muted-foreground">Arquivo / Arte</p>
+              <div className="space-y-3 border-t pt-4 mt-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Arquivo / Arte</p>
                 {order.file ? (
-                  <a
-                    href={order.file}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-2 text-primary hover:underline"
-                  >
-                    <Upload className="w-4 h-4" /> Baixar arquivo
-                  </a>
+                  <div className="space-y-3">
+                    {order.file.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i) ? (
+                      <div className="space-y-3">
+                        <div className="relative w-full bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 p-4 flex items-center justify-center min-h-[200px] max-h-[500px] overflow-hidden">
+                          <img
+                            src={order.file}
+                            alt="Arte do pedido"
+                            className="max-w-full max-h-[450px] w-auto h-auto object-contain rounded-lg shadow-sm"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              const parent = target.parentElement;
+                              if (parent) {
+                                parent.innerHTML = `
+                                  <div class="p-4 border border-border rounded-lg text-center">
+                                    <p class="text-sm text-muted-foreground mb-2">Não foi possível carregar a imagem.</p>
+                                    <a href="${order.file}" target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline flex items-center justify-center">
+                                      <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                                      </svg>
+                                      Baixar arquivo
+                                    </a>
+                                  </div>
+                                `;
+                              }
+                            }}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between pt-2 border-t border-border">
+                          <p className="text-xs text-muted-foreground">
+                            Pré-visualização da arte anexada
+                          </p>
+                          <Button
+                            asChild
+                            size="sm"
+                            className="bg-blue-600 hover:bg-blue-700"
+                          >
+                            <a
+                              href={order.file}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              <Download className="w-4 h-4 mr-2" />
+                              Baixar arquivo completo
+                            </a>
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-4 border-2 border-dashed border-gray-300 rounded-lg text-center bg-gray-50">
+                        <p className="text-sm text-muted-foreground mb-3">Arquivo anexado</p>
+                        <Button
+                          asChild
+                          size="sm"
+                          className="bg-blue-600 hover:bg-blue-700"
+                        >
+                          <a
+                            href={order.file}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <Download className="w-4 h-4 mr-2" />
+                            Baixar arquivo
+                          </a>
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <div className="text-sm text-muted-foreground">Nenhum arquivo enviado</div>
                 )}

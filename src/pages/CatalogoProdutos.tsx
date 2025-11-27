@@ -7,10 +7,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Package, Plus, Edit, Trash2, Copy, Search, Filter, Clock, Layers } from "lucide-react";
+import { Package, Plus, Edit, Trash2, Copy, Search, Filter, Clock, Layers, Upload, X, Image as ImageIcon } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { toast } from "sonner";
 import { getProducts, createProduct, updateProduct, deleteProduct } from "@/integrations/supabase/products";
+import { uploadProductImage } from "@/integrations/supabase/storage";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { DialogVariacoesProduto } from "@/components/DialogVariacoesProduto";
 import { useSync } from "@/contexts/SyncContext";
@@ -53,6 +54,10 @@ export default function CatalogoProdutos() {
   const [testQuantity, setTestQuantity] = useState(1);
   const [dialogVariacoesOpen, setDialogVariacoesOpen] = useState(false);
   const [produtoParaVariacoes, setProdutoParaVariacoes] = useState<Product | null>(null);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   const categories = ["all", "Uniforme", "Personalizado", "Bordado", "Estampado"];
 
@@ -81,6 +86,7 @@ export default function CatalogoProdutos() {
                     return 'Material';
                   })
                 : [],
+              image: product.image_url || undefined,
               createdAt: product.created_at || new Date().toISOString()
             };
           } catch (conversionError) {
@@ -145,30 +151,66 @@ export default function CatalogoProdutos() {
     }
     
     try {
+      let imageUrl = currentImageUrl;
+      
       // Medir performance da operação
       const result = await performanceMonitor.measure(
         editingProduct ? 'updateProduct' : 'createProduct',
         async () => {
           if (editingProduct) {
-            // Editar produto existente
+            // Editar produto existente - fazer upload da imagem primeiro se houver nova
+            if (selectedImage) {
+              setIsUploadingImage(true);
+              const uploadResult = await uploadProductImage(selectedImage, editingProduct.id);
+              
+              if (!uploadResult.ok) {
+                toast.error(uploadResult.error || "Erro ao fazer upload da imagem");
+                setIsUploadingImage(false);
+                throw new Error(uploadResult.error || "Erro ao fazer upload da imagem");
+              }
+              
+              imageUrl = uploadResult.url || null;
+              setIsUploadingImage(false);
+            }
+            
+            // Atualizar produto existente
             return await updateProduct(editingProduct.id, {
               name: formData.name,
               type: formData.category,
               materials: formData.materials.split(",").map(m => m.trim()),
               work_hours: formData.work_hours,
               unit_price: formData.unit_price,
-              profit_margin: 0 // Pode ser calculado depois
+              profit_margin: 0, // Pode ser calculado depois
+              image_url: imageUrl || undefined
             });
           } else {
-            // Criar novo produto
-            return await createProduct({
+            // Criar novo produto primeiro (sem imagem)
+            const createResult = await createProduct({
               name: formData.name,
               type: formData.category,
               materials: formData.materials.split(",").map(m => m.trim()),
               work_hours: formData.work_hours,
               unit_price: formData.unit_price,
-              profit_margin: 0 // Pode ser calculado depois
+              profit_margin: 0, // Pode ser calculado depois
             });
+            
+            // Se criou o produto e tem imagem, fazer upload com o ID correto
+            if (createResult.ok && createResult.id && selectedImage) {
+              setIsUploadingImage(true);
+              const uploadResult = await uploadProductImage(selectedImage, createResult.id);
+              
+              if (uploadResult.ok && uploadResult.url) {
+                // Atualizar o produto com a URL da imagem
+                await updateProduct(createResult.id, { image_url: uploadResult.url });
+                imageUrl = uploadResult.url;
+              } else {
+                console.warn("Produto criado mas falha ao fazer upload da imagem:", uploadResult.error);
+                toast.warning("Produto criado, mas houve erro ao fazer upload da imagem");
+              }
+              setIsUploadingImage(false);
+            }
+            
+            return createResult;
           }
         },
         'CatalogoProdutos'
@@ -213,6 +255,9 @@ export default function CatalogoProdutos() {
     
     setIsDialogOpen(false);
     setEditingProduct(null);
+    setSelectedImage(null);
+    setImagePreview(null);
+    setCurrentImageUrl(null);
     setFormData({
       name: "",
       category: "",
@@ -233,7 +278,40 @@ export default function CatalogoProdutos() {
       work_hours: product.work_hours,
       materials: product.materials.join(", ")
     });
+    setCurrentImageUrl(product.image || null);
+    setImagePreview(product.image || null);
+    setSelectedImage(null);
     setIsDialogOpen(true);
+  };
+  
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validar tipo de arquivo
+      if (!file.type.startsWith('image/')) {
+        toast.error("Por favor, selecione um arquivo de imagem");
+        return;
+      }
+      
+      // Validar tamanho (máximo 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error("A imagem deve ter no máximo 5MB");
+        return;
+      }
+      
+      setSelectedImage(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+  
+  const handleRemoveImage = () => {
+    setSelectedImage(null);
+    setImagePreview(null);
+    setCurrentImageUrl(null);
   };
 
   const handleDelete = async (id: string) => {
@@ -326,13 +404,13 @@ _Orçamento gerado pelo Ateliê Pro_
                 <span className="md:hidden">Novo</span>
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
+            <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
+              <DialogHeader className="flex-shrink-0">
                 <DialogTitle>
                   {editingProduct ? "Editar Produto" : "Novo Produto"}
                 </DialogTitle>
               </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto flex-1 pr-1">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>
@@ -413,6 +491,64 @@ _Orçamento gerado pelo Ateliê Pro_
                     required
                   />
                 </div>
+                
+                {/* Upload de Imagem */}
+                <div className="space-y-2">
+                  <Label>
+                    Foto do Produto <span className="text-gray-400">(opcional)</span>
+                  </Label>
+                  {imagePreview || currentImageUrl ? (
+                    <div className="relative">
+                      <div className="relative w-full h-48 bg-gray-100 rounded-lg border-2 border-dashed border-gray-300 overflow-hidden">
+                        <img
+                          src={imagePreview || currentImageUrl || ''}
+                          alt="Preview"
+                          className="w-full h-full object-contain"
+                        />
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="sm"
+                          className="absolute top-2 right-2"
+                          onClick={handleRemoveImage}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {selectedImage ? "Nova imagem selecionada" : "Imagem atual"}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                      <ImageIcon className="w-12 h-12 mx-auto text-gray-400 mb-2" />
+                      <Label htmlFor="image-upload" className="cursor-pointer">
+                        <span className="text-sm text-gray-600 hover:text-gray-900">
+                          Clique para selecionar uma imagem
+                        </span>
+                        <input
+                          id="image-upload"
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleImageChange}
+                        />
+                      </Label>
+                      <p className="text-xs text-gray-500 mt-2">
+                        JPG, PNG ou GIF (máx. 5MB)
+                      </p>
+                    </div>
+                  )}
+                  {!imagePreview && !currentImageUrl && (
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      className="hidden"
+                      id="image-input"
+                    />
+                  )}
+                </div>
 
                 {/* Seção de Cálculo de Tempo */}
                 {formData.work_hours > 0 && (
@@ -448,11 +584,30 @@ _Orçamento gerado pelo Ateliê Pro_
                   </div>
                 )}
                 
-                <div className="flex gap-2 pt-4">
-                  <Button type="submit" className="flex-1">
-                    {editingProduct ? "Atualizar" : "Criar"} Produto
+                <div className="flex gap-2 pt-4 border-t sticky bottom-0 bg-background pb-2 flex-shrink-0">
+                  <Button type="submit" className="flex-1" disabled={isUploadingImage}>
+                    {isUploadingImage ? (
+                      <>
+                        <Upload className="w-4 h-4 mr-2 animate-spin" />
+                        Enviando...
+                      </>
+                    ) : (
+                      <>
+                        {editingProduct ? "Atualizar" : "Criar"} Produto
+                      </>
+                    )}
                   </Button>
-                  <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => {
+                      setIsDialogOpen(false);
+                      setSelectedImage(null);
+                      setImagePreview(null);
+                      setCurrentImageUrl(null);
+                    }}
+                    disabled={isUploadingImage}
+                  >
                     Cancelar
                   </Button>
                 </div>
@@ -519,6 +674,15 @@ _Orçamento gerado pelo Ateliê Pro_
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {filteredProducts.map((product) => (
             <Card key={product.id} className="bg-white border border-gray-200/50 shadow-sm hover:shadow-md transition-all duration-200">
+              {product.image && (
+                <div className="w-full h-48 bg-gray-100 overflow-hidden">
+                  <img
+                    src={product.image}
+                    alt={product.name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              )}
               <CardHeader>
                 <div className="flex justify-between items-start">
                   <div>

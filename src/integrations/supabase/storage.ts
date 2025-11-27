@@ -63,4 +63,54 @@ export async function uploadOrderFile(file: File, orderCode: string): Promise<{ 
   }
 }
 
+export async function uploadProductImage(file: File, productId: string): Promise<{ ok: boolean; url?: string; error?: string }> {
+  try {
+    console.log("Iniciando upload da imagem do produto:", file.name, "para produto:", productId);
+    
+    // Verificar se o usuário está autenticado
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      console.error("Usuário não autenticado");
+      return { ok: false, error: "Usuário não autenticado" };
+    }
+    
+    const bucket = "products";
+    const path = `${productId}/${Date.now()}-${file.name}`;
+    
+    console.log("Upload para bucket:", bucket, "path:", path);
+    
+    // Tentar fazer upload diretamente (mais eficiente que verificar antes)
+    const { data, error } = await supabase.storage.from(bucket).upload(path, file, { 
+      upsert: true, 
+      cacheControl: "3600" 
+    });
+    
+    if (error) {
+      console.error("Erro no upload:", error);
+      
+      // Se for erro de RLS ou bucket não existe, retornar erro
+      if (error.message.includes('row-level security policy') || 
+          error.message.includes('Bucket not found') ||
+          error.message.includes('not found') ||
+          error.message.includes('permission denied') ||
+          error.message.includes('unauthorized')) {
+        console.log("Erro de permissão ou bucket não configurado");
+        return { ok: false, error: "Upload não disponível - verifique as configurações de armazenamento" };
+      }
+      
+      throw error;
+    }
+    
+    console.log("Upload realizado com sucesso:", data);
+    
+    const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path);
+    console.log("URL pública gerada:", urlData.publicUrl);
+    
+    return { ok: true, url: urlData.publicUrl };
+  } catch (e: unknown) {
+    console.error("Erro no upload:", e);
+    return { ok: false, error: e?.message ?? "Falha no upload" };
+  }
+}
+
 

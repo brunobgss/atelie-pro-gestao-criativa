@@ -57,9 +57,9 @@ export async function listQuotes(): Promise<QuoteRow[]> {
     // Filtrar por empresa_id
     const { data, error } = await supabase
       .from("atelie_quotes")
-      .select("id, code, customer_name, customer_phone, date, observations, total_value, status")
+      .select("id, code, customer_name, customer_phone, date, observations, total_value, status, created_at")
       .eq("empresa_id", userEmpresa.empresa_id)
-      .order("date", { ascending: false })
+      .order("created_at", { ascending: false })
       .limit(50);
     
     if (error) {
@@ -354,6 +354,30 @@ export async function approveQuote(quoteCode: string): Promise<{ ok: boolean; er
       `${item.description} (Qtd: ${item.quantity})`
     ).join(', ');
 
+    // Extrair URL do arquivo das observações
+    const extractFileUrl = (observations?: string | null): string | null => {
+      if (!observations) return null;
+      
+      const patterns = [
+        /Arquivo\/Arte:\s*(https?:\/\/[^\s\n]+)/i,
+        /Arquivo:\s*(https?:\/\/[^\s\n]+)/i,
+        /file_url:\s*(https?:\/\/[^\s\n]+)/i,
+        /(https?:\/\/[^\s\/]+\.supabase\.co\/storage\/[^\s\n]+)/i,
+      ];
+      
+      for (const pattern of patterns) {
+        const match = observations.match(pattern);
+        if (match && match[1]) {
+          return match[1].trim();
+        }
+      }
+      
+      return null;
+    };
+
+    const fileUrl = extractFileUrl(quote.observations);
+    console.log("URL do arquivo extraída:", fileUrl);
+
     // Obter empresa_id
     let empresa_id: string;
     try {
@@ -378,6 +402,7 @@ export async function approveQuote(quoteCode: string): Promise<{ ok: boolean; er
         type: "catalogo", // Adicionar campo type obrigatório
         delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 dias
         status: "Aguardando aprovação",
+        file_url: fileUrl || null, // Incluir URL do arquivo se existir
         empresa_id: empresa_id
       })
       .select("id")
@@ -400,7 +425,8 @@ export async function approveQuote(quoteCode: string): Promise<{ ok: boolean; er
             paid: 0,
             type: "catalogo", // Adicionar campo type obrigatório
             delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            status: "Aguardando aprovação"
+            status: "Aguardando aprovação",
+            file_url: fileUrl || null // Incluir URL do arquivo se existir
           })
           .select("id")
           .single();
