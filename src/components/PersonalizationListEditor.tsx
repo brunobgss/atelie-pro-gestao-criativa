@@ -2,8 +2,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Copy, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CLOTHING_SIZES } from "@/constants/sizes";
 
 export type PersonalizationEntry = {
   id: string;
@@ -115,11 +117,21 @@ export function PersonalizationListEditor({
               </div>
               <div className="space-y-1">
                 <Label>Tamanho</Label>
-                <Input
-                  value={entry.size ?? ""}
-                  placeholder="Ex: G"
-                  onChange={(event) => handleEntryChange(entry.id, "size", event.target.value)}
-                />
+                <Select
+                  value={entry.size || undefined}
+                  onValueChange={(value) => handleEntryChange(entry.id, "size", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o tamanho" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CLOTHING_SIZES.map((size) => (
+                      <SelectItem key={size.value} value={size.value}>
+                        {size.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-1">
                 <Label>Quantidade</Label>
@@ -172,4 +184,6 @@ export function PersonalizationListEditor({
     </div>
   );
 }
+
+
 

@@ -6,7 +6,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { ArrowLeft, Save, Share2, Plus, Trash2, MessageCircle, Printer, Package } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { ArrowLeft, Save, Share2, Plus, Trash2, MessageCircle, Printer, Package, Upload, CheckCircle, XCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -22,6 +23,9 @@ import { logger } from "@/utils/logger";
 import { performanceMonitor } from "@/utils/performanceMonitor";
 import { ClientSearch } from "@/components/ClientSearch";
 import { PersonalizationListEditor, PersonalizationEntry } from "@/components/PersonalizationListEditor";
+import { supabase } from "@/integrations/supabase/client";
+import { uploadOrderFile } from "@/integrations/supabase/storage";
+import { CLOTHING_SIZES } from "@/constants/sizes";
 
 export default function NovoOrcamento() {
   const navigate = useNavigate();
@@ -38,6 +42,27 @@ export default function NovoOrcamento() {
   const [whatsappModalOpen, setWhatsappModalOpen] = useState(false);
   const [customMessage, setCustomMessage] = useState("");
   const [personalizations, setPersonalizations] = useState<PersonalizationEntry[]>([]);
+  
+  // Novos estados para campos do pedido
+  const [type, setType] = useState<string>("");
+  const [selectedMedida, setSelectedMedida] = useState<string>("");
+  const [medidas, setMedidas] = useState<any[]>([]);
+  const [buscandoMedidas, setBuscandoMedidas] = useState<boolean>(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState<boolean>(false);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
+  const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
+  const [isKitMode, setIsKitMode] = useState<boolean>(false);
+  const [kitItems, setKitItems] = useState<Array<{size: string, quantity: number}>>([
+    { size: "P", quantity: 0 },
+    { size: "M", quantity: 0 },
+    { size: "G", quantity: 0 },
+    { size: "GG", quantity: 0 }
+  ]);
+  const [size, setSize] = useState<string>("");
+  const [color, setColor] = useState<string>("");
+  const [quantity, setQuantity] = useState<number>(1);
 
   // Query para buscar produtos do catálogo
   const { data: products = [] } = useQuery({
@@ -45,12 +70,169 @@ export default function NovoOrcamento() {
     queryFn: getProducts,
   });
 
+  // Função para buscar medidas do cliente
+  const buscarMedidasCliente = async (nomeCliente: string) => {
+    if (!nomeCliente || nomeCliente.length < 3) {
+      setMedidas([]);
+      setBuscandoMedidas(false);
+      return;
+    }
+
+    setBuscandoMedidas(true);
+
+    try {
+      const { data: medidasEncontradas, error } = await supabase
+        .from('atelie_medidas')
+        .select('*')
+        .ilike('cliente_nome', `%${nomeCliente}%`)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error("Erro ao buscar medidas:", error);
+        setMedidas([]);
+        return;
+      }
+
+      setMedidas(medidasEncontradas || []);
+    } catch (error) {
+      console.error("Erro ao buscar medidas:", error);
+      setMedidas([]);
+    } finally {
+      setBuscandoMedidas(false);
+    }
+  };
+
+  // Funções do Modo Kit
+  const addKitSize = () => {
+    setKitItems([...kitItems, { size: "", quantity: 0 }]);
+  };
+
+  const removeKitSize = (index: number) => {
+    setKitItems(kitItems.filter((_, i) => i !== index));
+  };
+
+  const updateKitSize = (index: number, size: string) => {
+    const updated = [...kitItems];
+    updated[index].size = size;
+    setKitItems(updated);
+  };
+
+  const updateKitQuantity = (index: number, quantity: number) => {
+    const updated = [...kitItems];
+    updated[index].quantity = quantity;
+    setKitItems(updated);
+  };
+
+  const getTotalKitQuantity = () => {
+    return kitItems.reduce((total, item) => total + item.quantity, 0);
+  };
+
+  // Funções de Upload de Arquivo
+  const handleFileUpload = async (file: File) => {
+    if (!file) return;
+    
+    setIsUploading(true);
+    setUploadProgress(0);
+    setUploadStatus('uploading');
+    setUploadedFileUrl(null);
+    
+    try {
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return prev;
+          }
+          return prev + Math.random() * 10;
+        });
+      }, 200);
+      
+      const code = generateQuoteCode();
+      const upload = await uploadOrderFile(file, code);
+      
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+      
+      if (upload.ok && upload.url) {
+        setUploadStatus('success');
+        setUploadedFileUrl(upload.url);
+        toast.success("Arquivo enviado com sucesso!");
+      } else {
+        setUploadStatus('error');
+        toast.warning(upload.error || "Upload falhou - orçamento será criado sem arquivo");
+      }
+    } catch (error) {
+      setUploadStatus('error');
+      toast.error("Erro no upload do arquivo");
+      console.error("Erro no upload:", error);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      handleFileUpload(file);
+    }
+  };
+
+  const removeFile = () => {
+    setSelectedFile(null);
+    setUploadedFileUrl(null);
+    setUploadStatus('idle');
+    setUploadProgress(0);
+    
+    const fileInput = document.getElementById("file") as HTMLInputElement;
+    if (fileInput) {
+      fileInput.value = "";
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Não permitir envio se estiver fazendo upload
+    if (isUploading) {
+      toast.warning("Aguarde o upload do arquivo terminar");
+      return;
+    }
+    
     const dateInput = (document.getElementById("date") as HTMLInputElement)?.value || new Date().toISOString().split('T')[0];
     const deliveryDateInput = (document.getElementById("deliveryDate") as HTMLInputElement)?.value;
     const observations = (document.getElementById("observations") as HTMLTextAreaElement)?.value || undefined;
     const code = generateQuoteCode();
+    
+    // Montar observações com informações adicionais
+    let observationsText = observations || '';
+    if (type) {
+      observationsText += (observationsText ? '\n' : '') + `Tipo: ${type}`;
+    }
+    if (size) {
+      observationsText += (observationsText ? '\n' : '') + `Tamanho: ${size}`;
+    }
+    if (color) {
+      observationsText += (observationsText ? '\n' : '') + `Cor: ${color}`;
+    }
+    if (quantity > 1) {
+      observationsText += (observationsText ? '\n' : '') + `Quantidade: ${quantity}`;
+    }
+    if (isKitMode && getTotalKitQuantity() > 0) {
+      const kitInfo = kitItems
+        .filter(item => item.quantity > 0)
+        .map(item => `${item.quantity} ${item.size}`)
+        .join(', ');
+      if (kitInfo) {
+        observationsText += (observationsText ? '\n' : '') + `Kit: ${kitInfo}`;
+      }
+    }
+    if (deliveryDateInput) {
+      observationsText += (observationsText ? '\n' : '') + `Data de entrega estimada: ${new Date(deliveryDateInput).toLocaleDateString('pt-BR')}`;
+    }
+    if (uploadedFileUrl) {
+      observationsText += (observationsText ? '\n' : '') + `Arquivo/Arte: ${uploadedFileUrl}`;
+    }
 
     // Validação de campos obrigatórios
     // Validação robusta
@@ -95,7 +277,7 @@ export default function NovoOrcamento() {
           customer_name: clientName,
           customer_phone: clientPhone,
           date: dateInput,
-          observations: (observations || '') + (deliveryDateInput ? `\nData de entrega estimada: ${new Date(deliveryDateInput).toLocaleDateString('pt-BR')}` : ''),
+          observations: observationsText || undefined,
           items,
           personalizations: personalizations
             .filter((p) => p.personName.trim())
@@ -237,7 +419,10 @@ Aguardo seu retorno! 😊`;
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <ClientSearch
                   value={clientName}
-                  onChange={setClientName}
+                  onChange={(value) => {
+                    setClientName(value);
+                    buscarMedidasCliente(value);
+                  }}
                   onPhoneChange={setClientPhone}
                   placeholder="Nome do cliente"
                   required
@@ -274,6 +459,277 @@ Aguardo seu retorno! 😊`;
                     className="border-input"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="type">Tipo de Pedido</Label>
+                <Select value={type} onValueChange={(value) => {
+                  setType(value);
+                  if (value !== "catalogo") {
+                    setSelectedProduct("");
+                  }
+                }}>
+                  <SelectTrigger className="border-input">
+                    <SelectValue placeholder="Selecione o tipo (opcional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="bordado">Bordado Computadorizado</SelectItem>
+                    <SelectItem value="camiseta">Camiseta Personalizada</SelectItem>
+                    <SelectItem value="uniforme">Uniforme</SelectItem>
+                    <SelectItem value="personalizado">Personalizado</SelectItem>
+                    <SelectItem value="catalogo">Item do Catálogo</SelectItem>
+                    <SelectItem value="outro">Outro</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Seletor de Medidas */}
+              <div className="space-y-2">
+                <Label htmlFor="medidas">Medidas do Cliente</Label>
+                {buscandoMedidas ? (
+                  <div className="flex items-center gap-2 p-3 bg-blue-50 rounded border border-blue-200">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                    <span className="text-sm text-blue-600">Buscando medidas...</span>
+                  </div>
+                ) : medidas.length > 0 ? (
+                  <Select value={selectedMedida} onValueChange={setSelectedMedida}>
+                    <SelectTrigger className="border-input">
+                      <SelectValue placeholder="Selecione as medidas do cliente (opcional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {medidas.map((medida) => (
+                        <SelectItem key={medida.id} value={medida.id}>
+                          {medida.tipo_peca.toUpperCase()} - {medida.cliente_nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="text-sm text-gray-500 p-3 bg-gray-50 rounded border border-gray-200">
+                    Nenhuma medida encontrada para este cliente. 
+                    <br />
+                    <span className="text-xs">Cadastre medidas na página "Medidas" primeiro.</span>
+                  </div>
+                )}
+                {selectedMedida && medidas.length > 0 && (
+                  <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded border border-blue-200">
+                    {(() => {
+                      const medida = medidas.find(m => m.id === selectedMedida);
+                      return medida ? (
+                        <div>
+                          <p className="font-medium text-blue-800 mb-2">Medidas Selecionadas:</p>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            {medida.busto && <span><strong>Busto:</strong> {medida.busto}cm</span>}
+                            {medida.cintura && <span><strong>Cintura:</strong> {medida.cintura}cm</span>}
+                            {medida.quadril && <span><strong>Quadril:</strong> {medida.quadril}cm</span>}
+                            {medida.ombro && <span><strong>Ombro:</strong> {medida.ombro}cm</span>}
+                            {medida.coxa && <span><strong>Coxa:</strong> {medida.coxa}cm</span>}
+                            {medida.comprimento && <span><strong>Comprimento:</strong> {medida.comprimento}cm</span>}
+                          </div>
+                          {medida.observacoes && (
+                            <p className="mt-2 text-xs"><strong>Observações:</strong> {medida.observacoes}</p>
+                          )}
+                        </div>
+                      ) : null;
+                    })()}
+                  </div>
+                )}
+              </div>
+
+              {/* Upload de Arquivo */}
+              <div className="space-y-2">
+                <Label htmlFor="file">Arquivo / Arte</Label>
+                <label htmlFor="file" className={`block border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
+                  isUploading ? 'border-blue-400 bg-blue-50' : 
+                  uploadStatus === 'success' ? 'border-green-400 bg-green-50' :
+                  uploadStatus === 'error' ? 'border-red-400 bg-red-50' :
+                  'border-input hover:border-secondary'
+                }`}>
+                  {isUploading ? (
+                    <div className="space-y-3">
+                      <div className="w-8 h-8 mx-auto border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                      <p className="text-sm text-blue-600 font-medium">Enviando arquivo...</p>
+                      <div className="w-full max-w-xs mx-auto">
+                        <Progress value={uploadProgress} className="h-2" />
+                        <p className="text-xs text-blue-600 mt-1">{Math.round(uploadProgress)}%</p>
+                      </div>
+                    </div>
+                  ) : uploadStatus === 'success' ? (
+                    <div className="space-y-2">
+                      <CheckCircle className="w-8 h-8 mx-auto text-green-600" />
+                      <p className="text-sm text-green-600 font-medium">Arquivo enviado com sucesso!</p>
+                      <p className="text-xs text-green-600">{selectedFile?.name}</p>
+                    </div>
+                  ) : uploadStatus === 'error' ? (
+                    <div className="space-y-2">
+                      <XCircle className="w-8 h-8 mx-auto text-red-600" />
+                      <p className="text-sm text-red-600 font-medium">Erro no upload</p>
+                      <p className="text-xs text-red-600">Clique para tentar novamente</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">Clique para fazer upload ou arraste o arquivo</p>
+                      <p className="text-xs text-muted-foreground mt-1">PNG, JPG, PDF até 10MB</p>
+                    </div>
+                  )}
+                </label>
+                <Input 
+                  id="file" 
+                  type="file" 
+                  onChange={handleFileChange}
+                  disabled={isUploading}
+                  className="hidden"
+                />
+                
+                {uploadStatus === 'success' && (
+                  <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-green-600" />
+                      <span className="text-sm text-green-700">Arquivo pronto</span>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={removeFile}
+                      className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300"
+                    >
+                      <XCircle className="w-4 h-4 mr-1" />
+                      Remover
+                    </Button>
+                  </div>
+                )}
+                
+                {uploadStatus === 'error' && (
+                  <div className="flex items-center justify-between p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <XCircle className="w-4 h-4 text-red-600" />
+                      <span className="text-sm text-red-700">Erro no upload</span>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => selectedFile && handleFileUpload(selectedFile)}
+                      className="text-blue-600 hover:text-blue-700 border-blue-200 hover:border-blue-300"
+                    >
+                      <Upload className="w-4 h-4 mr-1" />
+                      Tentar Novamente
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Campos de Tamanho, Cor e Quantidade */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="qty">Quantidade</Label>
+                  <Input 
+                    id="qty" 
+                    type="number" 
+                    min="1" 
+                    value={quantity} 
+                    onChange={(e) => setQuantity(Number(e.target.value))} 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="size">Tamanho</Label>
+                  <Select value={size} onValueChange={setSize}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o tamanho" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CLOTHING_SIZES.map((sizeOption) => (
+                        <SelectItem key={sizeOption.value} value={sizeOption.value}>
+                          {sizeOption.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="color">Cor</Label>
+                  <Input 
+                    id="color" 
+                    placeholder="Ex.: Preto, Azul..." 
+                    value={color} 
+                    onChange={(e) => setColor(e.target.value)} 
+                  />
+                </div>
+              </div>
+
+              {/* Controle de Kits e Tamanhos */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <Label className="text-base font-medium">Controle de Kits e Tamanhos</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsKitMode(!isKitMode)}
+                    className="text-xs"
+                  >
+                    {isKitMode ? "Modo Simples" : "Modo Kit"}
+                  </Button>
+                </div>
+
+                {isKitMode && (
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      Ideal para uniformes e lotes com diferentes tamanhos
+                    </p>
+                    <div className="space-y-2">
+                      {kitItems.map((item, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <Input
+                            placeholder="Tamanho (1 ano, 2 anos, P, M, G...)"
+                            value={item.size}
+                            onChange={(e) => updateKitSize(index, e.target.value)}
+                            className="w-24"
+                          />
+                          <Input
+                            type="number"
+                            min="0"
+                            placeholder="Qtd"
+                            value={item.quantity}
+                            onChange={(e) => updateKitQuantity(index, Number(e.target.value))}
+                            className="w-20"
+                          />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeKitSize(index)}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ))}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={addKitSize}
+                        className="w-full"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Adicionar Tamanho
+                      </Button>
+                    </div>
+                    <div className="p-3 bg-muted/50 rounded-lg">
+                      <p className="text-sm font-medium">
+                        Total do Kit: {getTotalKitQuantity()} peças
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {kitItems.filter(item => item.quantity > 0).map(item => 
+                          `${item.quantity} ${item.size}`
+                        ).join(" | ")}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Items */}

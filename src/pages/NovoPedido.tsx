@@ -23,6 +23,7 @@ import { errorHandler } from "@/utils/errorHandler";
 import { logger } from "@/utils/logger";
 import { performanceMonitor } from "@/utils/performanceMonitor";
 import { PersonalizationListEditor, PersonalizationEntry } from "@/components/PersonalizationListEditor";
+import { CLOTHING_SIZES } from "@/constants/sizes";
 
 export default function NovoPedido() {
   const navigate = useNavigate();
@@ -684,15 +685,11 @@ export default function NovoPedido() {
                       <SelectValue placeholder="Selecione o tamanho" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="PP">PP</SelectItem>
-                      <SelectItem value="P">P</SelectItem>
-                      <SelectItem value="M">M</SelectItem>
-                      <SelectItem value="G">G</SelectItem>
-                      <SelectItem value="GG">GG</SelectItem>
-                      <SelectItem value="XG">XG</SelectItem>
-                      <SelectItem value="XXG">XXG</SelectItem>
-                      <SelectItem value="Único">Único</SelectItem>
-                      <SelectItem value="Personalizado">Personalizado</SelectItem>
+                      {CLOTHING_SIZES.map((size) => (
+                        <SelectItem key={size.value} value={size.value}>
+                          {size.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -726,7 +723,7 @@ export default function NovoPedido() {
                       {kitItems.map((item, index) => (
                         <div key={index} className="flex items-center gap-2">
                           <Input
-                            placeholder="Tamanho (P, M, G, GG...)"
+                            placeholder="Tamanho (1 ano, 2 anos, P, M, G...)"
                             value={item.size}
                             onChange={(e) => updateKitSize(index, e.target.value)}
                             className="w-24"
