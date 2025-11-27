@@ -445,11 +445,13 @@ ${empresa?.nome || 'Ateliê'}`;
             >
               <CardHeader>
                 <div className="flex items-start justify-between">
-                  <div className="space-y-1">
-                    <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
+                  <div className="space-y-2 flex-1">
+                    <div className="flex items-center gap-2">
                       <FileText className="w-5 h-5 text-secondary" />
-                      {quote.client}
-                    </CardTitle>
+                      <CardTitle className="text-lg font-semibold text-foreground">
+                        {quote.client || "Cliente não informado"}
+                      </CardTitle>
+                    </div>
                     <p className="text-sm text-muted-foreground font-mono">{quote.id}</p>
                   </div>
                   <Badge variant="outline" className={getStatusColor(quote.status)}>
