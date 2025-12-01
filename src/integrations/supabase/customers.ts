@@ -1,5 +1,6 @@
 import { supabase } from "./client";
 import { getCurrentEmpresaId } from "./auth-utils";
+import { ErrorMessages } from "@/utils/errorMessages";
 
 export type CustomerRow = {
   id: string;
@@ -18,11 +19,15 @@ export async function createCustomer(input: { name: string; phone?: string; emai
       empresa_id = await getCurrentEmpresaId();
       if (!empresa_id) {
         console.error("❌ Erro ao obter empresa do usuário");
-        return { ok: false, error: "Erro ao identificar empresa. Verifique se você está logado e tem uma empresa associada." };
+        return { ok: false, error: ErrorMessages.empresaNotFound() };
       }
     } catch (empresaError: any) {
       console.error("❌ Erro ao obter empresa_id:", empresaError);
-      return { ok: false, error: empresaError?.message || "Erro ao identificar empresa. Verifique se você está logado e tem uma empresa associada." };
+      // Se já tem mensagem formatada, usar ela; senão, usar mensagem padrão
+      const errorMessage = empresaError?.message?.includes('⏱️') 
+        ? empresaError.message 
+        : ErrorMessages.empresaNotFound();
+      return { ok: false, error: errorMessage };
     }
     
     console.log("✅ Empresa encontrada:", empresa_id);
@@ -42,16 +47,20 @@ export async function createCustomer(input: { name: string; phone?: string; emai
       console.error("❌ Erro ao criar cliente:", error);
       // Melhorar mensagem de erro para RLS
       if (error.message?.includes('row-level security') || error.message?.includes('RLS')) {
-        return { ok: false, error: "Erro de permissão. Verifique se você tem acesso à empresa ou entre em contato com o suporte." };
+        return { ok: false, error: ErrorMessages.permissionDenied() };
       }
-      throw new Error(error.message || "Erro ao criar cliente no banco de dados");
+      throw new Error(ErrorMessages.saveError("o cliente"));
     }
     
     console.log("✅ Cliente criado com sucesso:", data.id);
     return { ok: true, id: data?.id, data: data };
   } catch (e: unknown) {
     console.error("❌ Erro na função createCustomer:", e);
-    return { ok: false, error: e?.message ?? "Erro ao criar cliente" };
+    // Se já tem mensagem formatada, usar ela; senão, usar mensagem padrão
+    const errorMessage = (e as any)?.message?.includes('⏱️') 
+      ? (e as any).message 
+      : ErrorMessages.saveError("o cliente");
+    return { ok: false, error: errorMessage };
   }
 }
 

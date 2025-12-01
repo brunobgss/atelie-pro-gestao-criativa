@@ -1,5 +1,6 @@
 import { supabase } from "./client";
 import { checkDatabaseHealth } from "./config";
+import { ErrorMessages } from "@/utils/errorMessages";
 
 // Função para obter o empresa_id do usuário logado
 export async function getCurrentEmpresaId(): Promise<string> {
@@ -10,12 +11,12 @@ export async function getCurrentEmpresaId(): Promise<string> {
     
     if (userError) {
       console.error("Erro ao obter usuário:", userError);
-      throw new Error("Erro ao verificar autenticação. Por favor, faça login novamente.");
+      throw new Error(ErrorMessages.authenticationError());
     }
     
     if (!user) {
       console.log("Usuário não logado - acesso negado");
-      throw new Error("Usuário não autenticado. Por favor, faça login novamente.");
+      throw new Error(ErrorMessages.authenticationError());
     }
 
     console.log("Usuário logado:", user.id);
@@ -31,18 +32,18 @@ export async function getCurrentEmpresaId(): Promise<string> {
       console.error("Erro ao buscar empresa do usuário:", error);
       // Se for erro de RLS, dar mensagem mais clara
       if (error.message?.includes('row-level security') || error.message?.includes('RLS')) {
-        throw new Error("Erro de permissão ao acessar dados da empresa. Entre em contato com o suporte.");
+        throw new Error(ErrorMessages.permissionDenied());
       }
       // Se não encontrou registro, pode ser que o usuário não tenha empresa associada
       if (error.code === 'PGRST116') {
-        throw new Error("Usuário não tem empresa associada. Entre em contato com o suporte para vincular uma empresa.");
+        throw new Error(ErrorMessages.empresaNotAssociated());
       }
-      throw new Error(`Erro ao buscar empresa: ${error.message || 'Erro desconhecido'}`);
+      throw new Error(ErrorMessages.empresaNotFound());
     }
 
     if (!data || !data.empresa_id) {
       console.log("Usuário não tem empresa associada - acesso negado");
-      throw new Error("Usuário não tem empresa associada. Entre em contato com o suporte para vincular uma empresa.");
+      throw new Error(ErrorMessages.empresaNotAssociated());
     }
 
     console.log("Empresa do usuário encontrada:", data.empresa_id);
@@ -50,10 +51,11 @@ export async function getCurrentEmpresaId(): Promise<string> {
   } catch (error: any) {
     console.error("Erro ao obter empresa_id:", error);
     // Re-throw com mensagem melhorada se ainda não tiver
-    if (error.message) {
+    if (error.message && error.message.includes('⏱️')) {
+      // Se já tem mensagem formatada, re-throw
       throw error;
     }
-    throw new Error("Erro ao identificar empresa. Tente fazer logout e login novamente.");
+    throw new Error(ErrorMessages.empresaNotFound());
   }
 }
 

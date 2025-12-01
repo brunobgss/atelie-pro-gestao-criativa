@@ -1,5 +1,6 @@
 import { supabase } from './client';
 import { getCurrentEmpresaId } from './auth-utils';
+import { ErrorMessages } from '@/utils/errorMessages';
 
 export interface ProductRow {
   id: string;
@@ -32,11 +33,15 @@ export async function createProduct(input: {
     try {
       empresaId = await getCurrentEmpresaId();
       if (!empresaId) {
-        return { ok: false, error: "Erro ao identificar empresa. Verifique se você está logado e tem uma empresa associada." };
+        return { ok: false, error: ErrorMessages.empresaNotFound() };
       }
     } catch (empresaError: any) {
       console.error("Erro ao obter empresa_id:", empresaError);
-      return { ok: false, error: empresaError?.message || "Erro ao identificar empresa. Verifique se você está logado e tem uma empresa associada." };
+      // Se já tem mensagem formatada, usar ela; senão, usar mensagem padrão
+      const errorMessage = empresaError?.message?.includes('⏱️') 
+        ? empresaError.message 
+        : ErrorMessages.empresaNotFound();
+      return { ok: false, error: errorMessage };
     }
 
     const { data, error } = await supabase
@@ -59,16 +64,20 @@ export async function createProduct(input: {
       console.error("❌ Erro ao criar produto:", error);
       // Melhorar mensagem de erro para RLS
       if (error.message?.includes('row-level security') || error.message?.includes('RLS')) {
-        return { ok: false, error: "Erro de permissão. Verifique se você tem acesso à empresa ou entre em contato com o suporte." };
+        return { ok: false, error: ErrorMessages.permissionDenied() };
       }
-      return { ok: false, error: error.message || "Erro ao criar produto no banco de dados" };
+      return { ok: false, error: ErrorMessages.saveError("o produto") };
     }
 
     console.log("✅ Produto criado com sucesso:", data);
     return { ok: true, id: data.id, data: data as ProductRow };
   } catch (e: unknown) {
     console.error("❌ Erro na função createProduct:", e);
-    return { ok: false, error: e?.message ?? "Erro ao criar produto" };
+    // Se já tem mensagem formatada, usar ela; senão, usar mensagem padrão
+    const errorMessage = (e as any)?.message?.includes('⏱️') 
+      ? (e as any).message 
+      : ErrorMessages.saveError("o produto");
+    return { ok: false, error: errorMessage };
   }
 }
 

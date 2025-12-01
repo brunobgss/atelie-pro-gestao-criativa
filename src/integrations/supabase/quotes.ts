@@ -1,6 +1,7 @@
 import { supabase } from "./client";
 import { getCurrentEmpresaId } from "./auth-utils";
 import { checkDatabaseHealth } from "./config";
+import { ErrorMessages } from "@/utils/errorMessages";
 
 export type QuoteRow = {
   id: string;
@@ -217,11 +218,15 @@ export async function createQuote(input: {
     try {
       empresa_id = await getCurrentEmpresaId();
       if (!empresa_id) {
-        return { ok: false, error: "Erro ao identificar empresa. Verifique se você está logado e tem uma empresa associada." };
+        return { ok: false, error: ErrorMessages.empresaNotFound() };
       }
     } catch (empresaError: any) {
       console.error("Erro ao obter empresa_id:", empresaError);
-      return { ok: false, error: empresaError?.message || "Erro ao identificar empresa. Verifique se você está logado e tem uma empresa associada." };
+      // Se já tem mensagem formatada, usar ela; senão, usar mensagem padrão
+      const errorMessage = empresaError?.message?.includes('⏱️') 
+        ? empresaError.message 
+        : ErrorMessages.empresaNotFound();
+      return { ok: false, error: errorMessage };
     }
     
     const { data: quote, error } = await supabase
@@ -239,9 +244,13 @@ export async function createQuote(input: {
       .single();
     if (error) {
       console.error("Erro do Supabase ao criar orçamento:", error);
-      throw new Error(error.message || "Erro ao criar orçamento no banco de dados");
+      // Melhorar mensagem de erro para RLS
+      if (error.message?.includes('row-level security') || error.message?.includes('RLS')) {
+        throw new Error(ErrorMessages.permissionDenied());
+      }
+      throw new Error(ErrorMessages.saveError("o orçamento"));
     }
-    if (!quote?.id) throw new Error("Falha ao criar orçamento - ID não retornado");
+    if (!quote?.id) throw new Error(ErrorMessages.saveError("o orçamento"));
 
     if (input.items?.length) {
       const items = input.items.map((it) => ({
@@ -252,7 +261,10 @@ export async function createQuote(input: {
         empresa_id: empresa_id,
       }));
       const { error: itemsError } = await supabase.from("atelie_quote_items").insert(items);
-      if (itemsError) throw itemsError;
+      if (itemsError) {
+        console.error("Erro ao inserir itens do orçamento:", itemsError);
+        throw new Error(ErrorMessages.saveError("os itens do orçamento"));
+      }
     }
 
     if (input.personalizations?.length) {
@@ -271,14 +283,21 @@ export async function createQuote(input: {
         const { error: personalizationError } = await supabase
           .from("atelie_quote_personalizations")
           .insert(personalizations);
-        if (personalizationError) throw personalizationError;
+        if (personalizationError) {
+          console.error("Erro ao inserir personalizações:", personalizationError);
+          throw new Error(ErrorMessages.saveError("as personalizações"));
+        }
       }
     }
 
     return { ok: true, id: code };
   } catch (e: unknown) {
     console.error("Erro ao criar orçamento:", e);
-    return { ok: false, error: e?.message ?? "Erro ao criar orçamento" };
+    // Se já tem mensagem formatada, usar ela; senão, usar mensagem padrão
+    const errorMessage = (e as any)?.message?.includes('⏱️') 
+      ? (e as any).message 
+      : ErrorMessages.saveError("o orçamento");
+    return { ok: false, error: errorMessage };
   }
 }
 
