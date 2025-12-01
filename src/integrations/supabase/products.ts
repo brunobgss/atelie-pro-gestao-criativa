@@ -28,9 +28,15 @@ export async function createProduct(input: {
     console.log("🔍 Criando produto:", input);
     
     // Obter empresa do usuário
-    const empresaId = await getCurrentEmpresaId();
-    if (!empresaId) {
-      return { ok: false, error: "Usuário não tem empresa associada" };
+    let empresaId: string;
+    try {
+      empresaId = await getCurrentEmpresaId();
+      if (!empresaId) {
+        return { ok: false, error: "Erro ao identificar empresa. Verifique se você está logado e tem uma empresa associada." };
+      }
+    } catch (empresaError: any) {
+      console.error("Erro ao obter empresa_id:", empresaError);
+      return { ok: false, error: empresaError?.message || "Erro ao identificar empresa. Verifique se você está logado e tem uma empresa associada." };
     }
 
     const { data, error } = await supabase
@@ -51,7 +57,11 @@ export async function createProduct(input: {
 
     if (error) {
       console.error("❌ Erro ao criar produto:", error);
-      return { ok: false, error: error.message };
+      // Melhorar mensagem de erro para RLS
+      if (error.message?.includes('row-level security') || error.message?.includes('RLS')) {
+        return { ok: false, error: "Erro de permissão. Verifique se você tem acesso à empresa ou entre em contato com o suporte." };
+      }
+      return { ok: false, error: error.message || "Erro ao criar produto no banco de dados" };
     }
 
     console.log("✅ Produto criado com sucesso:", data);
@@ -168,8 +178,8 @@ export async function getProductById(id: string): Promise<ProductRow | null> {
     console.log("🔍 Buscando produto por ID:", id);
     
     // Obter empresa do usuário
-    const userEmpresa = await getCurrentUserEmpresa();
-    if (!userEmpresa) {
+    const empresaId = await getCurrentEmpresaId();
+    if (!empresaId) {
       console.error("❌ Usuário não tem empresa associada");
       return null;
     }

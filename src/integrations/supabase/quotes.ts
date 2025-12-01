@@ -213,7 +213,16 @@ export async function createQuote(input: {
     const code = input.code ?? generateQuoteCode();
     
     // Obter empresa_id do usuário logado
-    const empresa_id = await getCurrentEmpresaId();
+    let empresa_id: string;
+    try {
+      empresa_id = await getCurrentEmpresaId();
+      if (!empresa_id) {
+        return { ok: false, error: "Erro ao identificar empresa. Verifique se você está logado e tem uma empresa associada." };
+      }
+    } catch (empresaError: any) {
+      console.error("Erro ao obter empresa_id:", empresaError);
+      return { ok: false, error: empresaError?.message || "Erro ao identificar empresa. Verifique se você está logado e tem uma empresa associada." };
+    }
     
     const { data: quote, error } = await supabase
       .from("atelie_quotes")
@@ -228,8 +237,11 @@ export async function createQuote(input: {
       })
       .select("id")
       .single();
-    if (error) throw error;
-    if (!quote?.id) throw new Error("Falha ao criar orçamento");
+    if (error) {
+      console.error("Erro do Supabase ao criar orçamento:", error);
+      throw new Error(error.message || "Erro ao criar orçamento no banco de dados");
+    }
+    if (!quote?.id) throw new Error("Falha ao criar orçamento - ID não retornado");
 
     if (input.items?.length) {
       const items = input.items.map((it) => ({

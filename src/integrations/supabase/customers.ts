@@ -13,11 +13,16 @@ export async function createCustomer(input: { name: string; phone?: string; emai
     console.log("➕ Criando cliente no banco:", input);
     
     // Obter empresa_id do usuário logado usando a função existente
-    const empresa_id = await getCurrentEmpresaId();
-    
-    if (!empresa_id) {
-      console.error("❌ Erro ao obter empresa do usuário");
-      return { ok: false, error: "Erro ao identificar empresa do usuário" };
+    let empresa_id: string;
+    try {
+      empresa_id = await getCurrentEmpresaId();
+      if (!empresa_id) {
+        console.error("❌ Erro ao obter empresa do usuário");
+        return { ok: false, error: "Erro ao identificar empresa. Verifique se você está logado e tem uma empresa associada." };
+      }
+    } catch (empresaError: any) {
+      console.error("❌ Erro ao obter empresa_id:", empresaError);
+      return { ok: false, error: empresaError?.message || "Erro ao identificar empresa. Verifique se você está logado e tem uma empresa associada." };
     }
     
     console.log("✅ Empresa encontrada:", empresa_id);
@@ -35,7 +40,11 @@ export async function createCustomer(input: { name: string; phone?: string; emai
     
     if (error) {
       console.error("❌ Erro ao criar cliente:", error);
-      throw error;
+      // Melhorar mensagem de erro para RLS
+      if (error.message?.includes('row-level security') || error.message?.includes('RLS')) {
+        return { ok: false, error: "Erro de permissão. Verifique se você tem acesso à empresa ou entre em contato com o suporte." };
+      }
+      throw new Error(error.message || "Erro ao criar cliente no banco de dados");
     }
     
     console.log("✅ Cliente criado com sucesso:", data.id);
