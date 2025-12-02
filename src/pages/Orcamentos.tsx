@@ -128,6 +128,10 @@ export default function Orcamentos() {
 
   const generateDefaultMessage = async (quote: any) => {
     try {
+      // Buscar template personalizado
+      const { getWhatsAppTemplate, processTemplate, getWhatsAppSettings, addSignature } = await import("@/utils/whatsappTemplates");
+      const customTemplate = empresa?.id ? await getWhatsAppTemplate(empresa.id, 'quote') : null;
+      
       // Buscar dados completos do orçamento
       const quoteData = await getQuoteByCode(quote.id);
       const { items, personalizations } = quoteData;
@@ -160,7 +164,21 @@ export default function Orcamentos() {
         ? `\n*Personalizações:*\n${personalizationLines}\n`
         : "";
 
-      return `*ORÇAMENTO ${empresa?.nome || 'ATELIÊ'}*
+      // Se tem template personalizado, usar ele
+      if (customTemplate) {
+        const message = processTemplate(customTemplate, {
+          cliente: quote.client,
+          produtos: productsList + personalizationSection,
+          valor_total: formatCurrency(Number(quote.total_value || 0))
+        }, empresa);
+        
+        // Adicionar assinatura se configurada
+        const settings = empresa?.id ? await getWhatsAppSettings(empresa.id) : null;
+        return addSignature(message, settings);
+      }
+
+      // Template padrão
+      const defaultMessage = `*ORÇAMENTO ${empresa?.nome || 'ATELIÊ'}*
 
 Olá *${quote.client}*!
 
@@ -182,6 +200,10 @@ Para aprovar ou fazer alterações, responda esta mensagem!
 
 Atenciosamente,
 ${empresa?.nome || 'Ateliê'}`;
+
+      // Adicionar assinatura se configurada
+      const settings = empresa?.id ? await getWhatsAppSettings(empresa.id) : null;
+      return addSignature(defaultMessage, settings);
     } catch (error) {
       console.error("Erro ao gerar mensagem:", error);
       return `Olá ${quote.client}! Seu orçamento está pronto. Total: ${formatCurrency(Number(quote.total_value || 0))}`;

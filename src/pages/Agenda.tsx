@@ -115,8 +115,27 @@ export default function Agenda() {
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
   );
 
-  const sendWhatsAppReminder = (event: DeliveryEvent) => {
-    const message = `Olá ${event.client}!
+  const sendWhatsAppReminder = async (event: DeliveryEvent) => {
+    try {
+      // Buscar template personalizado
+      const { getWhatsAppTemplate, processTemplate, getWhatsAppSettings, addSignature, generateWhatsAppUrl } = await import("@/utils/whatsappTemplates");
+      const customTemplate = empresa?.id ? await getWhatsAppTemplate(empresa.id, 'delivery') : null;
+      
+      let message = '';
+      
+      // Se tem template personalizado, usar ele
+      if (customTemplate) {
+        message = processTemplate(customTemplate, {
+          cliente: event.client,
+          codigo_pedido: event.orderCode,
+          data_entrega: new Date(event.date).toLocaleDateString('pt-BR'),
+          tipo: event.type,
+          status: event.status,
+          dias_restantes: event.daysUntilDelivery > 0 ? event.daysUntilDelivery.toString() : 'Atrasado'
+        }, empresa);
+      } else {
+        // Template padrão
+        message = `Olá ${event.client}!
 
 Lembramos que seu pedido ${event.orderCode} tem entrega prevista para ${new Date(event.date).toLocaleDateString('pt-BR')}.
 
@@ -128,10 +147,20 @@ Lembramos que seu pedido ${event.orderCode} tem entrega prevista para ${new Date
 Em caso de dúvidas, entre em contato conosco!
 
 _${empresa?.nome || 'Ateliê'}_`;
+      }
 
-    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
-    window.open(whatsappUrl, '_blank');
-    toast.success("Mensagem do WhatsApp preparada!");
+      // Adicionar assinatura se configurada
+      const settings = empresa?.id ? await getWhatsAppSettings(empresa.id) : null;
+      message = addSignature(message, settings);
+
+      // Gerar URL do WhatsApp
+      const whatsappUrl = generateWhatsAppUrl(message, settings?.whatsapp_number);
+      window.open(whatsappUrl, '_blank');
+      toast.success("Mensagem do WhatsApp preparada!");
+    } catch (error) {
+      console.error("Erro ao enviar lembrete WhatsApp:", error);
+      toast.error("Erro ao preparar mensagem do WhatsApp");
+    }
   };
 
   // Calendário Visual

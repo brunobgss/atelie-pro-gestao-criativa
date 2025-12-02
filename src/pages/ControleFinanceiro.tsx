@@ -163,8 +163,30 @@ export default function ControleFinanceiro() {
   const totalPending = paymentStatus.reduce((sum, p) => sum + p.remainingAmount, 0);
   const overdueCount = paymentStatus.filter(p => p.isOverdue).length;
 
-  const generateDefaultPaymentMessage = (payment: PaymentStatus) => {
-    return `Olá ${payment.client}!
+  const generateDefaultPaymentMessage = async (payment: PaymentStatus) => {
+    try {
+      // Buscar template personalizado
+      const { getWhatsAppTemplate, processTemplate, getWhatsAppSettings, addSignature } = await import("@/utils/whatsappTemplates");
+      const customTemplate = empresa?.id ? await getWhatsAppTemplate(empresa.id, 'payment') : null;
+      
+      // Se tem template personalizado, usar ele
+      if (customTemplate) {
+        const message = processTemplate(customTemplate, {
+          cliente: payment.client,
+          codigo_pedido: payment.orderCode,
+          valor_total: formatCurrency(payment.totalValue),
+          valor_pago: formatCurrency(payment.paidAmount),
+          valor_restante: formatCurrency(payment.remainingAmount),
+          aviso_atraso: payment.isOverdue ? 'ATENÇÃO: Este pedido está em atraso!' : `Prazo de entrega: ${new Date(payment.deliveryDate).toLocaleDateString('pt-BR')}`
+        }, empresa);
+        
+        // Adicionar assinatura se configurada
+        const settings = empresa?.id ? await getWhatsAppSettings(empresa.id) : null;
+        return addSignature(message, settings);
+      }
+
+      // Template padrão
+      const defaultMessage = `Olá ${payment.client}!
 
 Lembramos sobre o pagamento do pedido ${payment.orderCode}.
 
@@ -178,11 +200,33 @@ ${payment.isOverdue ? 'ATENÇÃO: Este pedido está em atraso!' : 'Prazo de entr
 Por favor, entre em contato para quitar o saldo.
 
 _${empresa?.nome || 'Ateliê'}_`;
+
+      // Adicionar assinatura se configurada
+      const settings = empresa?.id ? await getWhatsAppSettings(empresa.id) : null;
+      return addSignature(defaultMessage, settings);
+    } catch (error) {
+      console.error("Erro ao gerar mensagem de pagamento:", error);
+      // Fallback para template padrão
+      return `Olá ${payment.client}!
+
+Lembramos sobre o pagamento do pedido ${payment.orderCode}.
+
+*VALORES:*
+• Total: ${formatCurrency(payment.totalValue)}
+• Pago: ${formatCurrency(payment.paidAmount)}
+• Restante: ${formatCurrency(payment.remainingAmount)}
+
+${payment.isOverdue ? 'ATENÇÃO: Este pedido está em atraso!' : 'Prazo de entrega: ' + new Date(payment.deliveryDate).toLocaleDateString('pt-BR')}
+
+Por favor, entre em contato para quitar o saldo.
+
+_${empresa?.nome || 'Ateliê'}_`;
+    }
   };
 
-  const openPaymentReminderModal = (payment: PaymentStatus) => {
+  const openPaymentReminderModal = async (payment: PaymentStatus) => {
     setSelectedPayment(payment);
-    const defaultMessage = generateDefaultPaymentMessage(payment);
+    const defaultMessage = await generateDefaultPaymentMessage(payment);
     setCustomMessage(defaultMessage);
     setWhatsappModalOpen(true);
   };
@@ -556,7 +600,12 @@ _${empresa?.nome || 'Ateliê'}_`;
                   Cancelar
                 </Button>
                 <Button
-                  onClick={() => selectedPayment && setCustomMessage(generateDefaultPaymentMessage(selectedPayment))}
+                  onClick={async () => {
+                    if (selectedPayment) {
+                      const defaultMsg = await generateDefaultPaymentMessage(selectedPayment);
+                      setCustomMessage(defaultMsg);
+                    }
+                  }}
                   variant="outline"
                 >
                   Usar Modelo Padrão

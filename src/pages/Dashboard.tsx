@@ -84,24 +84,20 @@ export default function Dashboard() {
 
   // Buscar template WhatsApp personalizado
   const { data: whatsappTemplate } = useQuery({
-    queryKey: ["whatsapp-template", empresa?.id],
+    queryKey: ["whatsapp-templates", empresa?.id, "dashboard_intro"],
     queryFn: async () => {
       if (!empresa?.id) return null;
 
-      const { data, error } = await supabase
-        .from("whatsapp_templates")
-        .select("message_text")
-        .eq("empresa_id", empresa.id)
-        .eq("template_type", "dashboard_intro")
-        .eq("is_active", true)
-        .maybeSingle();
-
-      if (error) {
-        console.error("Erro ao buscar template:", error);
-        return null;
+      const { getWhatsAppTemplate, processTemplate, getWhatsAppSettings, addSignature } = await import("@/utils/whatsappTemplates");
+      const template = await getWhatsAppTemplate(empresa.id, 'dashboard_intro');
+      
+      if (template) {
+        const processed = processTemplate(template, {}, empresa);
+        const settings = await getWhatsAppSettings(empresa.id);
+        return { message_text: addSignature(processed, settings) };
       }
 
-      return data;
+      return null;
     },
     enabled: !!empresa?.id,
     staleTime: 5 * 60 * 1000, // Cache por 5 minutos
@@ -540,7 +536,7 @@ _${empresa?.nome || 'Atelie'}_`;
                 </MobileCard>
                 
                 <MobileCard 
-                  onClick={() => {
+                  onClick={async () => {
                     // Usar template personalizado se existir, senão usar padrão
                     let message = whatsappTemplate?.message_text;
                     
@@ -561,10 +557,11 @@ Sou do ${empresa?.nome || 'Atelie'} e gostaria de saber como posso ajudar você 
 _${empresa?.nome || 'Atelie'} - Qualidade e criatividade em cada peça_`;
                     }
                     
-                    // Substituir variáveis
-                    message = message.replace(/\$\{empresa\?\.nome\}/g, empresa?.nome || 'Atelie');
+                    // Buscar configurações para número do WhatsApp
+                    const { getWhatsAppSettings, generateWhatsAppUrl } = await import("@/utils/whatsappTemplates");
+                    const settings = empresa?.id ? await getWhatsAppSettings(empresa.id) : null;
                     
-                    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+                    const whatsappUrl = generateWhatsAppUrl(message, settings?.whatsapp_number);
                     window.open(whatsappUrl, '_blank');
                   }}
                   interactive
