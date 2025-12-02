@@ -147,6 +147,8 @@ export default function Indicacoes() {
       type: "one_time" | "recurring";
       percentage: number;
       description: string;
+      oneTimePercentage?: number;
+      recurringPercentage?: number;
     };
   }
 
@@ -186,7 +188,9 @@ export default function Indicacoes() {
       commission: {
         type: "one_time",
         percentage: 5,
-        description: "5% comissão na primeira assinatura do indicado",
+        oneTimePercentage: 5,
+        recurringPercentage: 5,
+        description: "5% única (R$ 1,95) + 5% recorrente (R$ 1,95/mês)",
       },
     },
     {
@@ -203,7 +207,9 @@ export default function Indicacoes() {
       commission: {
         type: "one_time",
         percentage: 10,
-        description: "10% comissão na primeira assinatura",
+        oneTimePercentage: 10,
+        recurringPercentage: 10,
+        description: "10% única (R$ 3,90) + 10% recorrente (R$ 3,90/mês)",
       },
     },
     {
@@ -220,7 +226,9 @@ export default function Indicacoes() {
       commission: {
         type: "recurring",
         percentage: 15,
-        description: "15% comissão recorrente mensal",
+        oneTimePercentage: 15,
+        recurringPercentage: 15,
+        description: "15% única (R$ 5,85) + 15% recorrente (R$ 5,85/mês)",
       },
     },
     {
@@ -236,7 +244,9 @@ export default function Indicacoes() {
       commission: {
         type: "recurring",
         percentage: 20,
-        description: "20% comissão recorrente mensal",
+        oneTimePercentage: 20,
+        recurringPercentage: 20,
+        description: "20% única (R$ 7,80) + 20% recorrente (R$ 7,80/mês)",
       },
     },
     {
@@ -253,7 +263,9 @@ export default function Indicacoes() {
       commission: {
         type: "recurring",
         percentage: 25,
-        description: "25% comissão recorrente mensal + Status VIP",
+        oneTimePercentage: 25,
+        recurringPercentage: 25,
+        description: "25% única (R$ 9,75) + 25% recorrente (R$ 9,75/mês) + Status VIP",
       },
     },
   ];

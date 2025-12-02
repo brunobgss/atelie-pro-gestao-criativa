@@ -46,16 +46,19 @@ CREATE INDEX IF NOT EXISTS idx_physical_rewards_status ON public.referral_physic
 CREATE INDEX IF NOT EXISTS idx_physical_rewards_level ON public.referral_physical_rewards(level_reached);
 
 -- Função para calcular e criar comissão quando indicação converte
+-- OPÇÃO C (PROGRESSIVA): Cada indicação mantém a comissão do nível em que converteu
+-- OPÇÃO 2 (HÍBRIDA): Comissão única + recorrente conforme o nível
 CREATE OR REPLACE FUNCTION create_referral_commission()
 RETURNS TRIGGER AS $$
 DECLARE
     v_referrer_id UUID;
     v_referral_id UUID;
     v_level VARCHAR(20);
-    v_commission_percentage DECIMAL(5,2);
-    v_commission_type VARCHAR(20);
+    v_one_time_percentage DECIMAL(5,2);
+    v_recurring_percentage DECIMAL(5,2);
     v_subscription_value DECIMAL(10,2);
-    v_commission_amount DECIMAL(10,2);
+    v_one_time_amount DECIMAL(10,2);
+    v_recurring_amount DECIMAL(10,2);
     v_converted_count INTEGER;
 BEGIN
     -- Só processar se a empresa virou premium (converteu)
@@ -72,46 +75,55 @@ BEGIN
             RETURN NEW;
         END IF;
         
-        -- Contar indicações convertidas do referrer
+        -- Contar indicações convertidas do referrer ATÉ ESTA (progressiva)
+        -- Isso determina o nível em que ESTA indicação converteu
         SELECT COUNT(*) INTO v_converted_count
         FROM public.referrals
         WHERE referrer_empresa_id = v_referrer_id
-        AND status = 'converted';
+        AND status = 'converted'
+        AND converted_at <= (SELECT converted_at FROM public.referrals WHERE id = v_referral_id);
         
-        -- Determinar nível e comissão baseado no número de conversões
+        -- OPÇÃO 2 (HÍBRIDA): Determinar comissão única + recorrente baseado no nível
+        -- Bronze (1-2): Sem comissão, só 1 mês grátis
+        -- Prata (3-4): 5% única + 5% recorrente
+        -- Ouro (5-9): 10% única + 10% recorrente
+        -- Platina (10-19): 15% única + 15% recorrente
+        -- Diamante (20-49): 20% única + 20% recorrente
+        -- Lendário (50+): 25% única + 25% recorrente
+        
         IF v_converted_count >= 50 THEN
             v_level := 'lendario';
-            v_commission_percentage := 25.00;
-            v_commission_type := 'recurring';
+            v_one_time_percentage := 25.00;
+            v_recurring_percentage := 25.00;
         ELSIF v_converted_count >= 20 THEN
             v_level := 'diamante';
-            v_commission_percentage := 20.00;
-            v_commission_type := 'recurring';
+            v_one_time_percentage := 20.00;
+            v_recurring_percentage := 20.00;
         ELSIF v_converted_count >= 10 THEN
             v_level := 'platina';
-            v_commission_percentage := 15.00;
-            v_commission_type := 'recurring';
+            v_one_time_percentage := 15.00;
+            v_recurring_percentage := 15.00;
         ELSIF v_converted_count >= 5 THEN
             v_level := 'ouro';
-            v_commission_percentage := 10.00;
-            v_commission_type := 'one_time';
+            v_one_time_percentage := 10.00;
+            v_recurring_percentage := 10.00;
         ELSIF v_converted_count >= 3 THEN
             v_level := 'prata';
-            v_commission_percentage := 5.00;
-            v_commission_type := 'one_time';
+            v_one_time_percentage := 5.00;
+            v_recurring_percentage := 5.00;
         ELSE
-            -- Bronze não tem comissão
+            -- Bronze (1-2): Sem comissão, só 1 mês grátis
             RETURN NEW;
         END IF;
         
         -- Buscar valor da assinatura (assumindo plano básico de R$ 39.00)
-        -- Você pode ajustar isso para buscar o valor real da assinatura
         v_subscription_value := 39.00;
         
-        -- Calcular comissão
-        v_commission_amount := (v_subscription_value * v_commission_percentage) / 100.00;
+        -- Calcular comissões
+        v_one_time_amount := (v_subscription_value * v_one_time_percentage) / 100.00;
+        v_recurring_amount := (v_subscription_value * v_recurring_percentage) / 100.00;
         
-        -- Criar registro de comissão
+        -- Criar comissão única
         INSERT INTO public.referral_commissions (
             referral_id,
             referrer_empresa_id,
@@ -127,16 +139,42 @@ BEGIN
             v_referral_id,
             v_referrer_id,
             NEW.id,
-            v_commission_type,
-            v_commission_percentage,
-            v_commission_amount,
+            'one_time',
+            v_one_time_percentage,
+            v_one_time_amount,
             v_subscription_value,
             'pending',
-            CASE WHEN v_commission_type = 'recurring' THEN NOW() ELSE NULL END,
-            CASE WHEN v_commission_type = 'recurring' THEN NOW() + INTERVAL '1 month' ELSE NULL END
+            NULL,
+            NULL
         );
         
-        RAISE NOTICE 'Comissão criada: % (R$ %) para empresa %', v_commission_type, v_commission_amount, v_referrer_id;
+        -- Criar comissão recorrente
+        INSERT INTO public.referral_commissions (
+            referral_id,
+            referrer_empresa_id,
+            referred_empresa_id,
+            commission_type,
+            percentage,
+            amount,
+            subscription_value,
+            status,
+            period_start,
+            period_end
+        ) VALUES (
+            v_referral_id,
+            v_referrer_id,
+            NEW.id,
+            'recurring',
+            v_recurring_percentage,
+            v_recurring_amount,
+            v_subscription_value,
+            'pending',
+            NOW(),
+            NOW() + INTERVAL '1 month'
+        );
+        
+        RAISE NOTICE 'Comissões criadas (nível %): Única R$ % + Recorrente R$ %/mês para empresa %', 
+            v_level, v_one_time_amount, v_recurring_amount, v_referrer_id;
     END IF;
     
     RETURN NEW;
@@ -242,6 +280,7 @@ ALTER TABLE public.referral_commissions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.referral_physical_rewards ENABLE ROW LEVEL SECURITY;
 
 -- Políticas para comissões
+DROP POLICY IF EXISTS "Users can view their own commissions" ON public.referral_commissions;
 CREATE POLICY "Users can view their own commissions"
     ON public.referral_commissions
     FOR SELECT
@@ -253,6 +292,7 @@ CREATE POLICY "Users can view their own commissions"
     );
 
 -- Políticas para presentes físicos
+DROP POLICY IF EXISTS "Users can view their own physical rewards" ON public.referral_physical_rewards;
 CREATE POLICY "Users can view their own physical rewards"
     ON public.referral_physical_rewards
     FOR SELECT
@@ -263,6 +303,7 @@ CREATE POLICY "Users can view their own physical rewards"
         )
     );
 
+DROP POLICY IF EXISTS "Users can update their own physical rewards" ON public.referral_physical_rewards;
 CREATE POLICY "Users can update their own physical rewards"
     ON public.referral_physical_rewards
     FOR UPDATE

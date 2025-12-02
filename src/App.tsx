@@ -55,6 +55,8 @@ import MovimentacoesEstoque from "./pages/MovimentacoesEstoque";
 import FluxoCaixa from "./pages/FluxoCaixa";
 import Indicacoes from "./pages/Indicacoes";
 import Recompensas from "./pages/Recompensas";
+import ConfiguracaoWhatsApp from "./pages/ConfiguracaoWhatsApp";
+import AdminComissoes from "./pages/AdminComissoes";
 
 // QueryClient fora do componente para evitar re-criação
 // Cache buster: 2024-12-19 - Corrigindo Dashboard not defined
@@ -113,7 +115,9 @@ function App() {
                     <Route path="assinatura" element={<Assinatura />} />
                     <Route path="indicacoes" element={<Indicacoes />} />
                     <Route path="recompensas" element={<Recompensas />} />
+                    <Route path="configuracao-whatsapp" element={<ConfiguracaoWhatsApp />} />
                     <Route path="minha-conta" element={<MinhaConta />} />
+                    <Route path="admin/comissoes" element={<AdminComissoes />} />
                     <Route path="agenda" element={<Agenda />} />
                     <Route path="medidas" element={<MedidasClientes />} />
                     <Route path="ajuda" element={<Ajuda />} />

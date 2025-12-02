@@ -120,14 +120,25 @@ export default function Recompensas() {
   });
 
   // Calcular estatísticas
-  const totalCommissions = commissions
-    .filter(c => c.status === 'paid')
+  // Comissões únicas pagas
+  const totalOneTimeCommissions = commissions
+    .filter(c => c.status === 'paid' && c.commission_type === 'one_time')
     .reduce((sum, c) => sum + parseFloat(c.amount.toString()), 0);
 
+  // Comissões recorrentes mensais (soma de todas as ativas)
+  const totalRecurringMonthly = commissions
+    .filter(c => c.commission_type === 'recurring' && c.status === 'paid')
+    .reduce((sum, c) => sum + parseFloat(c.amount.toString()), 0);
+
+  // Total geral (únicas + recorrentes mensais)
+  const totalCommissions = totalOneTimeCommissions + totalRecurringMonthly;
+
+  // Pendentes
   const pendingCommissions = commissions
     .filter(c => c.status === 'pending')
     .reduce((sum, c) => sum + parseFloat(c.amount.toString()), 0);
 
+  // Número de comissões recorrentes ativas
   const recurringCommissions = commissions.filter(c => 
     c.commission_type === 'recurring' && c.status === 'paid'
   ).length;
@@ -177,7 +188,7 @@ export default function Recompensas() {
 
       <div className="p-6 md:p-10 space-y-6">
         {/* Resumo Geral */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <Card className="bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200 shadow-md">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
@@ -196,9 +207,9 @@ export default function Recompensas() {
                 <DollarSign className="h-8 w-8 text-green-600" />
                 <div>
                   <div className="text-2xl font-bold text-green-600">
-                    R$ {totalCommissions.toFixed(2)}
+                    R$ {totalOneTimeCommissions.toFixed(2)}
                   </div>
-                  <div className="text-xs text-gray-600">Comissões Pagas</div>
+                  <div className="text-xs text-gray-600">Comissões Únicas</div>
                 </div>
               </div>
             </CardContent>
@@ -218,13 +229,35 @@ export default function Recompensas() {
             </CardContent>
           </Card>
 
+          <Card className="bg-gradient-to-br from-purple-50 to-pink-50 border-purple-200 shadow-md">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <DollarSign className="h-8 w-8 text-purple-600" />
+                <div>
+                  <div className="text-2xl font-bold text-purple-600">
+                    R$ {(totalOneTimeCommissions + totalRecurringMonthly).toFixed(2)}
+                  </div>
+                  <div className="text-xs text-gray-600">Total Ganho</div>
+                  <div className="text-[10px] text-gray-500 mt-0.5">
+                    {totalOneTimeCommissions.toFixed(2)} únicas + {totalRecurringMonthly.toFixed(2)}/mês
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 border-blue-200 shadow-md">
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <TrendingUp className="h-8 w-8 text-blue-600" />
                 <div>
-                  <div className="text-2xl font-bold text-blue-600">{recurringCommissions}</div>
-                  <div className="text-xs text-gray-600">Recorrentes Ativas</div>
+                  <div className="text-2xl font-bold text-blue-600">
+                    R$ {totalRecurringMonthly.toFixed(2)}
+                  </div>
+                  <div className="text-xs text-gray-600">Recorrente/Mês</div>
+                  <div className="text-[10px] text-gray-500 mt-0.5">
+                    {recurringCommissions} indicações ativas
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -284,7 +317,12 @@ export default function Recompensas() {
                               <div className="space-y-1 text-sm text-gray-600">
                                 <div className="flex items-center gap-2">
                                   <Trophy className="h-3 w-3" />
-                                  {commission.percentage}% de comissão {commission.commission_type === 'recurring' ? 'recorrente' : 'única'}
+                                  {commission.percentage}% de comissão {commission.commission_type === 'recurring' ? 'recorrente mensal' : 'única (paga uma vez)'}
+                                  {commission.commission_type === 'recurring' && (
+                                    <Badge variant="outline" className="ml-2 text-xs bg-blue-50 text-blue-700 border-blue-300">
+                                      R$ {parseFloat(commission.amount.toString()).toFixed(2)}/mês
+                                    </Badge>
+                                  )}
                                 </div>
                                 {commission.commission_type === 'recurring' && commission.period_start && (
                                   <div className="flex items-center gap-2">

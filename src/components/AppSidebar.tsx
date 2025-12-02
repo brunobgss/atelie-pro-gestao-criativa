@@ -1,5 +1,5 @@
 import type { MouseEvent } from "react";
-import { LayoutDashboard, Package, Calendar, FileText, Users, Archive, LogOut, Calculator, BookOpen, BarChart3, Crown, DollarSign, User, Ruler, HelpCircle, Receipt, Building2, CreditCard, TrendingUp, ShoppingCart, AlertTriangle, Gift, Trophy } from "lucide-react";
+import { LayoutDashboard, Package, Calendar, FileText, Users, Archive, LogOut, Calculator, BookOpen, BarChart3, Crown, DollarSign, User, Ruler, HelpCircle, Receipt, Building2, CreditCard, TrendingUp, ShoppingCart, AlertTriangle, Gift, Trophy, MessageCircle } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import logoAteliePro from "@/assets/logo-atelie-pro.png";
 import {
@@ -40,8 +40,10 @@ const menuItems = [
   { title: "Contas a Receber", url: "/contas-receber", icon: TrendingUp },
   { title: "Fluxo de Caixa", url: "/fluxo-caixa", icon: DollarSign },
   { title: "Ajuda", url: "/ajuda", icon: HelpCircle },
+  { title: "Config. WhatsApp", url: "/configuracao-whatsapp", icon: MessageCircle },
   { title: "Minha Conta", url: "/minha-conta", icon: User },
   { title: "Monitoramento de Erros", url: "/admin/erros", icon: AlertTriangle, isAdmin: true },
+  { title: "Gerenciar Comissões", url: "/admin/comissoes", icon: DollarSign, isAdmin: true },
 ];
 
 export function AppSidebar() {

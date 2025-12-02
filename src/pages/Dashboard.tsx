@@ -26,6 +26,7 @@ import { InAppMessages } from "@/components/InAppMessages";
 import { ReferralProgram } from "@/components/ReferralProgram";
 import { ChatWidget } from "@/components/ChatWidget";
 import { DashboardControls, useDashboardControls } from "@/components/DashboardControls";
+import { supabase } from "@/integrations/supabase/client";
 import React from "react";
 
 export default function Dashboard() {
@@ -79,6 +80,31 @@ export default function Dashboard() {
     gcTime: 5 * 60 * 1000, // Manter cache por 5 minutos
     // Carregar apenas se orders já carregou
     enabled: !ordersLoading,
+  });
+
+  // Buscar template WhatsApp personalizado
+  const { data: whatsappTemplate } = useQuery({
+    queryKey: ["whatsapp-template", empresa?.id],
+    queryFn: async () => {
+      if (!empresa?.id) return null;
+
+      const { data, error } = await supabase
+        .from("whatsapp_templates")
+        .select("message_text")
+        .eq("empresa_id", empresa.id)
+        .eq("template_type", "dashboard_intro")
+        .eq("is_active", true)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Erro ao buscar template:", error);
+        return null;
+      }
+
+      return data;
+    },
+    enabled: !!empresa?.id,
+    staleTime: 5 * 60 * 1000, // Cache por 5 minutos
   });
 
   // Mostrar loading apenas se orders ainda estiver carregando (conteúdo crítico)
@@ -515,19 +541,29 @@ _${empresa?.nome || 'Atelie'}_`;
                 
                 <MobileCard 
                   onClick={() => {
-                    const message = `Olá!
+                    // Usar template personalizado se existir, senão usar padrão
+                    let message = whatsappTemplate?.message_text;
+                    
+                    if (!message) {
+                      // Template padrão
+                      message = `Olá!
 
-Sou do ${empresa?.nome || 'Atelie'} e gostaria de saber como posso ajudar voce hoje!
+Sou do ${empresa?.nome || 'Atelie'} e gostaria de saber como posso ajudar você hoje!
 
-*NOSSOS SERVICOS:*
+*NOSSOS SERVIÇOS:*
 • Bordados computadorizados
 • Uniformes personalizados  
 • Camisetas estampadas
 • Produtos personalizados
 
-*Entre em contato conosco para um orcamento personalizado!*
+*Entre em contato conosco para um orçamento personalizado!*
 
-_${empresa?.nome || 'Atelie'} - Qualidade e criatividade em cada peca_`;
+_${empresa?.nome || 'Atelie'} - Qualidade e criatividade em cada peça_`;
+                    }
+                    
+                    // Substituir variáveis
+                    message = message.replace(/\$\{empresa\?\.nome\}/g, empresa?.nome || 'Atelie');
+                    
                     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
                     window.open(whatsappUrl, '_blank');
                   }}
