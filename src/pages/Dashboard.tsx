@@ -360,10 +360,12 @@ _${empresa?.nome || 'Atelie'}_`;
         </div>
 
       <div className="p-6 md:p-10 space-y-8 md:space-y-10">
-        {/* Banner de Trial - Sticky no topo (abaixo do header) */}
-        <div className="sticky top-[73px] md:top-[89px] z-20 -mx-6 md:-mx-10 px-6 md:px-10 pt-0 pb-4 bg-gradient-to-br from-purple-50 via-pink-50 to-slate-50">
-          <TrialBannerSmall />
-        </div>
+        {/* Banner de Trial - Sticky no topo (abaixo do header) - Só aparece se não for premium */}
+        {empresa?.is_premium !== true && (
+          <div className="sticky top-[73px] md:top-[89px] z-20 -mx-6 md:-mx-10 px-6 md:px-10 pt-0 pb-4 bg-gradient-to-br from-purple-50 via-pink-50 to-slate-50">
+            <TrialBannerSmall />
+          </div>
+        )}
 
         {/* Controles do Dashboard */}
         <DashboardControls 
