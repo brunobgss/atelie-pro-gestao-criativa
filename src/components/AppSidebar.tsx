@@ -1,5 +1,5 @@
 import type { MouseEvent } from "react";
-import { LayoutDashboard, Package, Calendar, FileText, Users, Archive, LogOut, Calculator, BookOpen, BarChart3, Crown, DollarSign, User, Ruler, HelpCircle, Receipt, Building2, CreditCard, TrendingUp, ShoppingCart, AlertTriangle } from "lucide-react";
+import { LayoutDashboard, Package, Calendar, FileText, Users, Archive, LogOut, Calculator, BookOpen, BarChart3, Crown, DollarSign, User, Ruler, HelpCircle, Receipt, Building2, CreditCard, TrendingUp, ShoppingCart, AlertTriangle, Gift, Trophy } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import logoAteliePro from "@/assets/logo-atelie-pro.png";
 import {
@@ -27,6 +27,8 @@ const menuItems = [
   { title: "Relatórios", url: "/relatorios", icon: BarChart3 },
   { title: "Financeiro", url: "/financeiro", icon: DollarSign },
   { title: "Assinatura", url: "/assinatura", icon: Crown },
+  { title: "Indicações", url: "/indicacoes", icon: Gift },
+  { title: "Recompensas", url: "/recompensas", icon: Trophy },
   { title: "Notas Fiscais", url: "/notas-fiscais", icon: Receipt, requiresNF: true },
   { title: "Config. Notas Fiscais", url: "/configuracao-focusnf", icon: Receipt, requiresNF: true },
   { title: "Clientes", url: "/clientes", icon: Users },

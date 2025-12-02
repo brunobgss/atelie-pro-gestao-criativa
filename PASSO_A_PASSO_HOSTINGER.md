@@ -169,3 +169,14 @@ Agora é só usar normalmente! 🚀
 Veja arquivo completo: `CONFIGURAR_HOSTINGER_SMTP.md`
 
 
+
+
+
+
+
+
+
+
+
+
+

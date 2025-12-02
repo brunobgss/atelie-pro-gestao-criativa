@@ -120,6 +120,112 @@ CREATE TABLE IF NOT EXISTS atelie_receitas (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS inventory_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    empresa_id UUID NOT NULL REFERENCES empresas(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    quantity NUMERIC(12,2) NOT NULL DEFAULT 0,
+    unit TEXT NOT NULL DEFAULT 'unidades',
+    min_quantity NUMERIC(12,2) NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'ok',
+    item_type TEXT NOT NULL DEFAULT 'produto_acabado' CHECK (item_type IN ('materia_prima','tecido','produto_acabado')),
+    category TEXT,
+    supplier TEXT,
+    cost_per_unit NUMERIC(12,2),
+    total_cost NUMERIC(12,2),
+    metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_inventory_items_empresa ON inventory_items(empresa_id);
+CREATE INDEX IF NOT EXISTS idx_inventory_items_tipo ON inventory_items(item_type);
+
+CREATE TABLE IF NOT EXISTS movimentacoes_estoque (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    empresa_id UUID NOT NULL REFERENCES empresas(id) ON DELETE CASCADE,
+    inventory_item_id UUID REFERENCES inventory_items(id) ON DELETE SET NULL,
+    produto_id UUID REFERENCES atelie_products(id) ON DELETE SET NULL,
+    variacao_id UUID REFERENCES produto_variacoes(id) ON DELETE SET NULL,
+    tipo_movimentacao VARCHAR(50) NOT NULL CHECK (tipo_movimentacao IN ('entrada','saida','ajuste','transferencia','perda','devolucao')),
+    ajuste_sign VARCHAR(20) NOT NULL DEFAULT 'incremento' CHECK (ajuste_sign IN ('incremento','decremento')),
+    quantidade NUMERIC(12,2) NOT NULL,
+    quantidade_anterior NUMERIC(12,2),
+    quantidade_atual NUMERIC(12,2),
+    motivo TEXT,
+    origem VARCHAR(100),
+    origem_id UUID,
+    lote VARCHAR(100),
+    data_validade DATE,
+    valor_unitario NUMERIC(12,2),
+    usuario_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_movimentacoes_empresa ON movimentacoes_estoque(empresa_id);
+CREATE INDEX IF NOT EXISTS idx_movimentacoes_item ON movimentacoes_estoque(inventory_item_id);
+CREATE INDEX IF NOT EXISTS idx_movimentacoes_tipo ON movimentacoes_estoque(tipo_movimentacao);
+CREATE INDEX IF NOT EXISTS idx_movimentacoes_data ON movimentacoes_estoque(created_at);
+
+CREATE OR REPLACE FUNCTION apply_inventory_movement()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  delta NUMERIC(12,2) := 0;
+  current_quantity NUMERIC(12,2) := 0;
+  new_quantity NUMERIC(12,2) := 0;
+BEGIN
+  IF NEW.inventory_item_id IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT quantity
+    INTO current_quantity
+    FROM inventory_items
+   WHERE id = NEW.inventory_item_id
+   FOR UPDATE;
+
+  IF NEW.tipo_movimentacao IN ('entrada','devolucao','transferencia') THEN
+    delta := NEW.quantidade;
+  ELSIF NEW.tipo_movimentacao IN ('saida','perda') THEN
+    delta := -NEW.quantidade;
+  ELSIF NEW.tipo_movimentacao = 'ajuste' THEN
+    IF NEW.ajuste_sign = 'decremento' THEN
+      delta := -NEW.quantidade;
+    ELSE
+      delta := NEW.quantidade;
+    END IF;
+  END IF;
+
+  new_quantity := GREATEST(0, COALESCE(current_quantity, 0) + delta);
+
+  UPDATE inventory_items
+  SET quantity = new_quantity,
+      total_cost = CASE
+        WHEN cost_per_unit IS NOT NULL THEN new_quantity * cost_per_unit
+        ELSE total_cost
+      END,
+      status = CASE
+        WHEN new_quantity <= 0 THEN 'critical'
+        WHEN new_quantity < min_quantity THEN 'low'
+        ELSE 'ok'
+      END,
+      updated_at = NOW()
+  WHERE id = NEW.inventory_item_id;
+
+  NEW.quantidade_anterior := current_quantity;
+  NEW.quantidade_atual := new_quantity;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_apply_inventory_movement ON movimentacoes_estoque;
+CREATE TRIGGER trg_apply_inventory_movement
+BEFORE INSERT ON movimentacoes_estoque
+FOR EACH ROW EXECUTE FUNCTION apply_inventory_movement();
+
 -- Índices para performance
 CREATE INDEX IF NOT EXISTS idx_atelie_quotes_empresa_id ON atelie_quotes(empresa_id);
 CREATE INDEX IF NOT EXISTS idx_atelie_quotes_code ON atelie_quotes(code);
@@ -151,6 +257,8 @@ ALTER TABLE atelie_order_personalizations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE order_status_configs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE atelie_customers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE atelie_receitas ENABLE ROW LEVEL SECURITY;
+ALTER TABLE inventory_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE movimentacoes_estoque ENABLE ROW LEVEL SECURITY;
 
 -- Políticas RLS básicas
 CREATE POLICY "Users can view quotes from their empresa" ON atelie_quotes
@@ -263,6 +371,34 @@ CREATE POLICY "Users can insert receitas for their empresa" ON atelie_receitas
 
 CREATE POLICY "Users can update receitas from their empresa" ON atelie_receitas
     FOR UPDATE USING (empresa_id IN (
+        SELECT empresa_id FROM user_empresas WHERE user_id = auth.uid()
+    ));
+
+CREATE POLICY "Users can view inventory from their empresa" ON inventory_items
+    FOR SELECT USING (empresa_id IN (
+        SELECT empresa_id FROM user_empresas WHERE user_id = auth.uid()
+    ));
+
+CREATE POLICY "Users can insert inventory for their empresa" ON inventory_items
+    FOR INSERT WITH CHECK (empresa_id IN (
+        SELECT empresa_id FROM user_empresas WHERE user_id = auth.uid()
+    ));
+
+CREATE POLICY "Users can update inventory from their empresa" ON inventory_items
+    FOR UPDATE USING (empresa_id IN (
+        SELECT empresa_id FROM user_empresas WHERE user_id = auth.uid()
+    ))
+    WITH CHECK (empresa_id IN (
+        SELECT empresa_id FROM user_empresas WHERE user_id = auth.uid()
+    ));
+
+CREATE POLICY "Users can view movimentacoes from their empresa" ON movimentacoes_estoque
+    FOR SELECT USING (empresa_id IN (
+        SELECT empresa_id FROM user_empresas WHERE user_id = auth.uid()
+    ));
+
+CREATE POLICY "Users can insert movimentacoes for their empresa" ON movimentacoes_estoque
+    FOR INSERT WITH CHECK (empresa_id IN (
         SELECT empresa_id FROM user_empresas WHERE user_id = auth.uid()
     ));
 

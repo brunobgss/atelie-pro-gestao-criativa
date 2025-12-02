@@ -292,3 +292,11 @@ WHERE NOT (
     OR (e.nome IS NOT NULL AND (LOWER(e.nome) LIKE '%bruno%' OR LOWER(e.nome) LIKE '%teste%' OR LOWER(e.nome) LIKE '%test%'))
 );
 
+
+
+
+
+
+
+
+

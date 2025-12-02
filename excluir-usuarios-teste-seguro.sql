@@ -156,3 +156,11 @@ FROM auth.users u
 LEFT JOIN public.user_empresas ue ON u.id = ue.user_id
 LEFT JOIN public.empresas e ON ue.empresa_id = e.id;
 
+
+
+
+
+
+
+
+

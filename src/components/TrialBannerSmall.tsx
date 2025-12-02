@@ -73,31 +73,31 @@ export function TrialBannerSmall({ onClose }: TrialBannerProps) {
 
   return (
     <Card className="bg-gradient-to-r from-purple-600 via-purple-500 to-pink-500 text-white border-0 shadow-lg">
-      <CardContent className="p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Crown className="w-4 h-4" />
-              <span className="font-semibold text-sm">Teste Grátis</span>
+      <CardContent className="p-3 md:p-4">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
+            <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
+              <Crown className="w-3 h-3 md:w-4 md:h-4" />
+              <span className="font-semibold text-xs md:text-sm whitespace-nowrap">Teste Grátis</span>
             </div>
             
             {!isExpired ? (
-              <div className="flex items-center gap-2">
-                <Clock className="w-3 h-3" />
-                <span className="text-xs">Restam:</span>
-                <div className="flex items-center gap-1 text-xs font-mono">
+              <div className="flex items-center gap-1 md:gap-2 min-w-0">
+                <Clock className="w-3 h-3 flex-shrink-0" />
+                <span className="text-xs whitespace-nowrap hidden sm:inline">Restam:</span>
+                <div className="flex items-center gap-0.5 md:gap-1 text-xs font-mono">
                   {timeLeft.days > 0 && (
-                    <Badge variant="secondary" className="bg-white/20 text-white border-white/30 text-xs px-1 py-0">
+                    <Badge variant="secondary" className="bg-white/20 text-white border-white/30 text-[10px] md:text-xs px-0.5 md:px-1 py-0 flex-shrink-0">
                       {timeLeft.days}d
                     </Badge>
                   )}
-                  <Badge variant="secondary" className="bg-white/20 text-white border-white/30 text-xs px-1 py-0">
+                  <Badge variant="secondary" className="bg-white/20 text-white border-white/30 text-[10px] md:text-xs px-0.5 md:px-1 py-0 flex-shrink-0">
                     {timeLeft.hours.toString().padStart(2, '0')}h
                   </Badge>
-                  <Badge variant="secondary" className="bg-white/20 text-white border-white/30 text-xs px-1 py-0">
+                  <Badge variant="secondary" className="bg-white/20 text-white border-white/30 text-[10px] md:text-xs px-0.5 md:px-1 py-0 flex-shrink-0">
                     {timeLeft.minutes.toString().padStart(2, '0')}m
                   </Badge>
-                  <Badge variant="secondary" className="bg-white/20 text-white border-white/30 text-xs px-1 py-0">
+                  <Badge variant="secondary" className="bg-white/20 text-white border-white/30 text-[10px] md:text-xs px-0.5 md:px-1 py-0 flex-shrink-0">
                     {timeLeft.seconds.toString().padStart(2, '0')}s
                   </Badge>
                 </div>
@@ -109,11 +109,11 @@ export function TrialBannerSmall({ onClose }: TrialBannerProps) {
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
             <Button
               onClick={handleUpgrade}
               size="sm"
-              className="bg-white text-purple-600 hover:bg-gray-100 font-medium text-xs h-7 px-3"
+              className="bg-white text-purple-600 hover:bg-gray-100 font-medium text-[10px] md:text-xs h-6 md:h-7 px-2 md:px-3 whitespace-nowrap"
             >
               {isExpired ? "Assinar" : "Upgrade"}
             </Button>
@@ -121,7 +121,7 @@ export function TrialBannerSmall({ onClose }: TrialBannerProps) {
               onClick={handleClose}
               variant="ghost"
               size="sm"
-              className="text-white hover:bg-white/20 h-7 w-7 p-0"
+              className="text-white hover:bg-white/20 h-6 w-6 md:h-7 md:w-7 p-0 flex-shrink-0"
             >
               <X className="w-3 h-3" />
             </Button>

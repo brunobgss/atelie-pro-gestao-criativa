@@ -53,6 +53,8 @@ import ContasReceber from "./pages/ContasReceber";
 import PedidosCompra from "./pages/PedidosCompra";
 import MovimentacoesEstoque from "./pages/MovimentacoesEstoque";
 import FluxoCaixa from "./pages/FluxoCaixa";
+import Indicacoes from "./pages/Indicacoes";
+import Recompensas from "./pages/Recompensas";
 
 // QueryClient fora do componente para evitar re-criação
 // Cache buster: 2024-12-19 - Corrigindo Dashboard not defined
@@ -109,6 +111,8 @@ function App() {
                     <Route path="relatorios" element={<Relatorios />} />
                     <Route path="financeiro" element={<ControleFinanceiro />} />
                     <Route path="assinatura" element={<Assinatura />} />
+                    <Route path="indicacoes" element={<Indicacoes />} />
+                    <Route path="recompensas" element={<Recompensas />} />
                     <Route path="minha-conta" element={<MinhaConta />} />
                     <Route path="agenda" element={<Agenda />} />
                     <Route path="medidas" element={<MedidasClientes />} />

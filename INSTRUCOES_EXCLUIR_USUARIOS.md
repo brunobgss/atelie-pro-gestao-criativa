@@ -106,3 +106,11 @@ Execute a query de verificação final no script para confirmar que:
 
 **NÃO exclua pela interface** se não tiver certeza absoluta do que está fazendo!
 
+
+
+
+
+
+
+
+

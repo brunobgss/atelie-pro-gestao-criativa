@@ -65,3 +65,11 @@ JOIN public.user_empresas ue ON u.id = ue.user_id
 JOIN public.empresas e ON ue.empresa_id = e.id
 WHERE e.trial_end_date IS NOT NULL;
 
+
+
+
+
+
+
+
+

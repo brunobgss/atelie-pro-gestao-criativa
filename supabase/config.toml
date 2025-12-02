@@ -1,1 +1,4 @@
 project_id = "xthioxkfkxjvqcjqllfy"
+
+[functions.inventory-alerts]
+verify_jwt = false

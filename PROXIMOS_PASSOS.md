@@ -163,3 +163,11 @@ DROP TRIGGER IF EXISTS sync_empresa_status_trigger ON public.empresas;
 
 **Tudo pronto! O sistema está configurado e funcionando automaticamente.** 🎉
 
+
+
+
+
+
+
+
+

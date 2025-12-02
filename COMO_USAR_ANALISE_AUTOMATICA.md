@@ -82,3 +82,11 @@ Para executar automaticamente todo dia, você pode:
 
 **Pronto! Agora você pode gerar análises completas com um único comando!** 🎉
 
+
+
+
+
+
+
+
+

@@ -121,8 +121,103 @@ create table if not exists public.inventory_items (
   unit text not null default 'unidades',
   min_quantity numeric(12,2) not null default 0,
   status text not null default 'ok',
-  created_at timestamptz not null default now()
+  item_type text not null default 'produto_acabado' check (item_type in ('materia_prima','tecido','produto_acabado')),
+  category text,
+  supplier text,
+  cost_per_unit numeric(12,2),
+  total_cost numeric(12,2),
+  metadata jsonb not null default '{}'::jsonb,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
+
+create index if not exists idx_inventory_items_empresa on public.inventory_items(empresa_id);
+create index if not exists idx_inventory_items_tipo on public.inventory_items(item_type);
+
+create table if not exists public.movimentacoes_estoque (
+  id uuid primary key default gen_random_uuid(),
+  empresa_id uuid not null references public.empresas(id) on delete cascade,
+  inventory_item_id uuid references public.inventory_items(id) on delete set null,
+  produto_id uuid references public.atelie_products(id) on delete set null,
+  variacao_id uuid references public.produto_variacoes(id) on delete set null,
+  tipo_movimentacao varchar(50) not null check (tipo_movimentacao in ('entrada','saida','ajuste','transferencia','perda','devolucao')),
+  ajuste_sign varchar(20) not null default 'incremento' check (ajuste_sign in ('incremento','decremento')),
+  quantidade numeric(12,2) not null,
+  quantidade_anterior numeric(12,2),
+  quantidade_atual numeric(12,2),
+  motivo text,
+  origem varchar(100),
+  origem_id uuid,
+  lote varchar(100),
+  data_validade date,
+  valor_unitario numeric(12,2),
+  usuario_id uuid references auth.users(id) on delete set null,
+  created_at timestamptz default now()
+);
+
+create index if not exists idx_movimentacoes_empresa on public.movimentacoes_estoque(empresa_id);
+create index if not exists idx_movimentacoes_item on public.movimentacoes_estoque(inventory_item_id);
+create index if not exists idx_movimentacoes_tipo on public.movimentacoes_estoque(tipo_movimentacao);
+create index if not exists idx_movimentacoes_data on public.movimentacoes_estoque(created_at);
+
+create or replace function public.apply_inventory_movement()
+returns trigger
+language plpgsql
+as $function$
+declare
+  delta numeric(12,2) := 0;
+  current_quantity numeric(12,2) := 0;
+  new_quantity numeric(12,2) := 0;
+begin
+  if NEW.inventory_item_id is null then
+    return NEW;
+  end if;
+
+  select quantity
+    into current_quantity
+    from public.inventory_items
+   where id = NEW.inventory_item_id
+   for update;
+
+  if NEW.tipo_movimentacao in ('entrada','devolucao','transferencia') then
+    delta := NEW.quantidade;
+  elsif NEW.tipo_movimentacao in ('saida','perda') then
+    delta := -NEW.quantidade;
+  elsif NEW.tipo_movimentacao = 'ajuste' then
+    if NEW.ajuste_sign = 'decremento' then
+      delta := -NEW.quantidade;
+    else
+      delta := NEW.quantidade;
+    end if;
+  end if;
+
+  new_quantity := greatest(0, coalesce(current_quantity, 0) + delta);
+
+  update public.inventory_items
+    set quantity = new_quantity,
+        total_cost = case
+          when cost_per_unit is not null then new_quantity * cost_per_unit
+          else total_cost
+        end,
+        status = case
+          when new_quantity <= 0 then 'critical'
+          when new_quantity < min_quantity then 'low'
+          else 'ok'
+        end,
+        updated_at = now()
+    where id = NEW.inventory_item_id;
+
+  NEW.quantidade_anterior := current_quantity;
+  NEW.quantidade_atual := new_quantity;
+
+  return NEW;
+end;
+$function$;
+
+drop trigger if exists trg_apply_inventory_movement on public.movimentacoes_estoque;
+create trigger trg_apply_inventory_movement
+before insert on public.movimentacoes_estoque
+for each row execute function public.apply_inventory_movement();
 
 -- RLS Policies
 alter table public.empresas enable row level security;
@@ -135,6 +230,7 @@ alter table public.quote_personalizations enable row level security;
 alter table public.inventory_items enable row level security;
 alter table public.order_status_configs enable row level security;
 alter table public.order_personalizations enable row level security;
+alter table public.movimentacoes_estoque enable row level security;
 
 -- Policies para empresas
 drop policy if exists "users_select_empresas" on public.empresas;
@@ -357,5 +453,39 @@ create policy "users_insert_inventory" on public.inventory_items for insert with
     select 1 from public.user_empresas 
     where user_empresas.user_id = auth.uid() 
     and user_empresas.empresa_id = inventory_items.empresa_id
+  )
+);
+
+drop policy if exists "users_update_inventory" on public.inventory_items;
+create policy "users_update_inventory" on public.inventory_items for update using (
+  exists (
+    select 1 from public.user_empresas 
+    where user_empresas.user_id = auth.uid() 
+    and user_empresas.empresa_id = inventory_items.empresa_id
+  )
+) with check (
+  exists (
+    select 1 from public.user_empresas 
+    where user_empresas.user_id = auth.uid() 
+    and user_empresas.empresa_id = inventory_items.empresa_id
+  )
+);
+
+-- Policies para movimentacoes_estoque
+drop policy if exists "users_select_movimentacoes" on public.movimentacoes_estoque;
+create policy "users_select_movimentacoes" on public.movimentacoes_estoque for select using (
+  exists (
+    select 1 from public.user_empresas 
+    where user_empresas.user_id = auth.uid()
+    and user_empresas.empresa_id = movimentacoes_estoque.empresa_id
+  )
+);
+
+drop policy if exists "users_insert_movimentacoes" on public.movimentacoes_estoque;
+create policy "users_insert_movimentacoes" on public.movimentacoes_estoque for insert with check (
+  exists (
+    select 1 from public.user_empresas 
+    where user_empresas.user_id = auth.uid()
+    and user_empresas.empresa_id = movimentacoes_estoque.empresa_id
   )
 );

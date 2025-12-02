@@ -26,3 +26,11 @@ SELECT
 FROM public.empresas
 WHERE created_at IS NOT NULL;
 
+
+
+
+
+
+
+
+

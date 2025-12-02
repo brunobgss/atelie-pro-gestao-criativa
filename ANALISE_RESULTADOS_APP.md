@@ -167,3 +167,11 @@
 
 **Resultado esperado**: Crescimento de 40-60% em usuários ativos e 40-60% em receita mensal!
 
+
+
+
+
+
+
+
+

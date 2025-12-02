@@ -14,6 +14,18 @@ const formatCurrency = (value: number) => {
   }).format(value);
 };
 
+// Função para remover URL do arquivo das observações
+const cleanObservations = (observations?: string | null): string => {
+  if (!observations) return '';
+  // Remove linhas que contenham "Arquivo/Arte:" seguido de URL
+  return observations
+    .split('\n')
+    .filter(line => !line.match(/Arquivo\/Arte:\s*https?:\/\/[^\s\n]+/i))
+    .filter(line => !line.match(/Arquivo:\s*https?:\/\/[^\s\n]+/i))
+    .join('\n')
+    .trim();
+};
+
 export default function OrcamentoImpressaoNovo() {
   console.log("🚀 OrcamentoImpressaoNovo component executando!");
   
@@ -241,9 +253,8 @@ export default function OrcamentoImpressaoNovo() {
               const empresaTelefone = empresa?.telefone || "Não informado";
               const empresaEndereco = empresa?.endereco || "Não informado";
               const empresaResponsavel = empresa?.responsavel || "Não informado";
-              const hoje = new Date().toLocaleDateString('pt-BR');
 
-              // Gerar HTML completo do PDF PROFISSIONAL
+              // Gerar HTML completo do PDF PROFISSIONAL (preto e branco)
               const pdfHtml = `
                 <!DOCTYPE html>
                 <html>
@@ -568,7 +579,7 @@ export default function OrcamentoImpressaoNovo() {
 
                       ${safeQuote.observations && safeQuote.observations !== 'Sem observações' ? `
                       <div style="margin-bottom: 15px; font-size: 11px;">
-                        <strong>Observações:</strong> ${safeQuote.observations}
+                        <strong>Observações:</strong> ${cleanObservations(safeQuote.observations)}
                       </div>
                       ` : ''}
 

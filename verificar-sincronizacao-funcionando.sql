@@ -113,3 +113,11 @@ FROM public.empresas e
 WHERE e.trial_end_date IS NOT NULL
 LIMIT 10;
 
+
+
+
+
+
+
+
+

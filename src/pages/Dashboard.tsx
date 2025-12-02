@@ -19,12 +19,20 @@ import { startStockAlerts, checkStockNow } from "@/utils/stockAlerts";
 import { LoadingCard, SkeletonCard } from "@/components/ui/loading";
 import { PageTransition, StaggeredAnimation, FadeIn } from "@/components/ui/page-transition";
 import { MobileCard, MobileGrid } from "@/components/ui/mobile-form";
+import { OnboardingChecklist } from "@/components/OnboardingChecklist";
+import { ValueDashboard } from "@/components/ValueDashboard";
+import { AchievementsBadges } from "@/components/AchievementsBadges";
+import { InAppMessages } from "@/components/InAppMessages";
+import { ReferralProgram } from "@/components/ReferralProgram";
+import { ChatWidget } from "@/components/ChatWidget";
+import { DashboardControls, useDashboardControls } from "@/components/DashboardControls";
 import React from "react";
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { empresa } = useAuth();
   const { formatCurrency } = useInternationalization();
+  const { engagementVisible, compactMode, setEngagementVisible, setCompactMode } = useDashboardControls();
   
   // Iniciar sistema de alertas de estoque
   React.useEffect(() => {
@@ -261,8 +269,11 @@ _${empresa?.nome || 'Atelie'}_`;
 
   return (
     <PageTransition className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-slate-50">
+      {/* Chat Widget para Suporte Proativo */}
+      <ChatWidget />
+      
       {/* Header */}
-      <FadeIn className="bg-white/90 backdrop-blur-lg border-b border-purple-100 sticky top-0 z-10 shadow-lg">
+      <FadeIn className="bg-white/90 backdrop-blur-lg border-b border-purple-100 sticky top-0 z-30 shadow-lg">
         <div className="p-4 md:p-6">
           {/* Mobile Layout */}
           <div className="md:hidden">
@@ -327,11 +338,24 @@ _${empresa?.nome || 'Atelie'}_`;
         </div>
 
       <div className="p-6 md:p-10 space-y-8 md:space-y-10">
-        {/* Banner de Trial */}
-        <TrialBannerSmall />
+        {/* Banner de Trial - Sticky no topo (abaixo do header) */}
+        <div className="sticky top-[73px] md:top-[89px] z-20 -mx-6 md:-mx-10 px-6 md:px-10 pt-0 pb-4 bg-gradient-to-br from-purple-50 via-pink-50 to-slate-50">
+          <TrialBannerSmall />
+        </div>
+
+        {/* Controles do Dashboard */}
+        <DashboardControls 
+          compactMode={compactMode}
+          engagementVisible={engagementVisible}
+          onCompactChange={setCompactMode}
+          onEngagementChange={setEngagementVisible}
+        />
+
+        {/* Onboarding Checklist */}
+        <OnboardingChecklist />
         
-        {/* Aviso de Vencimento de Pagamento */}
-        <PaymentExpirationWarning />
+        {/* In-App Messages e Notificações */}
+        <InAppMessages />
         
         {/* Stats Cards */}
         <div className="grid gap-4 md:gap-6 grid-cols-2 md:grid-cols-2 lg:grid-cols-4">
@@ -442,6 +466,20 @@ _${empresa?.nome || 'Atelie'}_`;
           )}
         </div>
 
+        {/* Seções de Engajamento - Controladas pelo toggle (entre Stats Cards e Ações Rápidas) */}
+        {engagementVisible && (
+          <div className={compactMode ? "space-y-4 md:space-y-6" : "space-y-8 md:space-y-10"}>
+            {/* Dashboard de Valor (ROI) */}
+            <ValueDashboard />
+            
+            {/* Badges e Achievements */}
+            <AchievementsBadges />
+            
+            {/* Programa de Referência */}
+            <ReferralProgram />
+          </div>
+        )}
+
         {/* Acoes Rapidass */}
         <FadeIn>
           <Card className="bg-white border border-gray-200/50 shadow-md">
@@ -516,6 +554,9 @@ _${empresa?.nome || 'Atelie'} - Qualidade e criatividade em cada peca_`;
           </CardContent>
         </Card>
         </FadeIn>
+
+        {/* Aviso de Vencimento de Pagamento */}
+        <PaymentExpirationWarning />
 
         {/* Centro de Alertas Inteligentes */}
         <FadeIn>

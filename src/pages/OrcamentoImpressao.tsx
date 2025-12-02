@@ -87,6 +87,7 @@ export default function OrcamentoImpressao() {
 
   const quote = quoteData.quote;
   const items = quoteData.items || [];
+  const personalizations = quoteData.personalizations || [];
 
   console.log("Dados do orçamento para impressão:", { quote, items });
   console.log("Items length:", items.length);
@@ -138,15 +139,36 @@ export default function OrcamentoImpressao() {
     total: Number(item?.quantity || 1) * Number(item?.unit_value || 0)
   }));
 
+  const safePersonalizations = personalizations.map((item: any, index: number) => ({
+    index: index + 1,
+    person_name: String(item?.person_name || "Cliente"),
+    size: item?.size ? String(item.size) : "—",
+    quantity: Number(item?.quantity || 1),
+    notes: item?.notes ? String(item.notes) : "",
+  }));
+
   console.log("=== DADOS FINAIS SERIALIZADOS ===");
   console.log("Safe Quote:", safeQuote);
   console.log("Safe Items:", safeItems);
+  console.log("Safe Personalizations:", safePersonalizations);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL'
     }).format(value);
+  };
+
+  // Função para remover URL do arquivo das observações
+  const cleanObservations = (observations?: string | null): string => {
+    if (!observations) return '';
+    // Remove linhas que contenham "Arquivo/Arte:" seguido de URL
+    return observations
+      .split('\n')
+      .filter(line => !line.match(/Arquivo\/Arte:\s*https?:\/\/[^\s\n]+/i))
+      .filter(line => !line.match(/Arquivo:\s*https?:\/\/[^\s\n]+/i))
+      .join('\n')
+      .trim();
   };
 
   return (
@@ -182,220 +204,297 @@ export default function OrcamentoImpressao() {
                   console.log("Safe Quote:", safeQuote);
                   console.log("Safe Items:", safeItems);
 
-                  // Função formatCurrency segura
-                  const formatCurrency = (value: number) => {
-                    return new Intl.NumberFormat('pt-BR', {
-                      style: 'currency',
-                      currency: 'BRL'
-                    }).format(value);
-                  };
+                  // Calcular data de validade (7 dias a partir da data do orçamento)
+                  const quoteDate = new Date(safeQuote.date);
+                  const validityDate = new Date(quoteDate);
+                  validityDate.setDate(validityDate.getDate() + 7);
 
-                  // Gerar HTML completo do PDF
+                  // Dados da empresa
+                  const empresaNome = empresa?.nome || "Empresa";
+                  const empresaCNPJ = empresa?.cpf_cnpj || "Não informado";
+                  const empresaTelefone = empresa?.telefone || "Não informado";
+                  const empresaEndereco = empresa?.endereco || "Não informado";
+                  const empresaResponsavel = empresa?.responsavel || "Não informado";
+
+                  // Gerar HTML completo do PDF PROFISSIONAL (preto e branco)
                   const pdfHtml = `
                     <!DOCTYPE html>
                     <html>
                       <head>
-                        <title>Orçamento - ${safeQuote.code}</title>
+                        <title>Orçamento ${safeQuote.code} - ${empresaNome}</title>
                         <meta charset="utf-8">
                         <style>
                           * { margin: 0; padding: 0; box-sizing: border-box; }
+                          @page { margin: 1cm; }
                           body { 
-                            font-family: 'Arial', sans-serif; 
-                            line-height: 1.6; 
-                            color: #333; 
+                            font-family: Arial, sans-serif; 
+                            line-height: 1.5; 
+                            color: #000; 
                             background: white; 
-                            padding: 20px; 
+                            padding: 15px; 
+                            font-size: 12px;
                           }
-                          .container { max-width: 800px; margin: 0 auto; }
+                          .container { max-width: 100%; margin: 0 auto; }
                           .header { 
-                            text-align: center; 
-                            margin-bottom: 40px; 
-                            border-bottom: 3px solid #2563eb; 
-                            padding-bottom: 20px; 
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: flex-start;
+                            margin-bottom: 20px;
+                            padding-bottom: 10px;
+                            border-bottom: 1px solid #000;
                           }
-                          .header h1 { font-size: 28px; font-weight: bold; margin: 0; margin-bottom: 10px; color: #1e40af; }
-                          .header .subtitle { font-size: 16px; color: #6b7280; }
-                          .section { 
-                            margin-bottom: 30px; 
-                            background: #f8fafc;
-                            padding: 20px;
-                            border-radius: 8px;
-                            border-left: 4px solid #2563eb;
+                          .empresa-info {
+                            flex: 1;
                           }
-                          .section h2 { 
-                            font-size: 20px; 
-                            font-weight: bold; 
-                            margin-bottom: 15px; 
-                            color: #1e40af; 
+                          .empresa-info > div {
+                            margin-bottom: 1px;
                           }
-                          .grid { 
-                            display: grid; 
-                            grid-template-columns: 1fr 1fr; 
-                            gap: 15px; 
+                          .empresa-nome { 
+                            font-size: 17px; 
+                            font-weight: bold;
+                            color: #000;
                           }
-                          .item { margin-bottom: 10px; }
-                          .label { 
-                            font-size: 12px; 
-                            font-weight: bold; 
-                            color: #6b7280; 
-                            text-transform: uppercase; 
-                            letter-spacing: 0.5px; 
+                          .empresa-cnpj {
+                            font-size: 9px;
+                            color: #000;
                           }
-                          .value { 
-                            font-size: 14px; 
-                            color: #1f2937; 
-                            margin-top: 2px; 
+                          .empresa-endereco {
+                            font-size: 9px;
+                            color: #000;
                           }
-                          .table { 
+                          .empresa-contato {
+                            font-size: 9px;
+                            color: #000;
+                          }
+                          .orçamento-info {
+                            text-align: left;
+                            min-width: 180px;
+                            padding-left: 10px;
+                            border-left: 1px solid #000;
+                          }
+                          .orçamento-info > div {
+                            margin-bottom: 1px;
+                          }
+                          .orçamento-titulo {
+                            font-size: 9px;
+                            font-weight: bold;
+                            text-transform: uppercase;
+                          }
+                          .orçamento-numero {
+                            font-size: 14px;
+                            font-weight: bold;
+                            margin-top: 2px;
+                            margin-bottom: 3px;
+                          }
+                          .orçamento-data {
+                            font-size: 9px;
+                          }
+                          .cliente-section {
+                            margin-bottom: 12px;
+                          }
+                          .lista-produtos-title {
+                            font-weight: bold;
+                            font-size: 11px;
+                            margin-bottom: 3px;
+                            margin-top: 5px;
+                            text-transform: uppercase;
+                          }
+                          .produtos-table { 
                             width: 100%; 
                             border-collapse: collapse; 
-                            margin-top: 15px; 
-                            background: white;
-                            border-radius: 8px;
-                            overflow: hidden;
-                            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+                            margin-bottom: 10px;
+                            font-size: 11px;
                           }
-                          .table th { 
-                            background: #2563eb; 
-                            color: white; 
-                            padding: 12px; 
+                          .produtos-table th { 
+                            background: #f0f0f0; 
+                            padding: 4px 3px; 
                             text-align: left; 
-                            font-weight: bold; 
-                          }
-                          .table td { 
-                            padding: 12px; 
-                            border-bottom: 1px solid #e5e7eb; 
-                          }
-                          .table tbody tr:hover { background: #f9fafb; }
-                          .total-row { 
-                            background: #1e40af; 
-                            color: white;
                             font-weight: bold;
+                            border: 1px solid #000;
+                            font-size: 10px;
                           }
-                          .total-row td { border-bottom: none; }
-                          .footer { 
-                            margin-top: 40px; 
-                            text-align: center; 
-                            font-size: 12px; 
-                            color: #6b7280; 
-                            border-top: 1px solid #e5e7eb; 
-                            padding-top: 20px; 
+                          .produtos-table td { 
+                            padding: 4px 3px; 
+                            border: 1px solid #999; 
+                          }
+                          .pagamento-table {
+                            width: 100%;
+                            border-collapse: collapse;
+                            margin-bottom: 15px;
+                            font-size: 11px;
+                          }
+                          .pagamento-table th {
+                            background: #f0f0f0;
+                            font-weight: bold;
+                            text-align: left;
+                            padding: 4px;
+                            border: 1px solid #000;
+                            font-size: 10px;
+                            text-transform: uppercase;
+                          }
+                          .pagamento-table td {
+                            padding: 3px;
+                            border: 1px solid #999;
+                          }
+                          .assinatura-section {
+                            margin-top: 20px;
+                            text-align: center;
+                          }
+                          .checkbox-line {
+                            display: inline-block;
+                            margin: 0 10px;
+                            font-size: 11px;
+                          }
+                          @media print {
+                            body { padding: 0; }
+                            .container { max-width: none; }
                           }
                         </style>
                       </head>
                       <body>
                         <div class="container">
                           <div class="header">
-                            <h1>Orçamento Profissional</h1>
-                            <div class="subtitle">Código: ${safeQuote.code} | Ateliê Pro - Sistema de Gestão</div>
-                          </div>
-                          
-                          <div class="section">
-                            <h2>📋 Informações do Orçamento</h2>
-                            <div class="grid">
-                              <div class="item">
-                                <div class="label">Código do Orçamento</div>
-                                <div class="value"><strong>${safeQuote.code}</strong></div>
-                              </div>
-                              <div class="item">
-                                <div class="label">Data de Criação</div>
-                                <div class="value">${new Date().toLocaleDateString('pt-BR')}</div>
-                              </div>
-                              <div class="item">
-                                <div class="label">Status</div>
-                                <div class="value"><span style="color: #059669; font-weight: bold;">Pendente</span></div>
-                              </div>
-                              <div class="item">
-                                <div class="label">Validade</div>
-                                <div class="value">7 dias corridos</div>
-                              </div>
+                            <div class="empresa-info">
+                              <div class="empresa-nome">${empresaNome}</div>
+                              <div class="empresa-cnpj">CPF/CNPJ ${empresaCNPJ}</div>
+                              <div class="empresa-endereco">${empresaEndereco}</div>
+                              <div class="empresa-contato">Fone: ${empresaTelefone}</div>
+                              <div class="empresa-contato">E-mail: ${(empresa as any)?.email || 'Não informado'}</div>
+                            </div>
+                            <div class="orçamento-info">
+                              <div class="orçamento-titulo">ORÇAMENTO N°</div>
+                              <div class="orçamento-numero">${safeQuote.code}</div>
+                              <div class="orçamento-data">Data: ${quoteDate.toLocaleDateString('pt-BR')}</div>
+                              <div class="orçamento-data">Validade: ${validityDate.toLocaleDateString('pt-BR')}</div>
+                              <div class="orçamento-data">Vendedor: ${empresaResponsavel}</div>
                             </div>
                           </div>
-                          
-                          <div class="section">
-                            <h2>👤 Informações do Cliente</h2>
-                            <div class="grid">
-                              <div class="item">
-                                <div class="label">Nome do Cliente</div>
-                                <div class="value"><strong>${safeQuote.customer_name}</strong></div>
-                              </div>
-                              <div class="item">
-                                <div class="label">Telefone/WhatsApp</div>
-                                <div class="value">${safeQuote.customer_phone}</div>
-                              </div>
+
+                          <div class="cliente-section" style="border-bottom: 1px solid #ccc; padding-bottom: 3px;">
+                            <div style="font-size: 10px; line-height: 1.4;">
+                              <div><span style="font-weight: bold;">Cliente: </span>${safeQuote.customer_name}</div>
+                              <div>Endereço: Não informado</div>
+                              <div>Telefone: </div>
+                              <div>CPF/CNPJ: Não informado</div>
+                              <div>Celular: ${safeQuote.customer_phone}</div>
                             </div>
                           </div>
-                          
-                          <div class="section">
-                            <h2>📦 Produtos e Serviços</h2>
-                            <table class="table">
-                              <thead>
+
+                          <div class="lista-produtos-title">Lista de Produtos</div>
+                          <table class="produtos-table">
+                            <thead>
+                              <tr>
+                                <th style="width: 6%;">Item</th>
+                                <th style="width: 45%;">Descrição</th>
+                                <th style="width: 8%; text-align: center;">Qtde</th>
+                                <th style="width: 6%; text-align: center;">UND</th>
+                                <th style="width: 10%; text-align: right;">Valor Unit.</th>
+                                <th style="width: 10%; text-align: right;">Total</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              ${safeItems.length > 0 ? safeItems.map(item => `
                                 <tr>
-                                  <th>Item</th>
-                                  <th>Descrição do Produto/Serviço</th>
-                                  <th>Quantidade</th>
-                                  <th>Valor Unitário</th>
-                                  <th>Valor Total</th>
+                                  <td style="text-align: center;">${item.index}</td>
+                                  <td>${item.description}</td>
+                                  <td style="text-align: center;">${item.quantity}</td>
+                                  <td style="text-align: center;">UN</td>
+                                  <td style="text-align: right;">${formatCurrency(item.unit_value)}</td>
+                                  <td style="text-align: right; font-weight: bold;">${formatCurrency(item.total)}</td>
                                 </tr>
-                              </thead>
-                              <tbody>
-                                ${safeItems.length > 0 ? safeItems.map(item => `
-                                  <tr>
-                                    <td><strong>${item.index}</strong></td>
-                                    <td>${item.description}</td>
-                                    <td>${item.quantity}</td>
-                                    <td>${formatCurrency(item.unit_value)}</td>
-                                    <td><strong>${formatCurrency(item.total)}</strong></td>
-                                  </tr>
-                                `).join('') : `
-                                  <tr>
-                                    <td colspan="5" style="text-align: center; padding: 20px; color: #6b7280;">
-                                      Nenhum item encontrado
-                                    </td>
-                                  </tr>
-                                `}
-                              </tbody>
-                              <tfoot>
-                                <tr class="total-row">
-                                  <th colspan="4">VALOR TOTAL DO ORÇAMENTO</th>
-                                  <th>${formatCurrency(safeQuote.total_value)}</th>
+                              `).join('') : `
+                                <tr>
+                                  <td colspan="6" style="text-align: center; padding: 20px; color: #666;">
+                                    Nenhum item encontrado
+                                  </td>
                                 </tr>
-                              </tfoot>
+                              `}
+                            </tbody>
+                          </table>
+
+                          ${safePersonalizations.length > 0 ? `
+                          <div class="lista-produtos-title" style="margin-top: 16px;">Lista de Personalizações</div>
+                          <table class="produtos-table">
+                            <thead>
+                              <tr>
+                                <th style="width: 8%;">Item</th>
+                                <th style="width: 40%;">Nome</th>
+                                <th style="width: 15%; text-align: center;">Tamanho</th>
+                                <th style="width: 15%; text-align: center;">Quantidade</th>
+                                <th style="width: 22%;">Observações</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              ${safePersonalizations.map(item => `
+                                <tr>
+                                  <td style="text-align: center;">${item.index}</td>
+                                  <td>${item.person_name}</td>
+                                  <td style="text-align: center;">${item.size}</td>
+                                  <td style="text-align: center;">${item.quantity}</td>
+                                  <td>${item.notes || ""}</td>
+                                </tr>
+                              `).join('')}
+                            </tbody>
+                          </table>
+                          ` : ''}
+
+                          <div style="margin-top: 0px; margin-bottom: 10px;">
+                            <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+                              <tr>
+                                <td style="background: #f0f0f0; font-weight: bold; padding: 3px 5px; border: 1px solid #999;">Frete:</td>
+                                <td style="text-align: right; font-weight: bold; padding: 3px 5px; border: 1px solid #999;">R$ 0,00</td>
+                                <td style="background: #f0f0f0; font-weight: bold; padding: 3px 5px; border: 1px solid #999;">Serviços:</td>
+                                <td style="text-align: right; font-weight: bold; padding: 3px 5px; border: 1px solid #999;">R$ 0,00</td>
+                                <td style="background: #f0f0f0; font-weight: bold; padding: 3px 5px; border: 1px solid #999;">Produtos à vista:</td>
+                                <td style="text-align: right; font-weight: bold; padding: 3px 5px; border: 1px solid #999;">${formatCurrency(safeQuote.total_value)}</td>
+                                <td style="background: #f0f0f0; font-weight: bold; padding: 3px 5px; border: 1px solid #999;">Descontos:</td>
+                                <td style="text-align: right; font-weight: bold; padding: 3px 5px; border: 1px solid #999;">R$ 0,00</td>
+                              </tr>
+                              <tr style="background: #e0e0e0; font-weight: bold;">
+                                <td colspan="7" style="padding: 4px 5px; border: 1px solid #999;">Total à vista:</td>
+                                <td style="text-align: right; padding: 4px 5px; border: 1px solid #999; font-size: 13px;">${formatCurrency(safeQuote.total_value)}</td>
+                              </tr>
                             </table>
                           </div>
-                          
+
+                          <table class="pagamento-table">
+                            <tr>
+                              <th>Forma Pagamento</th>
+                              <th>Obs. Forma Pagamento</th>
+                              <th>Prazo de Entrega</th>
+                              <th>Obs</th>
+                              <th>Impostos inclusos</th>
+                              <th>Responsável</th>
+                            </tr>
+                            <tr>
+                              <td>A combinar</td>
+                              <td>-</td>
+                              <td>A combinar</td>
+                              <td>-</td>
+                              <td>Não</td>
+                              <td>${empresaResponsavel}</td>
+                            </tr>
+                          </table>
+
                           ${safeQuote.observations && safeQuote.observations !== 'Sem observações' ? `
-                          <div class="section">
-                            <h2>📝 Observações e Especificações</h2>
-                            <div class="item">
-                              <div class="label">Detalhes do Trabalho</div>
-                              <div class="value">
-                                <p>${safeQuote.observations}</p>
-                              </div>
-                            </div>
+                          <div style="margin-bottom: 15px; font-size: 11px;">
+                            <strong>Observações:</strong> ${cleanObservations(safeQuote.observations)}
                           </div>
                           ` : ''}
-                          
-                          <div class="section">
-                            <h2>📋 Condições Comerciais</h2>
-                            <div style="background: white; padding: 15px; border-radius: 6px;">
-                              <h4 style="margin-bottom: 10px; color: #1e40af;">📋 Termos e Condições do Orçamento</h4>
-                              <ul style="padding-left: 20px;">
-                                <li>✅ Orçamento válido por 7 dias corridos a partir da data de emissão</li>
-                                <li>✅ Preços incluem mão de obra, materiais básicos e acabamento</li>
-                                <li>✅ Alterações após aprovação podem gerar custos adicionais</li>
-                                <li>✅ Pagamento conforme acordado no momento da aprovação</li>
-                                <li>✅ Prazo de entrega pode variar conforme complexidade do trabalho</li>
-                                <li>✅ Qualidade garantida conforme especificações técnicas</li>
-                                <li>✅ Garantia de 30 dias para defeitos de fabricação</li>
-                              </ul>
+
+                          <div class="assinatura-section">
+                            <div style="margin-bottom: 15px; font-weight: bold; font-size: 12px;">${empresaNome}</div>
+                            <div style="margin-bottom: 15px; font-size: 11px;">Eu, ${safeQuote.customer_name}</div>
+                            <div style="margin-bottom: 20px;">
+                              <span class="checkbox-line">( ) Aprovado</span>
+                              <span class="checkbox-line">( ) Reprovado</span>
                             </div>
-                          </div>
-                          
-                          <div class="footer">
-                            <p><strong>Documento gerado automaticamente pelo Ateliê Pro</strong></p>
-                            <p>Data de emissão: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</p>
-                            <p>Este orçamento é válido por 7 dias a partir da data de emissão</p>
+                            <div style="margin-top: 20px; border-top: 1px solid #000; padding-top: 5px; width: 300px; display: inline-block; font-size: 11px;">
+                              Assinatura do Cliente: _______________
+                            </div>
+                            <div style="margin-top: 5px; border-top: 1px solid #000; padding-top: 5px; width: 300px; display: inline-block; font-size: 11px;">
+                              Data: __/__/____
+                            </div>
                           </div>
                         </div>
                       </body>

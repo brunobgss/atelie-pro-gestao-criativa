@@ -71,3 +71,11 @@ WHERE
     AND ABS(EXTRACT(DAYS FROM (e.trial_end_date - (e.created_at + INTERVAL '7 days')))) > 1  -- Mais de 1 dia de diferença
 ORDER BY ABS(EXTRACT(DAYS FROM (e.trial_end_date - (e.created_at + INTERVAL '7 days')))) DESC;
 
+
+
+
+
+
+
+
+

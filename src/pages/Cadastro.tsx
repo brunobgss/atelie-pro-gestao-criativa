@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,19 @@ import { Country, COUNTRIES, AVAILABLE_COUNTRIES } from "@/types/internationaliz
 
 export default function Cadastro() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [referralCode, setReferralCode] = useState<string>("");
+  
+  // Detectar código de referência na URL
+  useEffect(() => {
+    const ref = searchParams.get("ref");
+    if (ref) {
+      setReferralCode(ref);
+      setFormData(prev => ({ ...prev, referralCode: ref }));
+      toast.info(`Código de indicação detectado! Você ganhará 7 dias grátis! 🎁`);
+    }
+  }, [searchParams]);
+
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -21,6 +34,7 @@ export default function Cadastro() {
     telefone: "",
     cpfCnpj: "",
     country: "BR" as Country,
+    referralCode: "",
   });
   const [loading, setLoading] = useState(false);
 
@@ -106,6 +120,50 @@ export default function Cadastro() {
         }
 
         console.log("Usuário vinculado à empresa com sucesso");
+
+        // Processar código de referência se houver (da URL ou do campo)
+        const codeToUse = referralCode || formData.referralCode?.trim().toUpperCase();
+        if (codeToUse) {
+          try {
+            // Buscar referência pelo código
+            const { data: referral, error: refError } = await supabase
+              .from("referrals")
+              .select("id, referrer_empresa_id")
+              .eq("referral_code", codeToUse)
+              .eq("status", "pending")
+              .single();
+
+            if (!refError && referral) {
+              // Atualizar referência com dados do novo usuário
+              await supabase
+                .from("referrals")
+                .update({
+                  referred_empresa_id: empresaData.id,
+                  referred_email: formData.email,
+                  status: "signed_up",
+                  signed_up_at: new Date().toISOString(),
+                })
+                .eq("id", referral.id);
+
+              // Estender trial para 14 dias (7 + 7 de bônus)
+              const bonusTrialEndDate = new Date();
+              bonusTrialEndDate.setDate(bonusTrialEndDate.getDate() + 14);
+              
+              await supabase
+                .from("empresas")
+                .update({
+                  trial_end_date: bonusTrialEndDate.toISOString(),
+                })
+                .eq("id", empresaData.id);
+
+              console.log("Referência processada com sucesso!");
+              toast.success("Você ganhou 7 dias grátis adicionais! 🎉");
+            }
+          } catch (error) {
+            console.error("Erro ao processar referência:", error);
+            // Não bloquear cadastro se houver erro na referência
+          }
+        }
 
         // Criar perfil do usuário
         const { error: profileError } = await supabase
@@ -283,6 +341,36 @@ export default function Cadastro() {
                   required
                 />
               </div>
+              
+              {/* Campo de Código de Referência */}
+              <div className="space-y-2">
+                <Label htmlFor="referralCode" className="text-white">
+                  Código de Indicação <span className="text-purple-200 text-xs">(Opcional)</span>
+                </Label>
+                <Input
+                  id="referralCode"
+                  name="referralCode"
+                  type="text"
+                  value={formData.referralCode}
+                  onChange={handleChange}
+                  className="bg-white/20 border-white/30 text-white placeholder:text-purple-200 uppercase"
+                  placeholder="Digite o código (ex: A123456)"
+                  maxLength={20}
+                />
+                {formData.referralCode && (
+                  <p className="text-xs text-purple-200 flex items-center gap-1">
+                    <span className="text-green-300">🎁</span>
+                    Você ganhará 7 dias grátis adicionais!
+                  </p>
+                )}
+                {referralCode && !formData.referralCode && (
+                  <p className="text-xs text-green-300 flex items-center gap-1">
+                    <span>✅</span>
+                    Código detectado na URL! Você ganhará 7 dias grátis!
+                  </p>
+                )}
+              </div>
+              
               <Button
                 type="submit"
                 className="w-full bg-gradient-to-r from-purple-600 via-purple-500 to-pink-500 hover:from-purple-700 hover:via-purple-600 hover:to-pink-600 text-white font-semibold py-3"

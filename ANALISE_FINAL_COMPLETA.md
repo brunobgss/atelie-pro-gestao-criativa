@@ -144,3 +144,11 @@
 
 **Você tem uma base real sólida de 13-15 usuários ativos. Agora é hora de MONETIZAR e CRESCER!** 💰🚀
 
+
+
+
+
+
+
+
+

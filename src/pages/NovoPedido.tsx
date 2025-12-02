@@ -23,6 +23,7 @@ import { errorHandler } from "@/utils/errorHandler";
 import { logger } from "@/utils/logger";
 import { performanceMonitor } from "@/utils/performanceMonitor";
 import { PersonalizationListEditor, PersonalizationEntry } from "@/components/PersonalizationListEditor";
+import { ClientSearch } from "@/components/ClientSearch";
 import { CLOTHING_SIZES } from "@/constants/sizes";
 
 export default function NovoPedido() {
@@ -36,6 +37,9 @@ export default function NovoPedido() {
     queryKey: ["products"],
     queryFn: getProducts,
   });
+  
+  // Estado para cliente
+  const [clientName, setClientName] = useState<string>("");
   
   // Estados para medidas
   const [selectedMedida, setSelectedMedida] = useState<string>("");
@@ -71,12 +75,12 @@ export default function NovoPedido() {
         const orderData = JSON.parse(duplicateData);
         
         // Preencher campos com dados duplicados
-        const clientInput = document.getElementById("client") as HTMLInputElement;
+        setClientName(orderData.client || "");
+        buscarMedidasCliente(orderData.client || "");
         const descriptionInput = document.getElementById("description") as HTMLTextAreaElement;
         const valueInput = document.getElementById("value") as HTMLInputElement;
         const paidInput = document.getElementById("paid") as HTMLInputElement;
         
-        if (clientInput) clientInput.value = orderData.client;
         if (descriptionInput) descriptionInput.value = orderData.description;
         if (valueInput) valueInput.value = orderData.value.toString();
         if (paidInput) paidInput.value = orderData.paid.toString();
@@ -228,7 +232,7 @@ export default function NovoPedido() {
       return;
     }
     
-    const client = (document.getElementById("client") as HTMLInputElement)?.value;
+    const client = clientName;
     const description = (document.getElementById("description") as HTMLTextAreaElement)?.value || "";
     const value = Number((document.getElementById("value") as HTMLInputElement)?.value || 0);
     const paid = Number((document.getElementById("paid") as HTMLInputElement)?.value || 0);
@@ -387,16 +391,15 @@ export default function NovoPedido() {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="client">Cliente *</Label>
-                  <Input
-                    id="client"
-                    placeholder="Nome do cliente"
-                    required
-                    className="border-input"
-                    onChange={(e) => buscarMedidasCliente(e.target.value)}
-                  />
-                </div>
+                <ClientSearch
+                  value={clientName}
+                  onChange={(value) => {
+                    setClientName(value);
+                    buscarMedidasCliente(value);
+                  }}
+                  placeholder="Nome do cliente"
+                  required
+                />
 
                 <div className="space-y-2">
                   <Label htmlFor="type">Tipo de Pedido *</Label>

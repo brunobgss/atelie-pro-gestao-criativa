@@ -161,3 +161,11 @@ Após implementar:
 - O código TypeScript funciona como verificação adicional
 - O cron job é opcional mas recomendado para garantir sincronização diária
 
+
+
+
+
+
+
+
+

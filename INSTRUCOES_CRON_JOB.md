@@ -92,3 +92,11 @@ O cron job é apenas uma **verificação extra diária** para garantir que tudo 
 - Verifique se está ativo: `SELECT * FROM cron.job;`
 - Verifique logs no Supabase Dashboard → Logs
 
+
+
+
+
+
+
+
+

@@ -144,3 +144,11 @@ WHERE NOT EXISTS (SELECT 1 FROM usuarios_teste WHERE empresa_id = e.id)
 
 ORDER BY ordem;
 
+
+
+
+
+
+
+
+

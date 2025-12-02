@@ -108,3 +108,11 @@ SELECT
           THEN 1 END) as ainda_incorreto_ativo
 FROM public.empresas;
 
+
+
+
+
+
+
+
+

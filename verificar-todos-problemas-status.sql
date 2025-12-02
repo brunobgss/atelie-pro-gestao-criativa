@@ -135,3 +135,11 @@ WHERE e.status NOT IN ('trial', 'expired') OR e.status IS NULL
 GROUP BY e.status
 ORDER BY quantidade DESC;
 
+
+
+
+
+
+
+
+

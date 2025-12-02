@@ -94,3 +94,11 @@ WHERE e.trial_end_date IS NOT NULL
     AND e.trial_end_date < NOW()
 ORDER BY e.trial_end_date ASC;
 
+
+
+
+
+
+
+
+
