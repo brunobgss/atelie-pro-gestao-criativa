@@ -7,12 +7,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/components/AuthProvider";
 import { useInternationalization } from "@/contexts/InternationalizationContext";
+import { useState } from "react";
 
 export default function VisualizarOrcamento() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { empresa } = useAuth();
   const { formatCurrency } = useInternationalization();
+  const [imageError, setImageError] = useState(false);
 
   const { data: quoteData, isLoading, error } = useQuery({
     queryKey: ["quoteView", id],
@@ -166,44 +168,47 @@ export default function VisualizarOrcamento() {
                   {fileUrl.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i) ? (
                     <div className="space-y-3">
                       <div className="relative w-full bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 p-4 flex items-center justify-center min-h-[300px] max-h-[600px] overflow-hidden">
-                        <img
-                          src={fileUrl}
-                          alt="Arte do orçamento"
-                          className="max-w-full max-h-[550px] w-auto h-auto object-contain rounded-lg shadow-md"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.style.display = 'none';
-                            const parent = target.parentElement;
-                            if (parent) {
-                              parent.innerHTML = `
-                                <div class="p-6 text-center">
-                                  <p class="text-sm text-muted-foreground mb-3">Arquivo não pode ser exibido como imagem</p>
-                                  <a href="${fileUrl}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
-                                    </svg>
-                                    Baixar arquivo
-                                  </a>
-                                </div>
-                              `;
-                            }
-                          }}
-                        />
+                        {!imageError ? (
+                          <img
+                            src={fileUrl}
+                            alt="Arte do orçamento"
+                            className="max-w-full max-h-[550px] w-auto h-auto object-contain rounded-lg shadow-md"
+                            onError={() => {
+                              // Usar state do React ao invés de manipular DOM diretamente
+                              setImageError(true);
+                            }}
+                          />
+                        ) : (
+                          <div className="p-6 text-center">
+                            <p className="text-sm text-muted-foreground mb-3">Arquivo não pode ser exibido como imagem</p>
+                            <a
+                              href={fileUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                            >
+                              <Download className="w-4 h-4" />
+                              Baixar arquivo
+                            </a>
+                          </div>
+                        )}
                       </div>
-                      <div className="flex items-center justify-between pt-2 border-t border-border">
-                        <p className="text-sm text-muted-foreground">
-                          Pré-visualização da arte anexada
-                        </p>
-                        <a
-                          href={fileUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                        >
-                          <Download className="w-4 h-4" />
-                          Baixar arquivo completo
-                        </a>
-                      </div>
+                      {!imageError && (
+                        <div className="flex items-center justify-between pt-2 border-t border-border">
+                          <p className="text-sm text-muted-foreground">
+                            Pré-visualização da arte anexada
+                          </p>
+                          <a
+                            href={fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                          >
+                            <Download className="w-4 h-4" />
+                            Baixar arquivo completo
+                          </a>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="p-6 border-2 border-dashed border-gray-300 rounded-lg text-center bg-gray-50">
