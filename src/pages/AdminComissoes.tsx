@@ -221,9 +221,24 @@ export default function AdminComissoes() {
     link.setAttribute("href", url);
     link.setAttribute("download", `comissoes-${format(new Date(), "yyyy-MM-dd")}.csv`);
     link.style.visibility = "hidden";
+    link.style.position = "absolute";
+    link.style.left = "-9999px";
+    
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    
+    // Remover o elemento de forma segura após um pequeno delay
+    setTimeout(() => {
+      try {
+        if (link.parentNode === document.body) {
+          document.body.removeChild(link);
+        }
+      } catch (e) {
+        // Ignorar erro se o elemento já foi removido
+        console.warn("Erro ao remover link de download:", e);
+      }
+      URL.revokeObjectURL(url);
+    }, 100);
     
     toast.success("Relatório exportado!");
   };

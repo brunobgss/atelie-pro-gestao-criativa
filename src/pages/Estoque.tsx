@@ -151,10 +151,25 @@ function exportInventoryToCSV(items: InventoryRow[]) {
   const link = document.createElement("a");
   link.href = url;
   link.setAttribute("download", `estoque_${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.csv`);
+  link.style.visibility = "hidden";
+  link.style.position = "absolute";
+  link.style.left = "-9999px";
+  
   document.body.appendChild(link);
   link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  
+  // Remover o elemento de forma segura após um pequeno delay
+  setTimeout(() => {
+    try {
+      if (link.parentNode === document.body) {
+        document.body.removeChild(link);
+      }
+    } catch (e) {
+      // Ignorar erro se o elemento já foi removido
+      console.warn("Erro ao remover link de download:", e);
+    }
+    URL.revokeObjectURL(url);
+  }, 100);
 }
 
 export default function Estoque() {

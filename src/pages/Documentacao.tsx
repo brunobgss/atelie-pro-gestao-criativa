@@ -38,9 +38,24 @@ export default function Documentacao() {
     const link = document.createElement('a');
     link.href = '#'; // Em produção, seria o link real do arquivo
     link.download = `${titulo}.${tipo.toLowerCase()}`;
+    link.style.visibility = "hidden";
+    link.style.position = "absolute";
+    link.style.left = "-9999px";
+    
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
+    
+    // Remover o elemento de forma segura após um pequeno delay
+    setTimeout(() => {
+      try {
+        if (link.parentNode === document.body) {
+          document.body.removeChild(link);
+        }
+      } catch (e) {
+        // Ignorar erro se o elemento já foi removido
+        console.warn("Erro ao remover link de download:", e);
+      }
+    }, 100);
   };
 
   const handleWhatsAppSupport = () => {

@@ -115,10 +115,26 @@ export default function AdminErros() {
     const a = document.createElement('a');
     a.href = url;
     a.download = `erros-${format(new Date(), 'yyyy-MM-dd-HH-mm-ss')}.json`;
+    a.style.visibility = "hidden";
+    a.style.position = "absolute";
+    a.style.left = "-9999px";
+    
     document.body.appendChild(a);
     a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    
+    // Remover o elemento de forma segura após um pequeno delay
+    setTimeout(() => {
+      try {
+        if (a.parentNode === document.body) {
+          document.body.removeChild(a);
+        }
+      } catch (e) {
+        // Ignorar erro se o elemento já foi removido
+        console.warn("Erro ao remover link de download:", e);
+      }
+      URL.revokeObjectURL(url);
+    }, 100);
+    
     toast.success("Erros exportados com sucesso");
   };
 
