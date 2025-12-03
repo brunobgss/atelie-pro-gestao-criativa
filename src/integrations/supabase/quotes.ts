@@ -70,10 +70,32 @@ export async function listQuotes(): Promise<QuoteRow[]> {
     
     console.log("Orçamentos encontrados:", data?.length || 0);
     console.log("Dados brutos dos orçamentos:", data);
+    
+    // Validar e logar dados problemáticos
     if (data && data.length > 0) {
-      console.log("Primeiro orçamento:", { id: data[0].id, code: data[0].code });
+      const quotesWithoutName = data.filter(q => !q.customer_name || q.customer_name.trim() === '');
+      if (quotesWithoutName.length > 0) {
+        console.warn(`⚠️ Encontrados ${quotesWithoutName.length} orçamentos sem nome de cliente:`, 
+          quotesWithoutName.map(q => ({ id: q.id, code: q.code, customer_name: q.customer_name }))
+        );
+      }
+      
+      console.log("Primeiro orçamento:", { 
+        id: data[0].id, 
+        code: data[0].code,
+        customer_name: data[0].customer_name,
+        customer_name_type: typeof data[0].customer_name,
+        customer_name_length: data[0].customer_name?.length
+      });
     }
-    return data ?? [];
+    
+    // Garantir que customer_name seja sempre uma string (não null/undefined)
+    const sanitizedData = (data ?? []).map(quote => ({
+      ...quote,
+      customer_name: quote.customer_name?.trim() || null, // Converter strings vazias para null
+    }));
+    
+    return sanitizedData;
   } catch (error) {
     console.error("Erro ao buscar orçamentos:", error);
     

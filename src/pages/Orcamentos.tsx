@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Plus, FileText, Calendar, DollarSign, Share2, Printer, MessageCircle, Edit, CheckCircle, Trash2, Eye, Search, Filter } from "lucide-react";
+import { Plus, FileText, Calendar, DollarSign, Share2, Printer, MessageCircle, Edit, CheckCircle, Trash2, Eye, Search, Filter, RefreshCw } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listQuotes, deleteQuote, approveQuote, getQuoteByCode } from "@/integrations/supabase/quotes";
@@ -42,15 +42,30 @@ export default function Orcamentos() {
         console.log("Iniciando busca de orçamentos...");
         const rows = await listQuotes();
         console.log("Orçamentos recebidos:", rows);
-        // Calcular valores baseados nos códigos conhecidos
+        
+        // Validar e processar cada orçamento
         const processedQuotes = rows.map((r, index) => {
+          // Garantir que customer_name seja uma string válida
+          const customerName = r.customer_name?.trim() || null;
+          
+          // Log para debug se customer_name estiver vazio
+          if (!customerName) {
+            console.warn(`Orçamento ${r.code || r.id} sem nome de cliente:`, {
+              id: r.id,
+              code: r.code,
+              customer_name: r.customer_name,
+              raw_data: r
+            });
+          }
+          
           // Usar total_value se disponível e válido, senão calcular baseado nos códigos conhecidos
           let value = 0;
           
           console.log(`Processando orçamento ${r.code}:`, {
             total_value: r.total_value,
             type: typeof r.total_value,
-            is_valid: r.total_value && typeof r.total_value === 'number' && r.total_value > 0
+            is_valid: r.total_value && typeof r.total_value === 'number' && r.total_value > 0,
+            customer_name: customerName
           });
           
           if (r.total_value && typeof r.total_value === 'number' && r.total_value > 0) {
@@ -66,13 +81,15 @@ export default function Orcamentos() {
             id: r.code || `ORC-${Date.now()}-${index}`, // Usar código como ID principal
             internalId: r.id, // Manter ID interno para referência
             code: r.code || `ORC-${Date.now()}-${index}`,
-            client: r.customer_name || "Cliente não informado",
-            description: r.observations || "Sem descrição",
+            client: customerName || "Cliente não informado",
+            description: r.observations?.trim() || "Sem descrição",
             value: value,
             total_value: value, // Adicionar total_value para compatibilidade
             date: r.date || new Date().toISOString().split('T')[0],
             status: r.status || "Pendente",
             created_at: (r as any).created_at || new Date().toISOString(),
+            // Manter referência ao customer_name original para debug
+            _raw_customer_name: r.customer_name,
           };
         });
         
@@ -84,12 +101,17 @@ export default function Orcamentos() {
         });
         
         console.log("Orçamentos processados:", processedQuotes);
+        console.log("Orçamentos sem nome de cliente:", processedQuotes.filter(q => q.client === "Cliente não informado").length);
         return processedQuotes;
       } catch (error) {
         console.error("Erro ao carregar orçamentos:", error);
         return [];
       }
     },
+    staleTime: 0, // Sempre considerar dados como stale para forçar refetch
+    cacheTime: 0, // Não cachear dados para evitar problemas
+    refetchOnMount: true, // Sempre refazer busca ao montar componente
+    refetchOnWindowFocus: true, // Refazer busca quando janela ganha foco
   });
 
   const getStatusColor = (status: string) => {
@@ -360,12 +382,26 @@ ${empresa?.nome || 'Ateliê'}`;
               <p className="text-sm text-muted-foreground">Gerencie propostas e orçamentos</p>
             </div>
           </div>
-          <Link to="/orcamentos/novo">
-            <Button className="bg-secondary hover:bg-secondary/90 text-secondary-foreground">
-              <Plus className="w-4 h-4 mr-2" />
-              Novo Orçamento
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                console.log("Forçando atualização de orçamentos...");
+                refetch();
+                toast.info("Atualizando orçamentos...");
+              }}
+              disabled={isLoading}
+            >
+              <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+              Atualizar
             </Button>
-          </Link>
+            <Link to="/orcamentos/novo">
+              <Button className="bg-secondary hover:bg-secondary/90 text-secondary-foreground">
+                <Plus className="w-4 h-4 mr-2" />
+                Novo Orçamento
+              </Button>
+            </Link>
+          </div>
         </div>
       </header>
 
