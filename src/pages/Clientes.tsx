@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Search, Phone, Mail, Package, Plus, Edit, Trash2, FileText, ShoppingCart, ExternalLink, Eye, MapPin } from "lucide-react";
+import { Search, Phone, Mail, Package, Plus, Edit, Trash2, FileText, ShoppingCart, ExternalLink, Eye, MapPin, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -126,6 +126,9 @@ export default function Clientes() {
         toast.success("Cliente atualizado com sucesso!");
         setIsEditDialogOpen(false);
         setEditingClient(null);
+        // Invalidar e refetch da query de clientes
+        queryClient.invalidateQueries({ queryKey: ["customers"] });
+        await refetch();
         // Sincronização automática
         syncAfterUpdate('customers', editingClient.id, result.data);
       } else {
@@ -159,6 +162,9 @@ export default function Clientes() {
         const result = await deleteCustomer(client.id);
         if (result.ok) {
           toast.success("Cliente excluído com sucesso!");
+          // Invalidar e refetch da query de clientes
+          queryClient.invalidateQueries({ queryKey: ["customers"] });
+          await refetch();
           // Sincronização automática
           syncAfterDelete('customers', client.id);
         } else {
@@ -369,7 +375,10 @@ export default function Clientes() {
     );
   });
   
-  console.log("🔍 Debug - clients final:", clients.length, "clientes");
+  console.log("🔍 Debug - searchTerm:", searchTerm);
+  console.log("🔍 Debug - allClients.length:", allClients.length);
+  console.log("🔍 Debug - clients filtrados:", clients.length, "clientes");
+  console.log("🔍 Debug - clientes encontrados:", clients.map(c => c.name || "Sem nome"));
 
   if (isLoading) {
     return (
@@ -473,6 +482,9 @@ export default function Clientes() {
                       }
                     }
                     
+                    // Invalidar e refetch da query de clientes
+                    queryClient.invalidateQueries({ queryKey: ["customers"] });
+                    await refetch();
                     // Sincronização automática
                     syncAfterCreate('customers', res.data);
                   }}
@@ -489,14 +501,28 @@ export default function Clientes() {
         {/* Search */}
         <Card className="border-border">
           <CardContent className="p-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar cliente..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 border-input"
-              />
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar cliente..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 border-input"
+                />
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  queryClient.invalidateQueries({ queryKey: ["customers"] });
+                  await refetch();
+                  toast.success("Lista de clientes atualizada!");
+                }}
+                title="Atualizar lista"
+              >
+                <RefreshCw className="w-4 h-4" />
+              </Button>
             </div>
           </CardContent>
         </Card>
