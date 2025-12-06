@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Search, Phone, Mail, Package, Plus, Edit, Trash2, FileText, ShoppingCart, ExternalLink } from "lucide-react";
+import { Search, Phone, Mail, Package, Plus, Edit, Trash2, FileText, ShoppingCart, ExternalLink, Eye, MapPin } from "lucide-react";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -16,6 +16,18 @@ import { useSyncOperations } from "@/hooks/useSyncOperations";
 import { validateName, validatePhone, validateEmail, validateForm } from "@/utils/validators";
 import { errorHandler } from "@/utils/errorHandler";
 import { useNavigate } from "react-router-dom";
+import { CustomerRow } from "@/integrations/supabase/customers";
+
+type ClientWithHistory = CustomerRow & {
+  orders?: number;
+  quotes?: number;
+  lastOrder?: string | null;
+  lastQuote?: string | null;
+  totalValue?: number;
+  type?: string;
+  ordersList?: unknown[];
+  quotesList?: unknown[];
+};
 
 export default function Clientes() {
   const queryClient = useQueryClient();
@@ -24,7 +36,9 @@ export default function Clientes() {
   const { syncAfterCreate, syncAfterUpdate, syncAfterDelete, syncWithToast } = useSyncOperations();
   const [searchTerm, setSearchTerm] = useState("");
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [editingClient, setEditingClient] = useState<unknown>(null);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [viewingClient, setViewingClient] = useState<ClientWithHistory | null>(null);
+  const [editingClient, setEditingClient] = useState<ClientWithHistory | null>(null);
   const [editForm, setEditForm] = useState({
     name: "",
     phone: "",
@@ -32,7 +46,12 @@ export default function Clientes() {
     address: ""
   });
 
-  const handleEditClient = (client: unknown) => {
+  const handleViewClient = (client: ClientWithHistory) => {
+    setViewingClient(client);
+    setIsViewDialogOpen(true);
+  };
+
+  const handleEditClient = (client: ClientWithHistory) => {
     setEditingClient(client);
     setEditForm({
       name: client.name || "",
@@ -77,7 +96,12 @@ export default function Clientes() {
       }
       
       // Preparar dados para atualização
-      const updateData: unknown = {
+      const updateData: {
+        name: string;
+        phone: string;
+        email?: string;
+        address?: string | null;
+      } = {
         name: editForm.name.trim(),
         phone: editForm.phone.trim()
       };
@@ -85,6 +109,13 @@ export default function Clientes() {
       // Adicionar campos opcionais apenas se preenchidos
       if (editForm.email && editForm.email.trim()) {
         updateData.email = editForm.email.trim();
+      }
+      
+      if (editForm.address && editForm.address.trim()) {
+        updateData.address = editForm.address.trim();
+      } else {
+        // Se o campo estiver vazio, definir como null para limpar o valor
+        updateData.address = null;
       }
       
       console.log("📝 Dados preparados para atualização:", updateData);
@@ -107,7 +138,7 @@ export default function Clientes() {
     }
   };
 
-  const handleDeleteClient = async (client: unknown) => {
+  const handleDeleteClient = async (client: ClientWithHistory) => {
     if (confirm(`Tem certeza que deseja excluir "${client.name}"?`)) {
       // Se for um cliente de demonstração, simular exclusão
       if (client.id.startsWith('demo-')) {
@@ -153,7 +184,7 @@ export default function Clientes() {
   };
 
   // Dados de demonstração (sempre funcionam)
-  const demoClients = [
+  const demoClients: ClientWithHistory[] = [
     {
       id: "demo-1",
       name: "Maria Silva",
@@ -308,7 +339,19 @@ export default function Clientes() {
   console.log("🔍 Debug - realClients.length:", realClients.length);
   console.log("🔍 Debug - demoClients.length:", demoClients.length);
   
-  const clients = realClients.length > 0 ? realClients : demoClients;
+  const allClients = realClients.length > 0 ? realClients : demoClients;
+  
+  // Filtrar clientes pelo termo de busca
+  const clients = allClients.filter((client) => {
+    if (!searchTerm) return true;
+    const search = searchTerm.toLowerCase();
+    return (
+      client.name?.toLowerCase().includes(search) ||
+      client.phone?.toLowerCase().includes(search) ||
+      client.email?.toLowerCase().includes(search) ||
+      client.address?.toLowerCase().includes(search)
+    );
+  });
   
   console.log("🔍 Debug - clients final:", clients.length, "clientes");
 
@@ -443,8 +486,30 @@ export default function Clientes() {
         </Card>
 
         {/* Clients Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {clients.map((client, index) => (
+        {clients.length === 0 ? (
+          <Card className="border-border">
+            <CardContent className="p-8 text-center">
+              <Package className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">
+                {searchTerm 
+                  ? `Nenhum cliente encontrado para "${searchTerm}"`
+                  : "Nenhum cliente cadastrado ainda"}
+              </p>
+              {searchTerm && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSearchTerm("")}
+                  className="mt-4"
+                >
+                  Limpar busca
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {clients.map((client, index) => (
             <Card
               key={index}
               className="border-border hover:shadow-md transition-all animate-fade-in cursor-pointer"
@@ -479,9 +544,22 @@ export default function Clientes() {
                       size="sm"
                       onClick={(e) => {
                         e.stopPropagation();
+                        handleViewClient(client);
+                      }}
+                      className="h-8 w-8 p-0"
+                      title="Ver detalhes"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
                         handleEditClient(client);
                       }}
                       className="h-8 w-8 p-0"
+                      title="Editar"
                     >
                       <Edit className="w-4 h-4" />
                     </Button>
@@ -493,6 +571,7 @@ export default function Clientes() {
                         handleDeleteClient(client);
                       }}
                       className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                      title="Excluir"
                     >
                       <Trash2 className="w-4 h-4" />
                     </Button>
@@ -586,8 +665,156 @@ export default function Clientes() {
               </CardContent>
             </Card>
           ))}
-        </div>
+          </div>
+        )}
       </div>
+
+      {/* Modal de Visualização de Cliente */}
+      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
+                <span className="text-white font-semibold text-lg">
+                  {viewingClient?.name?.charAt(0) || ""}
+                </span>
+              </div>
+              <span>Detalhes do Cliente</span>
+            </DialogTitle>
+          </DialogHeader>
+          {viewingClient && (
+            <div className="space-y-6 py-4">
+              {/* Informações Básicas */}
+              <div className="space-y-4">
+                <h3 className="font-semibold text-lg border-b pb-2">Informações Básicas</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-muted-foreground text-sm">Nome</Label>
+                    <p className="font-medium">{viewingClient.name}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-muted-foreground text-sm flex items-center gap-2">
+                      <Phone className="w-4 h-4" />
+                      Telefone
+                    </Label>
+                    <p className="font-medium">{viewingClient.phone || "Não informado"}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-muted-foreground text-sm flex items-center gap-2">
+                      <Mail className="w-4 h-4" />
+                      Email
+                    </Label>
+                    <p className="font-medium">{viewingClient.email || "Não informado"}</p>
+                  </div>
+                  {viewingClient.address && (
+                    <div className="space-y-1 md:col-span-2">
+                      <Label className="text-muted-foreground text-sm flex items-center gap-2">
+                        <MapPin className="w-4 h-4" />
+                        Endereço
+                      </Label>
+                      <p className="font-medium">{viewingClient.address}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Estatísticas */}
+              <div className="space-y-4">
+                <h3 className="font-semibold text-lg border-b pb-2">Estatísticas</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="p-4 bg-muted/50 rounded-lg">
+                    <div className="text-2xl font-bold text-primary">{viewingClient.orders || 0}</div>
+                    <div className="text-sm text-muted-foreground">Pedidos</div>
+                  </div>
+                  <div className="p-4 bg-muted/50 rounded-lg">
+                    <div className="text-2xl font-bold text-primary">{viewingClient.quotes || 0}</div>
+                    <div className="text-sm text-muted-foreground">Orçamentos</div>
+                  </div>
+                  <div className="p-4 bg-muted/50 rounded-lg">
+                    <div className="text-2xl font-bold text-primary">
+                      R$ {(viewingClient.totalValue || 0).toFixed(2)}
+                    </div>
+                    <div className="text-sm text-muted-foreground">Total Gasto</div>
+                  </div>
+                  <div className="p-4 bg-muted/50 rounded-lg">
+                    <Badge
+                      variant="outline"
+                      className={
+                        viewingClient.type === "VIP"
+                          ? "bg-accent/20 text-accent border-accent/30"
+                          : "bg-muted text-muted-foreground border-muted-foreground/30"
+                      }
+                    >
+                      {viewingClient.type || "Regular"}
+                    </Badge>
+                    <div className="text-sm text-muted-foreground mt-2">Tipo</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Última Atividade */}
+              {(viewingClient.lastOrder || viewingClient.lastQuote) && (
+                <div className="space-y-4">
+                  <h3 className="font-semibold text-lg border-b pb-2">Última Atividade</h3>
+                  <div className="p-4 bg-muted/50 rounded-lg">
+                    <p className="text-sm">
+                      {viewingClient.lastOrder && viewingClient.lastQuote ? 
+                        (new Date(viewingClient.lastOrder) > new Date(viewingClient.lastQuote) ? 
+                          `Último pedido em ${new Date(viewingClient.lastOrder).toLocaleDateString('pt-BR')}` :
+                          `Último orçamento em ${new Date(viewingClient.lastQuote).toLocaleDateString('pt-BR')}`) :
+                        viewingClient.lastOrder ? 
+                          `Último pedido em ${new Date(viewingClient.lastOrder).toLocaleDateString('pt-BR')}` :
+                          `Último orçamento em ${new Date(viewingClient.lastQuote).toLocaleDateString('pt-BR')}`
+                      }
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Ações Rápidas */}
+              <div className="flex gap-2 pt-4 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsViewDialogOpen(false);
+                    handleEditClient(viewingClient);
+                  }}
+                  className="flex-1"
+                >
+                  <Edit className="w-4 h-4 mr-2" />
+                  Editar Cliente
+                </Button>
+                {viewingClient.orders > 0 && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setIsViewDialogOpen(false);
+                      navigate('/pedidos');
+                    }}
+                    className="flex-1"
+                  >
+                    <ShoppingCart className="w-4 h-4 mr-2" />
+                    Ver Pedidos
+                  </Button>
+                )}
+                {viewingClient.quotes > 0 && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setIsViewDialogOpen(false);
+                      navigate('/orcamentos');
+                    }}
+                    className="flex-1"
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    Ver Orçamentos
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Modal de Edição de Cliente */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
