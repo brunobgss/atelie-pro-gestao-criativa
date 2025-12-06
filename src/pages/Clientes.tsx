@@ -139,15 +139,16 @@ export default function Clientes() {
   };
 
   const handleDeleteClient = async (client: ClientWithHistory) => {
-    if (confirm(`Tem certeza que deseja excluir "${client.name}"?`)) {
+    const clientName = client.name || "este cliente";
+    if (confirm(`Tem certeza que deseja excluir "${clientName}"?`)) {
       // Se for um cliente de demonstração, simular exclusão
       if (client.id.startsWith('demo-')) {
-        console.log("🗑️ Excluindo cliente de demonstração:", client.name);
+        console.log("🗑️ Excluindo cliente de demonstração:", clientName);
         
         // Simular delay de exclusão
         await new Promise(resolve => setTimeout(resolve, 300));
         
-        toast.success(`Cliente "${client.name}" excluído com sucesso! (Modo demonstração)`);
+        toast.success(`Cliente "${clientName}" excluído com sucesso! (Modo demonstração)`);
         return;
       }
       
@@ -282,6 +283,21 @@ export default function Clientes() {
         // Buscar histórico real de pedidos e orçamentos para cada cliente
         const clientsWithHistory = await Promise.all(
           customers.map(async (client) => {
+            // Só buscar histórico se o cliente tiver nome
+            if (!client.name) {
+              return {
+                ...client,
+                orders: 0,
+                quotes: 0,
+                lastOrder: null,
+                lastQuote: null,
+                totalValue: 0,
+                type: "Regular",
+                ordersList: [],
+                quotesList: []
+              };
+            }
+
             // Buscar pedidos do cliente (filtrado por empresa)
             const { data: orders } = await supabase
               .from("atelie_orders")
@@ -519,12 +535,12 @@ export default function Clientes() {
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
                       <span className="text-white font-semibold text-lg">
-                        {client.name.charAt(0)}
+                        {client.name?.charAt(0)?.toUpperCase() || "?"}
                       </span>
                     </div>
                     <div>
                       <CardTitle className="text-lg font-semibold text-foreground">
-                        {client.name}
+                        {client.name || "Cliente sem nome"}
                       </CardTitle>
                       <Badge
                         variant="outline"
@@ -676,7 +692,7 @@ export default function Clientes() {
             <DialogTitle className="flex items-center gap-2">
               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
                 <span className="text-white font-semibold text-lg">
-                  {viewingClient?.name?.charAt(0) || ""}
+                  {viewingClient?.name?.charAt(0)?.toUpperCase() || "?"}
                 </span>
               </div>
               <span>Detalhes do Cliente</span>
@@ -690,7 +706,7 @@ export default function Clientes() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <Label className="text-muted-foreground text-sm">Nome</Label>
-                    <p className="font-medium">{viewingClient.name}</p>
+                    <p className="font-medium">{viewingClient.name || "Cliente sem nome"}</p>
                   </div>
                   <div className="space-y-1">
                     <Label className="text-muted-foreground text-sm flex items-center gap-2">
