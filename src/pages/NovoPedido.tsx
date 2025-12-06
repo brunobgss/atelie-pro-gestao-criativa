@@ -26,6 +26,14 @@ import { PersonalizationListEditor, PersonalizationEntry } from "@/components/Pe
 import { ClientSearch } from "@/components/ClientSearch";
 import { CLOTHING_SIZES } from "@/constants/sizes";
 
+// Função auxiliar para gerar IDs únicos
+const generateId = () => {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+};
+
 export default function NovoPedido() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -53,11 +61,11 @@ export default function NovoPedido() {
   const [type, setType] = useState<string>("");
   const [selectedProduct, setSelectedProduct] = useState<string>("");
   const [isKitMode, setIsKitMode] = useState<boolean>(false);
-  const [kitItems, setKitItems] = useState<Array<{size: string, quantity: number}>>([
-    { size: "P", quantity: 0 },
-    { size: "M", quantity: 0 },
-    { size: "G", quantity: 0 },
-    { size: "GG", quantity: 0 }
+  const [kitItems, setKitItems] = useState<Array<{id: string, size: string, quantity: number}>>([
+    { id: generateId(), size: "P", quantity: 0 },
+    { id: generateId(), size: "M", quantity: 0 },
+    { id: generateId(), size: "G", quantity: 0 },
+    { id: generateId(), size: "GG", quantity: 0 }
   ]);
   const [personalizations, setPersonalizations] = useState<PersonalizationEntry[]>([]);
   
@@ -132,22 +140,24 @@ export default function NovoPedido() {
   };
 
   const addKitSize = () => {
-    setKitItems([...kitItems, { size: "", quantity: 0 }]);
+    setKitItems([...kitItems, { id: generateId(), size: "", quantity: 0 }]);
   };
 
-  const removeKitSize = (index: number) => {
-    setKitItems(kitItems.filter((_, i) => i !== index));
+  const removeKitSize = (id: string) => {
+    setKitItems(kitItems.filter((item) => item.id !== id));
   };
 
-  const updateKitSize = (index: number, size: string) => {
-    const updated = [...kitItems];
-    updated[index].size = size;
+  const updateKitSize = (id: string, size: string) => {
+    const updated = kitItems.map(item => 
+      item.id === id ? { ...item, size } : item
+    );
     setKitItems(updated);
   };
 
-  const updateKitQuantity = (index: number, quantity: number) => {
-    const updated = [...kitItems];
-    updated[index].quantity = quantity;
+  const updateKitQuantity = (id: string, quantity: number) => {
+    const updated = kitItems.map(item => 
+      item.id === id ? { ...item, quantity } : item
+    );
     setKitItems(updated);
   };
 
@@ -182,6 +192,9 @@ export default function NovoPedido() {
       
       clearInterval(progressInterval);
       setUploadProgress(100);
+      
+      // Pequeno delay para garantir que o DOM está estável antes de atualizar o estado
+      await new Promise(resolve => setTimeout(resolve, 100));
       
       if (upload.ok && upload.url) {
         setUploadStatus('success');
@@ -408,8 +421,8 @@ export default function NovoPedido() {
         if (value !== "catalogo") {
           setSelectedProduct("");
         }
-      }} required>
-                    <SelectTrigger className="border-input">
+      }} required disabled={isUploading}>
+                    <SelectTrigger className="border-input" disabled={isUploading}>
                       <SelectValue placeholder="Selecione o tipo" />
                     </SelectTrigger>
         <SelectContent>
@@ -427,8 +440,8 @@ export default function NovoPedido() {
                 {type === "catalogo" && (
                   <div className="space-y-2">
                     <Label htmlFor="product">Produto do Catálogo</Label>
-                    <Select value={selectedProduct} onValueChange={setSelectedProduct}>
-                      <SelectTrigger className="border-input">
+                    <Select value={selectedProduct} onValueChange={setSelectedProduct} disabled={isUploading}>
+                      <SelectTrigger className="border-input" disabled={isUploading}>
                         <SelectValue placeholder="Selecione um produto do catálogo" />
                       </SelectTrigger>
                       <SelectContent>
@@ -470,8 +483,8 @@ export default function NovoPedido() {
                     <span className="text-sm text-blue-600">Buscando medidas...</span>
                   </div>
                 ) : medidas.length > 0 ? (
-                  <Select value={selectedMedida} onValueChange={setSelectedMedida}>
-                    <SelectTrigger className="border-input">
+                  <Select value={selectedMedida} onValueChange={setSelectedMedida} disabled={isUploading}>
+                    <SelectTrigger className="border-input" disabled={isUploading}>
                       <SelectValue placeholder="Selecione as medidas do cliente" />
                     </SelectTrigger>
                     <SelectContent>
@@ -683,8 +696,8 @@ export default function NovoPedido() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="size">Tamanho</Label>
-                  <Select value={size} onValueChange={setSize}>
-                    <SelectTrigger>
+                  <Select value={size} onValueChange={setSize} disabled={isUploading}>
+                    <SelectTrigger disabled={isUploading}>
                       <SelectValue placeholder="Selecione o tamanho" />
                     </SelectTrigger>
                     <SelectContent>
@@ -723,12 +736,12 @@ export default function NovoPedido() {
                       Ideal para uniformes e lotes com diferentes tamanhos
                     </p>
                     <div className="space-y-2">
-                      {kitItems.map((item, index) => (
-                        <div key={index} className="flex items-center gap-2">
+                      {kitItems.map((item) => (
+                        <div key={item.id} className="flex items-center gap-2">
                           <Input
                             placeholder="Tamanho (1 ano, 2 anos, P, M, G...)"
                             value={item.size}
-                            onChange={(e) => updateKitSize(index, e.target.value)}
+                            onChange={(e) => updateKitSize(item.id, e.target.value)}
                             className="w-24"
                           />
                           <Input
@@ -736,14 +749,14 @@ export default function NovoPedido() {
                             min="0"
                             placeholder="Qtd"
                             value={item.quantity}
-                            onChange={(e) => updateKitQuantity(index, Number(e.target.value))}
+                            onChange={(e) => updateKitQuantity(item.id, Number(e.target.value))}
                             className="w-20"
                           />
                           <Button
                             type="button"
                             variant="ghost"
                             size="sm"
-                            onClick={() => removeKitSize(index)}
+                            onClick={() => removeKitSize(item.id)}
                             className="text-red-600 hover:text-red-700"
                           >
                             <Trash2 className="w-4 h-4" />
