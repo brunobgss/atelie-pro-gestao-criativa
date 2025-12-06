@@ -191,26 +191,37 @@ export default function NovoPedido() {
       const upload = await uploadOrderFile(file, code);
       
       clearInterval(progressInterval);
+      
+      // Aguardar o próximo frame de renderização para garantir que o DOM está estável
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      await new Promise(resolve => setTimeout(resolve, 150));
+      
+      // Atualizar progresso e status de forma segura
       setUploadProgress(100);
       
-      // Pequeno delay para garantir que o DOM está estável antes de atualizar o estado
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
       if (upload.ok && upload.url) {
+        // Aguardar mais um frame antes de atualizar o status
+        await new Promise(resolve => requestAnimationFrame(resolve));
         setUploadStatus('success');
         setUploadedFileUrl(upload.url);
         toast.success("Arquivo enviado com sucesso!");
         console.log("Upload realizado com sucesso:", upload.url);
       } else {
+        // Aguardar mais um frame antes de atualizar o status
+        await new Promise(resolve => requestAnimationFrame(resolve));
         setUploadStatus('error');
         toast.warning(upload.error || "Upload falhou - pedido será criado sem arquivo");
         console.log("Upload falhou:", upload.error);
       }
     } catch (error) {
+      console.error("Erro no upload:", error);
+      // Aguardar frame antes de atualizar estado em caso de erro
+      await new Promise(resolve => requestAnimationFrame(resolve));
       setUploadStatus('error');
       toast.error("Erro no upload do arquivo");
-      console.error("Erro no upload:", error);
     } finally {
+      // Aguardar frame antes de desabilitar upload
+      await new Promise(resolve => requestAnimationFrame(resolve));
       setIsUploading(false);
     }
   };
