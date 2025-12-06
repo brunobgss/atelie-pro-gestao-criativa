@@ -241,16 +241,17 @@ export default function Clientes() {
     queryKey: ["customers"],
     queryFn: async () => {
       try {
-        console.log("🔍 [CLIENTES] Iniciando busca de clientes do banco de dados...");
+        window.console.log("🔍 [CLIENTES] ===== INICIANDO BUSCA =====");
+        window.console.log("🔍 [CLIENTES] Iniciando busca de clientes do banco de dados...");
         
         // Obter usuário logado
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          console.error("Usuário não logado");
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError || !user) {
+          window.console.error("❌ [CLIENTES] Erro ao obter usuário:", userError);
           return [];
         }
         
-        console.log("🔍 Usuário logado:", user.id);
+        window.console.log("✅ [CLIENTES] Usuário logado:", user.id);
         
         // Obter empresa_id do usuário logado
         const { data: userEmpresa, error: userEmpresaError } = await supabase
@@ -259,23 +260,28 @@ export default function Clientes() {
           .eq("user_id", user.id)
           .single();
         
-        console.log("🔍 Resultado user_empresas:", { userEmpresa, userEmpresaError });
+        window.console.log("🔍 [CLIENTES] Resultado user_empresas:", { 
+          userEmpresa, 
+          userEmpresaError,
+          empresa_id: userEmpresa?.empresa_id 
+        });
         
         if (userEmpresaError || !userEmpresa?.empresa_id) {
-          console.error("Usuário não tem empresa associada:", userEmpresaError);
+          window.console.error("❌ [CLIENTES] Usuário não tem empresa associada:", userEmpresaError);
           return [];
         }
         
-        console.log("🔍 Empresa ID encontrada:", userEmpresa.empresa_id);
+        window.console.log("✅ [CLIENTES] Empresa ID encontrada:", userEmpresa.empresa_id);
         
         // Buscar TODOS os clientes da empresa (sem filtros adicionais)
+        // IMPORTANTE: Não usar .limit() para garantir que todos sejam retornados
         const { data: customers, error: customersError } = await supabase
           .from("customers")
           .select("*")
           .eq("empresa_id", userEmpresa.empresa_id)
           .order("name", { ascending: true });
         
-        console.log("🔍 [CLIENTES] Resultado consulta customers:", { 
+        window.console.log("🔍 [CLIENTES] Resultado consulta customers:", { 
           count: customers?.length || 0, 
           error: customersError,
           empresa_id_usada: userEmpresa.empresa_id,
@@ -283,17 +289,18 @@ export default function Clientes() {
         });
         
         if (customersError) {
-          console.warn("Erro ao buscar clientes do banco, usando dados de demonstração:", customersError);
+          window.console.error("❌ [CLIENTES] Erro ao buscar clientes:", customersError);
+          window.console.error("❌ [CLIENTES] Detalhes do erro:", JSON.stringify(customersError, null, 2));
           return [];
         }
         
         if (!customers || customers.length === 0) {
-          console.log("Nenhum cliente encontrado no banco, usando dados de demonstração");
+          window.console.warn("⚠️ [CLIENTES] Nenhum cliente encontrado no banco para empresa_id:", userEmpresa.empresa_id);
           return [];
         }
         
-        console.log(`✅ [CLIENTES] ${customers.length} clientes encontrados no banco`);
-        console.log(`✅ [CLIENTES] Nomes dos clientes:`, customers.map(c => c.name || "Sem nome"));
+        window.console.log(`✅ [CLIENTES] ${customers.length} clientes encontrados no banco`);
+        window.console.log(`✅ [CLIENTES] Nomes dos clientes:`, customers.map(c => c.name || "Sem nome"));
         
         // Buscar histórico real de pedidos e orçamentos para cada cliente
         const clientsWithHistory = await Promise.all(
