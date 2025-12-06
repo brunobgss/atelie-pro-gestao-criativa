@@ -235,11 +235,11 @@ export default function Clientes() {
   ];
 
   // Buscar clientes reais do banco de dados com histórico
-  const { data: realClients = [], isLoading, refetch } = useQuery({
+  const { data: realClients = [], isLoading, refetch, error: queryError } = useQuery({
     queryKey: ["customers"],
     queryFn: async () => {
       try {
-        console.log("🔍 Buscando clientes do banco de dados...");
+        console.log("🔍 [CLIENTES] Iniciando busca de clientes do banco de dados...");
         
         // Obter usuário logado
         const { data: { user } } = await supabase.auth.getUser();
@@ -284,7 +284,8 @@ export default function Clientes() {
           return [];
         }
         
-        console.log(`✅ ${customers.length} clientes encontrados no banco`);
+        console.log(`✅ [CLIENTES] ${customers.length} clientes encontrados no banco`);
+        console.log(`✅ [CLIENTES] Nomes dos clientes:`, customers.map(c => c.name || "Sem nome"));
         
         // Buscar histórico real de pedidos e orçamentos para cada cliente
         const clientsWithHistory = await Promise.all(
@@ -346,22 +347,32 @@ export default function Clientes() {
           })
         );
         
+        console.log(`✅ [CLIENTES] Processamento concluído. Retornando ${clientsWithHistory.length} clientes com histórico`);
         return clientsWithHistory;
       } catch (error) {
-        console.warn("Erro ao buscar clientes, usando dados de demonstração:", error);
+        console.error("❌ [CLIENTES] Erro ao buscar clientes:", error);
+        console.warn("⚠️ [CLIENTES] Retornando array vazio, será usado dados de demonstração");
         return [];
       }
     },
     retry: false,
     staleTime: 0, // Sem cache para sempre buscar dados atualizados
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
   });
 
-  // Usar clientes reais se disponíveis, senão usar demonstração
-  console.log("🔍 Debug - realClients:", realClients);
-  console.log("🔍 Debug - realClients.length:", realClients.length);
-  console.log("🔍 Debug - demoClients.length:", demoClients.length);
+  // Logs de debug sempre visíveis
+  console.log("🔍 [CLIENTES] ===== DEBUG INFO =====");
+  console.log("🔍 [CLIENTES] isLoading:", isLoading);
+  console.log("🔍 [CLIENTES] queryError:", queryError);
+  console.log("🔍 [CLIENTES] realClients.length:", realClients.length);
+  console.log("🔍 [CLIENTES] realClients:", realClients);
+  console.log("🔍 [CLIENTES] demoClients.length:", demoClients.length);
+  console.log("🔍 [CLIENTES] searchTerm:", searchTerm);
   
+  // Usar clientes reais se disponíveis, senão usar demonstração
   const allClients = realClients.length > 0 ? realClients : demoClients;
+  console.log("🔍 [CLIENTES] allClients.length:", allClients.length);
   
   // Filtrar clientes pelo termo de busca
   const clients = allClients.filter((client) => {
@@ -375,10 +386,9 @@ export default function Clientes() {
     );
   });
   
-  console.log("🔍 Debug - searchTerm:", searchTerm);
-  console.log("🔍 Debug - allClients.length:", allClients.length);
-  console.log("🔍 Debug - clients filtrados:", clients.length, "clientes");
-  console.log("🔍 Debug - clientes encontrados:", clients.map(c => c.name || "Sem nome"));
+  console.log("🔍 [CLIENTES] clients filtrados:", clients.length, "clientes");
+  console.log("🔍 [CLIENTES] clientes encontrados:", clients.map(c => ({ id: c.id, name: c.name || "Sem nome" })));
+  console.log("🔍 [CLIENTES] =====================");
 
   if (isLoading) {
     return (
