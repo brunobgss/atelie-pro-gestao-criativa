@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Search, Phone, Mail, Package, Plus, Edit, Trash2, FileText, ShoppingCart, ExternalLink, Eye, MapPin, RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { createCustomer, deleteCustomer, updateCustomer } from "@/integrations/supabase/customers";
@@ -126,7 +126,8 @@ export default function Clientes() {
         toast.success("Cliente atualizado com sucesso!");
         setIsEditDialogOpen(false);
         setEditingClient(null);
-        // Invalidar e refetch da query de clientes
+        // Limpar completamente o cache e refetch
+        queryClient.removeQueries({ queryKey: ["customers"] });
         queryClient.invalidateQueries({ queryKey: ["customers"] });
         await refetch();
         // Sincronização automática
@@ -162,7 +163,8 @@ export default function Clientes() {
         const result = await deleteCustomer(client.id);
         if (result.ok) {
           toast.success("Cliente excluído com sucesso!");
-          // Invalidar e refetch da query de clientes
+          // Limpar completamente o cache e refetch
+          queryClient.removeQueries({ queryKey: ["customers"] });
           queryClient.invalidateQueries({ queryKey: ["customers"] });
           await refetch();
           // Sincronização automática
@@ -266,13 +268,19 @@ export default function Clientes() {
         
         console.log("🔍 Empresa ID encontrada:", userEmpresa.empresa_id);
         
+        // Buscar TODOS os clientes da empresa (sem filtros adicionais)
         const { data: customers, error: customersError } = await supabase
           .from("customers")
           .select("*")
           .eq("empresa_id", userEmpresa.empresa_id)
           .order("name", { ascending: true });
         
-        console.log("🔍 Resultado consulta customers:", { customers, customersError });
+        console.log("🔍 [CLIENTES] Resultado consulta customers:", { 
+          count: customers?.length || 0, 
+          error: customersError,
+          empresa_id_usada: userEmpresa.empresa_id,
+          clientes_ids: customers?.map(c => ({ id: c.id, name: c.name, empresa_id: c.empresa_id }))
+        });
         
         if (customersError) {
           console.warn("Erro ao buscar clientes do banco, usando dados de demonstração:", customersError);
@@ -362,17 +370,8 @@ export default function Clientes() {
   });
 
   // Logs de debug sempre visíveis
-  console.log("🔍 [CLIENTES] ===== DEBUG INFO =====");
-  console.log("🔍 [CLIENTES] isLoading:", isLoading);
-  console.log("🔍 [CLIENTES] queryError:", queryError);
-  console.log("🔍 [CLIENTES] realClients.length:", realClients.length);
-  console.log("🔍 [CLIENTES] realClients:", realClients);
-  console.log("🔍 [CLIENTES] demoClients.length:", demoClients.length);
-  console.log("🔍 [CLIENTES] searchTerm:", searchTerm);
-  
   // Usar clientes reais se disponíveis, senão usar demonstração
   const allClients = realClients.length > 0 ? realClients : demoClients;
-  console.log("🔍 [CLIENTES] allClients.length:", allClients.length);
   
   // Filtrar clientes pelo termo de busca
   const clients = allClients.filter((client) => {
@@ -385,10 +384,33 @@ export default function Clientes() {
       client.address?.toLowerCase().includes(search)
     );
   });
-  
-  console.log("🔍 [CLIENTES] clients filtrados:", clients.length, "clientes");
-  console.log("🔍 [CLIENTES] clientes encontrados:", clients.map(c => ({ id: c.id, name: c.name || "Sem nome" })));
-  console.log("🔍 [CLIENTES] =====================");
+
+  // Logs que sempre aparecem (usando window.console para garantir)
+  useEffect(() => {
+    const debugInfo = {
+      isLoading,
+      queryError: queryError?.message || null,
+      realClientsCount: realClients.length,
+      realClientsNames: realClients.map(c => c.name || "Sem nome"),
+      demoClientsCount: demoClients.length,
+      searchTerm,
+      allClientsCount: allClients.length,
+      clientsCount: clients.length,
+      clientsNames: clients.map(c => c.name || "Sem nome")
+    };
+    
+    // Usar window.console para garantir que não seja removido
+    window.console.log("🔍 [CLIENTES] ===== DEBUG INFO =====");
+    window.console.log("🔍 [CLIENTES] Debug completo:", JSON.stringify(debugInfo, null, 2));
+    window.console.log("🔍 [CLIENTES] isLoading:", isLoading);
+    window.console.log("🔍 [CLIENTES] queryError:", queryError);
+    window.console.log("🔍 [CLIENTES] realClients.length:", realClients.length);
+    window.console.log("🔍 [CLIENTES] realClients:", realClients);
+    window.console.log("🔍 [CLIENTES] allClients.length:", allClients.length);
+    window.console.log("🔍 [CLIENTES] clients filtrados:", clients.length);
+    window.console.log("🔍 [CLIENTES] clientes:", clients.map(c => ({ id: c.id, name: c.name || "Sem nome" })));
+    window.console.log("🔍 [CLIENTES] =====================");
+  }, [isLoading, queryError, realClients, allClients, clients, searchTerm]);
 
   if (isLoading) {
     return (
@@ -492,7 +514,8 @@ export default function Clientes() {
                       }
                     }
                     
-                    // Invalidar e refetch da query de clientes
+                    // Limpar completamente o cache e refetch
+                    queryClient.removeQueries({ queryKey: ["customers"] });
                     queryClient.invalidateQueries({ queryKey: ["customers"] });
                     await refetch();
                     // Sincronização automática
@@ -525,6 +548,8 @@ export default function Clientes() {
                 variant="outline"
                 size="sm"
                 onClick={async () => {
+                  // Limpar completamente o cache
+                  queryClient.removeQueries({ queryKey: ["customers"] });
                   queryClient.invalidateQueries({ queryKey: ["customers"] });
                   await refetch();
                   toast.success("Lista de clientes atualizada!");
