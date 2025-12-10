@@ -34,6 +34,10 @@ export default function Pedidos() {
         status: r.status,
       }));
     },
+    staleTime: 10000, // 10 segundos - dados considerados "frescos"
+    refetchOnWindowFocus: true, // Atualizar quando a janela recebe foco
+    refetchOnMount: true, // Sempre refetch ao montar o componente
+    refetchInterval: 30000, // Atualizar a cada 30 segundos automaticamente
   });
 
   const getStatusColor = (status: string) => {
@@ -42,11 +46,12 @@ export default function Pedidos() {
 
   const duplicateOrder = (order: unknown) => {
     // Armazenar dados do pedido para duplicação
+    const orderTyped = order as any;
     const orderData = {
-      client: order.client,
-      type: order.type,
-      description: order.description,
-      value: order.value,
+      client: orderTyped.customer_name || orderTyped.client,
+      type: orderTyped.type,
+      description: orderTyped.description,
+      value: orderTyped.value,
       // Não duplicar sinal pago e data de entrega
       paid: 0,
       delivery: "",
@@ -74,6 +79,7 @@ export default function Pedidos() {
           // Invalidar e recarregar os dados
           await queryClient.invalidateQueries({ queryKey: ["orders"] });
           await queryClient.invalidateQueries({ queryKey: ["order", orderId] });
+          await queryClient.invalidateQueries({ queryKey: ["receitas"] }); // Sincronizar receitas
         } else {
           console.error("Erro ao cancelar pedido:", result.error);
           toast.error(result.error || "Erro ao cancelar pedido");

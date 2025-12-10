@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { DollarSign, CreditCard, AlertCircle, CheckCircle, MessageCircle, Search, Calendar } from "lucide-react";
+import { DollarSign, CreditCard, AlertCircle, CheckCircle, MessageCircle, Search, Calendar, RefreshCw } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -33,7 +33,7 @@ interface PaymentStatus {
 export default function ControleFinanceiro() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
-  const [selectedPeriod, setSelectedPeriod] = useState<string>("current_month"); // current_month, last_month, all
+  const [selectedPeriod, setSelectedPeriod] = useState<string>("all"); // Mudado para "all" por padrão para mostrar todos os pedidos
   const queryClient = useQueryClient();
   const { empresa } = useAuth();
   const { formatCurrency } = useInternationalization();
@@ -43,14 +43,22 @@ export default function ControleFinanceiro() {
   const [customMessage, setCustomMessage] = useState("");
   const [selectedPayment, setSelectedPayment] = useState<PaymentStatus | null>(null);
 
-  const { data: orders = [] } = useQuery({
+  const { data: orders = [], refetch: refetchOrders } = useQuery({
     queryKey: ["orders"],
     queryFn: listOrders,
+    staleTime: 10000, // 10 segundos - dados considerados "frescos"
+    refetchOnWindowFocus: true, // Atualizar quando a janela recebe foco
+    refetchOnMount: true, // Sempre refetch ao montar o componente
+    refetchInterval: 30000, // Atualizar a cada 30 segundos automaticamente
   });
 
-  const { data: receitas = [] } = useQuery({
+  const { data: receitas = [], refetch: refetchReceitas } = useQuery({
     queryKey: ["receitas"],
     queryFn: listReceitas,
+    staleTime: 10000, // 10 segundos - dados considerados "frescos"
+    refetchOnWindowFocus: true, // Atualizar quando a janela recebe foco
+    refetchOnMount: true, // Sempre refetch ao montar o componente
+    refetchInterval: 30000, // Atualizar a cada 30 segundos automaticamente
   });
 
   // Função para atualizar status de pagamento
@@ -60,9 +68,13 @@ export default function ControleFinanceiro() {
       
       if (result.ok) {
         toast.success(`Status atualizado para: ${newStatus}`);
-        // Recarregar dados
-        queryClient.invalidateQueries({ queryKey: ["receitas"] });
-        queryClient.invalidateQueries({ queryKey: ["orders"] });
+        // Invalidar e refetch imediatamente para atualizar a tela
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ["receitas"] }),
+          queryClient.invalidateQueries({ queryKey: ["orders"] }),
+          refetchReceitas(),
+          refetchOrders()
+        ]);
       } else {
         toast.error(result.error || "Erro ao atualizar status");
       }
@@ -94,6 +106,11 @@ export default function ControleFinanceiro() {
 
   const { startDate, endDate } = getPeriodDates();
 
+  // Debug: Log para verificar quantos pedidos estão sendo processados
+  console.log(`[FINANCEIRO] Total de pedidos recebidos: ${orders.length}`);
+  console.log(`[FINANCEIRO] Total de receitas recebidas: ${receitas.length}`);
+  console.log(`[FINANCEIRO] Período selecionado: ${selectedPeriod}`, { startDate, endDate });
+
   // Processar dados de pagamento combinando pedidos e receitas
   const paymentStatus: PaymentStatus[] = orders
     .filter(order => {
@@ -105,6 +122,11 @@ export default function ControleFinanceiro() {
       // Filtrar por período se especificado
       if (startDate && endDate) {
         const orderDate = new Date(order.created_at || order.delivery_date || '');
+        // Verificar se a data é válida antes de comparar
+        if (isNaN(orderDate.getTime())) {
+          // Se a data não é válida, incluir o pedido para não perder dados
+          return true;
+        }
         return orderDate >= startDate && orderDate <= endDate;
       }
       
@@ -119,12 +141,13 @@ export default function ControleFinanceiro() {
       
       const remainingAmount = totalValue - paidAmount;
       const paymentPercentage = totalValue > 0 ? (paidAmount / totalValue) * 100 : 0;
-      const isFullyPaid = remainingAmount <= 0;
+      // Considerar pago apenas se o valor total for maior que 0 e o restante for menor ou igual a 0
+      const isFullyPaid = totalValue > 0 && remainingAmount <= 0;
       
       // Verificar se está atrasado (mais de 7 dias após entrega)
       const deliveryDate = order.delivery_date ? new Date(order.delivery_date) : null;
       const today = new Date();
-      const isOverdue = deliveryDate && today > deliveryDate && !isFullyPaid;
+      const isOverdue = deliveryDate && !isNaN(deliveryDate.getTime()) && today > deliveryDate && !isFullyPaid;
 
       return {
         id: order.id,
@@ -139,6 +162,11 @@ export default function ControleFinanceiro() {
         deliveryDate: order.delivery_date || "",
       };
     });
+
+  // Debug: Log para verificar quantos pedidos foram processados
+  console.log(`[FINANCEIRO] Total de pedidos processados: ${paymentStatus.length}`);
+  const naoPagos = paymentStatus.filter(p => !p.isFullyPaid);
+  console.log(`[FINANCEIRO] Pedidos não pagos: ${naoPagos.length}`);
 
   // Filtrar dados
   const filteredPayments = paymentStatus.filter(payment => {
@@ -294,6 +322,25 @@ _${empresa?.nome || 'Ateliê'}_`;
               </h1>
               <p className="text-gray-600 text-xs md:text-sm mt-0.5 truncate">Gestão de pagamentos e cobranças</p>
             </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                toast.loading("Atualizando dados...", { id: "refresh-financeiro" });
+                await Promise.all([
+                  queryClient.invalidateQueries({ queryKey: ["receitas"] }),
+                  queryClient.invalidateQueries({ queryKey: ["orders"] }),
+                  refetchReceitas(),
+                  refetchOrders()
+                ]);
+                toast.success("Dados atualizados!", { id: "refresh-financeiro" });
+              }}
+              className="flex-shrink-0"
+              title="Atualizar dados"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              <span className="hidden md:inline">Atualizar</span>
+            </Button>
           </div>
         </div>
       </div>

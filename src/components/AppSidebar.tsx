@@ -1,6 +1,6 @@
 import type { MouseEvent } from "react";
 import { useState, useEffect } from "react";
-import { LayoutDashboard, Package, Calendar, FileText, Users, Archive, LogOut, Calculator, BookOpen, BarChart3, Crown, DollarSign, User, Ruler, HelpCircle, Receipt, Building2, CreditCard, TrendingUp, ShoppingCart, AlertTriangle, Gift, Trophy, MessageCircle, ChevronDown, ChevronRight } from "lucide-react";
+import { LayoutDashboard, Package, Calendar, FileText, Users, Archive, LogOut, Calculator, BookOpen, BarChart3, Crown, DollarSign, User, Ruler, HelpCircle, Receipt, Building2, CreditCard, TrendingUp, ShoppingCart, AlertTriangle, Gift, Trophy, MessageCircle, ChevronDown, ChevronRight, Wrench } from "lucide-react";
 import { NavLink, useNavigate, useLocation } from "react-router-dom";
 import logoAteliePro from "@/assets/logo-atelie-pro.png";
 import {
@@ -60,6 +60,7 @@ const menuItems: MenuItem[] = [
     ],
   },
   { title: "Clientes", url: "/clientes", icon: Users },
+  { title: "Serviços", url: "/servicos", icon: Wrench },
   {
     title: "Fornecedores",
     url: "/fornecedores",

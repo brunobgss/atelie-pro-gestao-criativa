@@ -7,12 +7,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, Save, Share2, Plus, Trash2, MessageCircle, Printer, Package, Upload, CheckCircle, XCircle } from "lucide-react";
+import { ArrowLeft, Save, Share2, Plus, Trash2, MessageCircle, Printer, Package, Upload, CheckCircle, XCircle, Wrench } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useState } from "react";
 import { createQuote, generateQuoteCode } from "@/integrations/supabase/quotes";
 import { getProducts } from "@/integrations/supabase/products";
+import { listServicos } from "@/integrations/supabase/servicos";
 import { useAuth } from "@/components/AuthProvider";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useSync } from "@/contexts/SyncContext";
@@ -35,6 +36,7 @@ export default function NovoOrcamento() {
   const { syncAfterCreate } = useSyncOperations();
   const [items, setItems] = useState([{ description: "", quantity: 1, value: 0 }]);
   const [selectedProduct, setSelectedProduct] = useState<string>("");
+  const [selectedServico, setSelectedServico] = useState<string>("");
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [quantityModalOpen, setQuantityModalOpen] = useState(false);
@@ -68,6 +70,12 @@ export default function NovoOrcamento() {
   const { data: products = [] } = useQuery({
     queryKey: ["products"],
     queryFn: getProducts,
+  });
+
+  // Buscar serviços
+  const { data: servicos = [] } = useQuery({
+    queryKey: ["servicos"],
+    queryFn: () => listServicos({ ativo: true }),
   });
 
   // Função para buscar medidas do cliente
@@ -729,6 +737,66 @@ Aguardo seu retorno! 😊`;
                       </p>
                     </div>
                   </div>
+                )}
+              </div>
+
+              {/* Seletor de Serviços */}
+              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center gap-2 mb-3">
+                  <Wrench className="w-4 h-4 text-green-600" />
+                  <Label className="text-green-800 font-medium">Adicionar Serviço Rápido</Label>
+                </div>
+                <div className="flex gap-3">
+                  <Select value={selectedServico} onValueChange={setSelectedServico}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Selecione um serviço pré-cadastrado" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {servicos.map((servico) => (
+                        <SelectItem key={servico.id} value={servico.id}>
+                          {servico.nome}
+                          {servico.preco_padrao > 0 && ` - R$ ${servico.preco_padrao.toFixed(2)}`}
+                          {servico.categoria && ` (${servico.categoria})`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      if (!selectedServico) {
+                        toast.error("Selecione um serviço");
+                        return;
+                      }
+                      const servico = servicos.find(s => s.id === selectedServico);
+                      if (servico) {
+                        // Adicionar serviço como um novo item no orçamento
+                        const newItem = {
+                          description: servico.nome + (servico.descricao ? ` - ${servico.descricao}` : ""),
+                          quantity: 1,
+                          value: servico.preco_padrao || 0
+                        };
+                        setItems([...items, newItem]);
+                        
+                        // Só definir tipo como "outro" se o usuário ainda não tiver selecionado um tipo
+                        if (!type || type.trim() === "") {
+                          setType("outro");
+                        }
+                        toast.success(`Serviço "${servico.nome}" adicionado!`);
+                        setSelectedServico("");
+                      }
+                    }}
+                    disabled={!selectedServico}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Adicionar
+                  </Button>
+                </div>
+                {servicos.length === 0 && (
+                  <p className="text-xs text-green-700 mt-2">
+                    Nenhum serviço cadastrado. <a href="/servicos" className="underline">Cadastre serviços aqui</a>
+                  </p>
                 )}
               </div>
 

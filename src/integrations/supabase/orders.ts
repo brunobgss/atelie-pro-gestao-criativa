@@ -63,13 +63,13 @@ export async function listOrders(): Promise<OrderRow[]> {
       return [];
     }
 
-    const { data, error } = await supabase
-      .from("atelie_orders")
-      .select("id, code, customer_name, customer_phone, type, description, value, paid, delivery_date, status, file_url")
+    const { data, error } = await (supabase
+      .from("atelie_orders" as any)
+      .select("id, code, customer_name, customer_phone, type, description, value, paid, delivery_date, status, file_url, created_at")
       .eq("empresa_id", userEmpresa.empresa_id)
       .neq("status", "Cancelado") // Excluir pedidos cancelados das listagens
       .order("created_at", { ascending: false })
-      .limit(100);
+      .limit(500) as any); // Aumentar limite para garantir que todos os pedidos sejam buscados
     
     console.log("Pedidos encontrados no banco:", data?.length, "pedidos");
     if (data && data.length > 0) {
@@ -120,11 +120,11 @@ export async function getOrderByCode(code: string): Promise<OrderRow | null> {
     const isUuid = isUUID(code.trim());
     console.log("Tipo de identificador:", isUuid ? "UUID" : "Código");
     
-    const fetchPromise = supabase
-      .from("atelie_orders")
+    const fetchPromise = (supabase
+      .from("atelie_orders" as any)
       .select("*")
       .eq(isUuid ? "id" : "code", code.trim())
-      .maybeSingle();
+      .maybeSingle() as any);
 
     const { data, error } = await Promise.race([fetchPromise, timeoutPromise]) as any;
     
@@ -140,11 +140,11 @@ export async function getOrderByCode(code: string): Promise<OrderRow | null> {
     
     console.log("Pedido encontrado:", data);
 
-    const personalizationsPromise = supabase
-      .from("atelie_order_personalizations")
+    const personalizationsPromise = (supabase
+      .from("atelie_order_personalizations" as any)
       .select("id, order_id, empresa_id, person_name, size, quantity, notes, created_at, updated_at")
       .eq("order_id", data.id)
-      .order("created_at", { ascending: true });
+      .order("created_at", { ascending: true }) as any);
 
     const personalizationsResult = await Promise.race([personalizationsPromise, timeoutPromise]) as any;
     const personalizationsError = personalizationsResult?.error;
@@ -187,8 +187,8 @@ export async function createOrder(input: {
     // Obter empresa_id do usuário logado
     const empresa_id = await getCurrentEmpresaId();
     
-    const { data, error } = await supabase
-      .from("atelie_orders")
+    const { data, error } = await (supabase
+      .from("atelie_orders" as any)
       .insert({
         code,
         customer_name: input.customer_name,
@@ -205,20 +205,21 @@ export async function createOrder(input: {
         empresa_id
       })
       .select()
-      .single();
+      .single() as any);
 
     if (error) {
       console.error("Erro ao criar pedido:", error);
-      return { ok: false, error: error.message };
+      return { ok: false, error: (error as any)?.message || "Erro ao criar pedido" };
     }
 
     console.log("Pedido criado com sucesso:", data);
 
-    if (input.personalizations?.length && data?.id) {
+    const orderData = data as any;
+    if (input.personalizations?.length && orderData?.id) {
       const personalizations = input.personalizations
         .filter((p) => p.person_name?.trim())
         .map((p) => ({
-          order_id: data.id,
+          order_id: orderData.id,
           empresa_id,
           person_name: p.person_name.trim(),
           size: p.size?.trim() || null,
@@ -227,9 +228,9 @@ export async function createOrder(input: {
         }));
 
       if (personalizations.length) {
-        const { error: personalizationsError } = await supabase
-          .from("atelie_order_personalizations")
-          .insert(personalizations);
+        const { error: personalizationsError } = await (supabase
+          .from("atelie_order_personalizations" as any)
+          .insert(personalizations) as any);
 
         if (personalizationsError) {
           console.error("Erro ao salvar personalizações do pedido:", personalizationsError);
@@ -237,10 +238,42 @@ export async function createOrder(input: {
       }
     }
 
-    return { ok: true, id: data.id };
+    // SINCRONIZAÇÃO: Criar receita imediatamente se houver valor pago
+    if (input.paid && input.paid > 0 && orderData?.code) {
+      console.log("Criando receita automaticamente para pedido:", orderData.code);
+      try {
+        const { error: receitaError } = await (supabase
+          .from("atelie_receitas" as any)
+          .insert({
+            order_code: orderData.code,
+            customer_name: input.customer_name || "Sem nome",
+            description: `Pagamento do pedido ${orderData.code}`,
+            amount: input.paid,
+            payment_method: "Dinheiro",
+            payment_date: new Date().toISOString().split('T')[0],
+            status: "realizada",
+            empresa_id: empresa_id,
+            order_id: orderData.id,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          } as any));
+
+        if (receitaError) {
+          console.error("Erro ao criar receita automaticamente:", receitaError);
+          // Não falhar aqui, apenas logar
+        } else {
+          console.log("Receita criada automaticamente com sucesso");
+        }
+      } catch (receitaErr: any) {
+        console.error("Erro ao criar receita:", receitaErr);
+        // Não falhar aqui, apenas logar
+      }
+    }
+
+    return { ok: true, id: orderData.id };
   } catch (e: unknown) {
     console.error("Erro ao criar pedido:", e);
-    return { ok: false, error: e.message };
+    return { ok: false, error: (e as any)?.message || "Erro ao criar pedido" };
   }
 }
 
@@ -290,18 +323,18 @@ export async function updateOrderStatus(
       setTimeout(() => reject(new Error('Timeout')), 5000)
     );
 
-    const updatePromise = supabase
-      .from("atelie_orders")
+    const updatePromise = (supabase
+      .from("atelie_orders" as any)
       .update(updateData)
       .eq(column, value)
       .select()
-      .single();
+      .single() as any);
 
     const { data, error } = await Promise.race([updatePromise, timeoutPromise]) as any;
 
     if (error) {
       console.error("Erro ao atualizar pedido:", error);
-      return { ok: false, error: error.message };
+      return { ok: false, error: (error as any)?.message || "Erro ao atualizar pedido" };
     }
     
     if (!data) {
@@ -317,21 +350,21 @@ export async function updateOrderStatus(
       console.log("Campo 'paid' foi alterado, atualizando tabela de receitas...");
 
       // Buscar se já existe receita para este pedido
-      const { data: existingReceita } = await supabase
-        .from("atelie_receitas")
+      const { data: existingReceita } = await (supabase
+        .from("atelie_receitas" as any)
         .select("id")
         .eq("order_code", effectiveOrderCode)
-        .maybeSingle();
+        .maybeSingle() as any);
 
       if (existingReceita) {
         // Atualizar receita existente
-        const { error: updateReceitaError } = await supabase
-          .from("atelie_receitas")
+        const { error: updateReceitaError } = await (supabase
+          .from("atelie_receitas" as any)
           .update({ 
             amount: paid,
             updated_at: new Date().toISOString()
           })
-          .eq("order_code", effectiveOrderCode);
+          .eq("order_code", effectiveOrderCode) as any);
 
         if (updateReceitaError) {
           console.error("Erro ao atualizar receita:", updateReceitaError);
@@ -341,8 +374,8 @@ export async function updateOrderStatus(
         }
       } else if (updatedOrder.empresa_id) {
         // Criar nova receita com todos os campos obrigatórios
-        const { error: createReceitaError } = await supabase
-          .from("atelie_receitas")
+        const { error: createReceitaError } = await (supabase
+          .from("atelie_receitas" as any)
           .insert({
             order_code: effectiveOrderCode,
             customer_name: updatedOrder.customer_name || "Sem nome",
@@ -354,7 +387,7 @@ export async function updateOrderStatus(
             empresa_id: updatedOrder.empresa_id,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
-          });
+          } as any));
 
         if (createReceitaError) {
           console.error("Erro ao criar receita:", createReceitaError);
@@ -369,7 +402,7 @@ export async function updateOrderStatus(
     return { ok: true, data: updatedOrder };
   } catch (e: unknown) {
     console.error("Erro ao atualizar pedido:", e);
-    return { ok: false, error: e.message };
+    return { ok: false, error: (e as any)?.message || "Erro ao atualizar pedido" };
   }
 }
 
@@ -425,18 +458,18 @@ export async function updateOrder(
       setTimeout(() => reject(new Error('Timeout')), 5000)
     );
 
-    const updatePromise = supabase
-      .from("atelie_orders")
+    const updatePromise = (supabase
+      .from("atelie_orders" as any)
       .update(updateData)
       .eq(column, value)
       .select()
-      .single();
+      .single() as any);
 
     const { data, error } = await Promise.race([updatePromise, timeoutPromise]) as any;
 
     if (error) {
       console.error("Erro ao atualizar pedido:", error);
-      return { ok: false, error: error.message };
+      return { ok: false, error: (error as any)?.message || "Erro ao atualizar pedido" };
     }
 
     if (!data) {
@@ -453,21 +486,21 @@ export async function updateOrder(
       console.log("Campo 'paid' foi alterado, atualizando tabela de receitas...");
 
       // Buscar se já existe receita para este pedido
-      const { data: existingReceita } = await supabase
-        .from("atelie_receitas")
+      const { data: existingReceita } = await (supabase
+        .from("atelie_receitas" as any)
         .select("id")
         .eq("order_code", effectiveOrderCode)
-        .maybeSingle();
+        .maybeSingle() as any);
 
       if (existingReceita) {
         // Atualizar receita existente
-        const { error: updateReceitaError } = await supabase
-          .from("atelie_receitas")
+        const { error: updateReceitaError } = await (supabase
+          .from("atelie_receitas" as any)
           .update({ 
             amount: paidValue,
             updated_at: new Date().toISOString()
           })
-          .eq("order_code", effectiveOrderCode);
+          .eq("order_code", effectiveOrderCode) as any);
 
         if (updateReceitaError) {
           console.error("Erro ao atualizar receita:", updateReceitaError);
@@ -477,8 +510,8 @@ export async function updateOrder(
         }
       } else if (updatedOrder.empresa_id) {
         // Criar nova receita com todos os campos obrigatórios
-        const { error: createReceitaError } = await supabase
-          .from("atelie_receitas")
+        const { error: createReceitaError } = await (supabase
+          .from("atelie_receitas" as any)
           .insert({
             order_code: effectiveOrderCode,
             customer_name: updatedOrder.customer_name || "Sem nome",
@@ -490,7 +523,7 @@ export async function updateOrder(
             empresa_id: updatedOrder.empresa_id,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
-          });
+          } as any));
 
         if (createReceitaError) {
           console.error("Erro ao criar receita:", createReceitaError);
@@ -504,10 +537,10 @@ export async function updateOrder(
     if (personalizations && updatedOrder.id) {
       console.log("Atualizando personalizações do pedido:", personalizations.length);
 
-      const { error: deletePersonalizationsError } = await supabase
-        .from("atelie_order_personalizations")
+      const { error: deletePersonalizationsError } = await (supabase
+        .from("atelie_order_personalizations" as any)
         .delete()
-        .eq("order_id", updatedOrder.id);
+        .eq("order_id", updatedOrder.id) as any);
 
       if (deletePersonalizationsError) {
         console.error("Erro ao remover personalizações do pedido:", deletePersonalizationsError);
@@ -525,9 +558,9 @@ export async function updateOrder(
           }));
 
         if (sanitizedPersonalizations.length) {
-          const { error: insertPersonalizationsError } = await supabase
-            .from("atelie_order_personalizations")
-            .insert(sanitizedPersonalizations);
+          const { error: insertPersonalizationsError } = await (supabase
+            .from("atelie_order_personalizations" as any)
+            .insert(sanitizedPersonalizations) as any);
 
           if (insertPersonalizationsError) {
             console.error("Erro ao salvar personalizações do pedido:", insertPersonalizationsError);
@@ -536,11 +569,11 @@ export async function updateOrder(
       }
     }
 
-    const { data: orderPersonalizations, error: personalizationsError } = await supabase
-      .from("atelie_order_personalizations")
+    const { data: orderPersonalizations, error: personalizationsError } = await (supabase
+      .from("atelie_order_personalizations" as any)
       .select("id, order_id, empresa_id, person_name, size, quantity, notes, created_at, updated_at")
       .eq("order_id", updatedOrder.id)
-      .order("created_at", { ascending: true });
+      .order("created_at", { ascending: true }) as any);
 
     if (personalizationsError) {
       console.error("Erro ao carregar personalizações atualizadas:", personalizationsError);
@@ -552,7 +585,7 @@ export async function updateOrder(
     return { ok: true, data: updatedOrder };
   } catch (e: unknown) {
     console.error("Erro ao atualizar pedido:", e);
-    return { ok: false, error: e.message };
+    return { ok: false, error: (e as any)?.message || "Erro ao atualizar pedido" };
   }
 }
 

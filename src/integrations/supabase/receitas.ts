@@ -43,12 +43,12 @@ export async function listReceitas(): Promise<ReceitaRow[]> {
       return [];
     }
 
-    const { data, error } = await supabase
-      .from("atelie_receitas")
+    const { data, error } = await (supabase
+      .from("atelie_receitas" as any)
       .select("*")
       .eq("empresa_id", userEmpresa.empresa_id)
       .order("payment_date", { ascending: false })
-      .limit(100);
+      .limit(100) as any);
 
     if (error) {
       console.error("Erro ao buscar receitas:", error);
@@ -88,12 +88,12 @@ export async function getReceitaByOrderCode(orderCode: string): Promise<ReceitaR
       return null;
     }
 
-    const { data, error } = await supabase
-      .from("atelie_receitas")
+    const { data, error } = await (supabase
+      .from("atelie_receitas" as any)
       .select("*")
       .eq("order_code", orderCode)
       .eq("empresa_id", userEmpresa.empresa_id)
-      .maybeSingle();
+      .maybeSingle() as any);
 
     if (error) {
       console.error("Erro ao buscar receita:", error);
@@ -124,8 +124,8 @@ export async function createReceita(input: {
     // Obter empresa_id do usuário logado
     const empresa_id = await getCurrentEmpresaId();
     
-    const { data, error } = await supabase
-      .from("atelie_receitas")
+    const { data, error } = await (supabase
+      .from("atelie_receitas" as any)
       .insert({
         empresa_id,
         order_code: input.order_code,
@@ -137,7 +137,7 @@ export async function createReceita(input: {
         status: input.status ?? "Pago"
       })
       .select()
-      .maybeSingle();
+      .maybeSingle() as any);
 
     if (error) {
       console.error("Erro ao criar receita:", error);
@@ -171,12 +171,12 @@ export async function updateReceita(
       updated_at: new Date().toISOString()
     };
     
-    const { data, error } = await supabase
-      .from("atelie_receitas")
+    const { data, error } = await (supabase
+      .from("atelie_receitas" as any)
       .update(updateData)
       .eq("id", id)
       .select()
-      .maybeSingle();
+      .maybeSingle() as any);
 
     if (error) {
       console.error("Erro ao atualizar receita:", error);
@@ -196,10 +196,10 @@ export async function deleteReceita(id: string): Promise<{ ok: boolean; error?: 
   try {
     console.log("Deletando receita:", id);
     
-    const { error } = await supabase
-      .from("atelie_receitas")
+    const { error } = await (supabase
+      .from("atelie_receitas" as any)
       .delete()
-      .eq("id", id);
+      .eq("id", id) as any);
 
     if (error) {
       console.error("Erro ao deletar receita:", error);
@@ -223,11 +223,11 @@ export async function updatePaymentStatus(
     console.log(`Atualizando status de pagamento para ${orderCode}:`, status);
     
     // Buscar o pedido para obter o valor total e customer_name
-    const { data: order, error: orderError } = await supabase
-      .from("atelie_orders")
+    const { data: order, error: orderError } = await (supabase
+      .from("atelie_orders" as any)
       .select("id, value, paid, empresa_id, customer_name")
       .eq("code", orderCode)
-      .maybeSingle();
+      .maybeSingle() as any);
 
     if (orderError || !order) {
       console.error("Erro ao buscar pedido:", orderError);
@@ -248,21 +248,21 @@ export async function updatePaymentStatus(
     
     // IMPORTANTE: Criar/Atualizar registro na tabela RECEITAS, não apenas order.paid
     // Buscar se já existe receita para este pedido
-    const { data: existingReceita } = await supabase
-      .from("atelie_receitas")
+    const { data: existingReceita } = await (supabase
+      .from("atelie_receitas" as any)
       .select("id")
       .eq("order_code", orderCode)
-      .maybeSingle();
+      .maybeSingle() as any);
 
     if (existingReceita) {
       // Atualizar receita existente
-      const { error: updateReceitaError } = await supabase
-        .from("atelie_receitas")
+      const { error: updateReceitaError } = await (supabase
+        .from("atelie_receitas" as any)
         .update({ 
           amount: newPaidValue,
           updated_at: new Date().toISOString()
         })
-        .eq("order_code", orderCode);
+        .eq("order_code", orderCode) as any);
 
       if (updateReceitaError) {
         console.error("Erro ao atualizar receita:", updateReceitaError);
@@ -285,9 +285,9 @@ export async function updatePaymentStatus(
       
       console.log("Tentando criar receita com dados:", receitaData);
       
-      const { error: createReceitaError } = await supabase
-        .from("atelie_receitas")
-        .insert(receitaData);
+      const { error: createReceitaError } = await (supabase
+        .from("atelie_receitas" as any)
+        .insert(receitaData) as any);
 
       if (createReceitaError) {
         console.error("Erro detalhado ao criar receita:", JSON.stringify(createReceitaError, null, 2));
@@ -298,13 +298,13 @@ export async function updatePaymentStatus(
     }
     
     // Atualizar também order.paid para compatibilidade (DEPRECATED - não usar mais)
-    const { error: updateError } = await supabase
-      .from("atelie_orders")
+    const { error: updateError } = await (supabase
+      .from("atelie_orders" as any)
       .update({ 
         paid: newPaidValue,
         updated_at: new Date().toISOString()
       })
-      .eq("code", orderCode);
+      .eq("code", orderCode) as any);
 
     if (updateError) {
       console.error("Erro ao atualizar order.paid:", updateError);
@@ -315,6 +315,6 @@ export async function updatePaymentStatus(
     return { ok: true };
   } catch (e: unknown) {
     console.error("Erro ao atualizar status de pagamento:", e);
-    return { ok: false, error: e.message };
+    return { ok: false, error: (e as any)?.message || "Erro ao atualizar status de pagamento" };
   }
 }

@@ -39,6 +39,7 @@ export default function ContasPagar() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingConta, setEditingConta] = useState<ContaPagar | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState<Partial<ContaPagar>>({
     descricao: "",
     categoria: "",
@@ -123,6 +124,8 @@ export default function ContasPagar() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (isSubmitting) return; // Prevenir múltiplos cliques
+
     if (!formData.descricao?.trim()) {
       toast.error("Descrição é obrigatória");
       return;
@@ -138,9 +141,18 @@ export default function ContasPagar() {
       return;
     }
 
+    setIsSubmitting(true);
+    
+    // Timeout de segurança para evitar travamento infinito
+    const timeoutId = setTimeout(() => {
+      setIsSubmitting(false);
+      toast.error("Operação está demorando muito. Tente novamente.");
+    }, 30000); // 30 segundos
+
     try {
       if (editingConta?.id) {
         const result = await atualizarContaPagar(editingConta.id, formData);
+        clearTimeout(timeoutId);
         if (result.ok) {
           toast.success("Conta atualizada com sucesso!");
           invalidateRelated('contas_pagar');
@@ -150,6 +162,7 @@ export default function ContasPagar() {
         }
       } else {
         const result = await criarContaPagar(formData as Omit<ContaPagar, 'id' | 'created_at' | 'updated_at' | 'empresa_id' | 'valor_pago'>);
+        clearTimeout(timeoutId);
         if (result.ok) {
           toast.success("Conta criada com sucesso!");
           invalidateRelated('contas_pagar');
@@ -159,7 +172,10 @@ export default function ContasPagar() {
         }
       }
     } catch (error: any) {
+      clearTimeout(timeoutId);
       toast.error(error.message || "Erro ao salvar conta");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -518,11 +534,18 @@ export default function ContasPagar() {
               </div>
 
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={handleCloseDialog}>
+                <Button type="button" variant="outline" onClick={handleCloseDialog} disabled={isSubmitting}>
                   Cancelar
                 </Button>
-                <Button type="submit">
-                  {editingConta ? "Atualizar" : "Criar"}
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      {editingConta ? "Atualizando..." : "Criando..."}
+                    </>
+                  ) : (
+                    editingConta ? "Atualizar" : "Criar"
+                  )}
                 </Button>
               </DialogFooter>
             </form>

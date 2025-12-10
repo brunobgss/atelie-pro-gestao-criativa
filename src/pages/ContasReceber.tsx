@@ -28,6 +28,7 @@ import { getCustomers } from "@/integrations/supabase/customers";
 import { formatCurrency } from "@/utils/formatCurrency";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { ClientSearch } from "@/components/ClientSearch";
 
 export default function ContasReceber() {
   const queryClient = useQueryClient();
@@ -37,6 +38,8 @@ export default function ContasReceber() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingConta, setEditingConta] = useState<ContaReceber | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedClientName, setSelectedClientName] = useState<string>("");
   const [formData, setFormData] = useState<Partial<ContaReceber>>({
     descricao: "",
     categoria: "",
@@ -91,6 +94,8 @@ export default function ContasReceber() {
   const handleOpenDialog = (conta?: ContaReceber) => {
     if (conta) {
       setEditingConta(conta);
+      const cliente = clientes.find(c => c.id === conta.cliente_id);
+      setSelectedClientName(cliente?.name || "");
       setFormData({
         ...conta,
         data_vencimento: conta.data_vencimento.split('T')[0],
@@ -98,6 +103,7 @@ export default function ContasReceber() {
       });
     } else {
       setEditingConta(null);
+      setSelectedClientName("");
       setFormData({
         descricao: "",
         categoria: "",
@@ -118,10 +124,47 @@ export default function ContasReceber() {
   const handleCloseDialog = () => {
     setIsDialogOpen(false);
     setEditingConta(null);
+    setSelectedClientName("");
+  };
+
+  const handleClientChange = async (clientName: string) => {
+    setSelectedClientName(clientName);
+    
+    if (!clientName) {
+      setFormData({ ...formData, cliente_id: undefined });
+      return;
+    }
+    
+    // Buscar o ID do cliente pelo nome
+    let cliente = clientes.find(c => c.name === clientName);
+    
+    // Se o cliente não foi encontrado, recarregar lista de clientes
+    // Isso pode acontecer quando um novo cliente foi criado
+    if (!cliente && clientName) {
+      // Aguardar um pouco para garantir que o cliente foi salvo
+      await new Promise(resolve => setTimeout(resolve, 300));
+      await queryClient.refetchQueries({ queryKey: ["customers"] });
+      const updatedClients = await getCustomers();
+      cliente = updatedClients.find(c => c.name === clientName);
+      
+      if (cliente) {
+        setFormData({ ...formData, cliente_id: cliente.id });
+      } else {
+        // Se ainda não encontrou, tentar mais uma vez após mais um delay
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const finalClients = await getCustomers();
+        const finalCliente = finalClients.find(c => c.name === clientName);
+        setFormData({ ...formData, cliente_id: finalCliente?.id || undefined });
+      }
+    } else if (cliente) {
+      setFormData({ ...formData, cliente_id: cliente.id });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (isSubmitting) return; // Prevenir múltiplos cliques
 
     if (!formData.descricao?.trim()) {
       toast.error("Descrição é obrigatória");
@@ -138,9 +181,29 @@ export default function ContasReceber() {
       return;
     }
 
+    setIsSubmitting(true);
+    
+    // Timeout de segurança para evitar travamento infinito
+    const timeoutId = setTimeout(() => {
+      setIsSubmitting(false);
+      toast.error("Operação está demorando muito. Tente novamente.");
+    }, 30000); // 30 segundos
+
     try {
+      // Se um nome de cliente foi selecionado mas não encontramos o ID, buscar novamente
+      if (selectedClientName && !formData.cliente_id) {
+        // Recarregar clientes e buscar novamente
+        await queryClient.refetchQueries({ queryKey: ["customers"] });
+        const updatedClients = await getCustomers();
+        const clienteAtualizado = updatedClients.find(c => c.name === selectedClientName);
+        if (clienteAtualizado) {
+          formData.cliente_id = clienteAtualizado.id;
+        }
+      }
+
       if (editingConta?.id) {
         const result = await atualizarContaReceber(editingConta.id, formData);
+        clearTimeout(timeoutId);
         if (result.ok) {
           toast.success("Conta atualizada com sucesso!");
           invalidateRelated('contas_receber');
@@ -150,6 +213,7 @@ export default function ContasReceber() {
         }
       } else {
         const result = await criarContaReceber(formData as Omit<ContaReceber, 'id' | 'created_at' | 'updated_at' | 'empresa_id' | 'valor_recebido'>);
+        clearTimeout(timeoutId);
         if (result.ok) {
           toast.success("Conta criada com sucesso!");
           invalidateRelated('contas_receber');
@@ -159,7 +223,10 @@ export default function ContasReceber() {
         }
       }
     } catch (error: any) {
+      clearTimeout(timeoutId);
       toast.error(error.message || "Erro ao salvar conta");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -391,26 +458,12 @@ export default function ContasReceber() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="cliente_id">Cliente</Label>
-                  <Select
-                    value={formData.cliente_id || "__none__"}
-                    onValueChange={(value) => setFormData({ ...formData, cliente_id: value === "__none__" ? undefined : value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione um cliente" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">Nenhum</SelectItem>
-                      {clientes.map((cliente) => (
-                        <SelectItem key={cliente.id} value={cliente.id}>
-                          {cliente.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <ClientSearch
+                  value={selectedClientName}
+                  onChange={handleClientChange}
+                  placeholder="Selecione ou crie um cliente"
+                />
                 <div className="space-y-2">
                   <Label htmlFor="categoria">Categoria</Label>
                   <Input
@@ -519,11 +572,18 @@ export default function ContasReceber() {
               </div>
 
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={handleCloseDialog}>
+                <Button type="button" variant="outline" onClick={handleCloseDialog} disabled={isSubmitting}>
                   Cancelar
                 </Button>
-                <Button type="submit">
-                  {editingConta ? "Atualizar" : "Criar"}
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      {editingConta ? "Atualizando..." : "Criando..."}
+                    </>
+                  ) : (
+                    editingConta ? "Atualizar" : "Criar"
+                  )}
                 </Button>
               </DialogFooter>
             </form>

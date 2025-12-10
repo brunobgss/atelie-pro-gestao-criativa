@@ -456,9 +456,11 @@ export default function PedidoDetalhe() {
         
         // Invalidar cache e recursos relacionados
         invalidateRelated('orders');
+        invalidateRelated('receitas'); // Sincronizar receitas também
         // Refetch automático
         queryClient.refetchQueries({ queryKey: ["order", code] });
         queryClient.refetchQueries({ queryKey: ["orders"] });
+        queryClient.invalidateQueries({ queryKey: ["receitas"] }); // Invalidar receitas explicitamente
         
       } else {
         console.error("Erro ao atualizar status:", result.error);
@@ -500,6 +502,8 @@ export default function PedidoDetalhe() {
           // Forçar re-render imediato
           await queryClient.invalidateQueries({ queryKey: ["order", code] });
           await queryClient.invalidateQueries({ queryKey: ["orders"] });
+          await queryClient.invalidateQueries({ queryKey: ["receitas"] }); // Sincronizar receitas
+          invalidateRelated('receitas'); // Sincronizar via contexto
           
           // Refetch para garantir consistência
           refetch();
@@ -508,6 +512,8 @@ export default function PedidoDetalhe() {
           // Se não temos dados, forçar refetch completo
           await queryClient.invalidateQueries({ queryKey: ["order", code] });
           await queryClient.invalidateQueries({ queryKey: ["orders"] });
+          await queryClient.invalidateQueries({ queryKey: ["receitas"] }); // Sincronizar receitas
+          invalidateRelated('receitas'); // Sincronizar via contexto
           refetch();
         }
       } else {
@@ -536,6 +542,8 @@ export default function PedidoDetalhe() {
         // Forçar refetch para atualizar a interface
         await queryClient.invalidateQueries({ queryKey: ["order", code] });
         await queryClient.invalidateQueries({ queryKey: ["orders"] });
+        await queryClient.invalidateQueries({ queryKey: ["receitas"] }); // Sincronizar receitas
+        invalidateRelated('receitas'); // Sincronizar via contexto
         refetch();
       } else {
         console.error("Erro ao atualizar descrição:", result.error);

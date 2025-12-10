@@ -3,11 +3,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Search, Phone, Mail, Package, Plus, Edit, Trash2, FileText, ShoppingCart, ExternalLink, Eye, MapPin, RefreshCw } from "lucide-react";
+import { Search, Phone, Mail, Package, Plus, Edit, Trash2, FileText, ShoppingCart, ExternalLink, Eye, MapPin, RefreshCw, Trash } from "lucide-react";
+import { ImportContacts } from "@/components/ImportContacts";
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { createCustomer, deleteCustomer, updateCustomer } from "@/integrations/supabase/customers";
+import { createCustomer, deleteCustomer, updateCustomer, deleteInvalidCustomers } from "@/integrations/supabase/customers";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -139,6 +140,31 @@ export default function Clientes() {
     } catch (error) {
       console.error("Erro ao atualizar cliente:", error);
       toast.error("Erro ao atualizar cliente");
+    }
+  };
+
+  const handleCleanInvalidCustomers = async () => {
+    const confirmMessage = "Tem certeza que deseja excluir todos os clientes com nomes inválidos (BR, AO, AR, etc.)?\n\nEsta ação não pode ser desfeita!";
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+    
+    try {
+      toast.loading("Limpando clientes inválidos...", { id: "clean-invalid" });
+      const result = await deleteInvalidCustomers();
+      
+      if (result.ok) {
+        toast.success(`✅ ${result.deletedCount || 0} clientes inválidos excluídos com sucesso!`, { id: "clean-invalid" });
+        // Limpar cache e refetch
+        queryClient.removeQueries({ queryKey: ["customers"] });
+        queryClient.invalidateQueries({ queryKey: ["customers"] });
+        await refetch();
+      } else {
+        toast.error(result.error || "Erro ao limpar clientes inválidos", { id: "clean-invalid" });
+      }
+    } catch (error) {
+      console.error("Erro ao limpar clientes inválidos:", error);
+      toast.error("Erro ao limpar clientes inválidos", { id: "clean-invalid" });
     }
   };
 
@@ -288,6 +314,19 @@ export default function Clientes() {
           clientes_ids: customers?.map(c => ({ id: c.id, name: c.name, empresa_id: c.empresa_id }))
         });
         
+        // Log detalhado de cada cliente para debug
+        if (customers && customers.length > 0) {
+          window.console.log("📋 [CLIENTES] Dados brutos dos clientes:", customers.map(c => ({
+            id: c.id,
+            name: c.name,
+            name_length: c.name?.length || 0,
+            name_type: typeof c.name,
+            name_raw: JSON.stringify(c.name),
+            phone: c.phone,
+            email: c.email
+          })));
+        }
+        
         if (customersError) {
           window.console.error("❌ [CLIENTES] Erro ao buscar clientes:", customersError);
           window.console.error("❌ [CLIENTES] Detalhes do erro:", JSON.stringify(customersError, null, 2));
@@ -302,65 +341,109 @@ export default function Clientes() {
         window.console.log(`✅ [CLIENTES] ${customers.length} clientes encontrados no banco`);
         window.console.log(`✅ [CLIENTES] Nomes dos clientes:`, customers.map(c => c.name || "Sem nome"));
         
-        // Buscar histórico real de pedidos e orçamentos para cada cliente
-        const clientsWithHistory = await Promise.all(
-          customers.map(async (client) => {
-            // Só buscar histórico se o cliente tiver nome
-            if (!client.name) {
-              return {
-                ...client,
-                orders: 0,
-                quotes: 0,
-                lastOrder: null,
-                lastQuote: null,
-                totalValue: 0,
-                type: "Regular",
-                ordersList: [],
-                quotesList: []
-              };
+        // Filtrar clientes com nomes válidos (mais de 3 caracteres e não são códigos de país)
+        const validClients = customers.filter(client => {
+          const name = client.name?.trim() || "";
+          // Filtrar nomes muito curtos (provavelmente dados corrompidos)
+          // Códigos de país comuns: BR, AO, AR, BD, CO, CR, IN, MX, MZ, NI, PK, PT, TM
+          const countryCodes = ['BR', 'AO', 'AR', 'BD', 'CO', 'CR', 'IN', 'MX', 'MZ', 'NI', 'PK', 'PT', 'TM'];
+          return name.length > 3 && !countryCodes.includes(name.toUpperCase());
+        });
+        
+        const invalidClients = customers.filter(client => {
+          const name = client.name?.trim() || "";
+          const countryCodes = ['BR', 'AO', 'AR', 'BD', 'CO', 'CR', 'IN', 'MX', 'MZ', 'NI', 'PK', 'PT', 'TM'];
+          return name.length <= 3 || countryCodes.includes(name.toUpperCase());
+        });
+        
+        if (invalidClients.length > 0) {
+          window.console.warn(`⚠️ [CLIENTES] ${invalidClients.length} clientes com nomes inválidos detectados (serão exibidos sem histórico)`);
+        }
+        
+        // Buscar TODOS os pedidos e orçamentos de uma vez (otimização)
+        const allCustomerNames = validClients.map(c => c.name).filter(Boolean);
+        
+        // Buscar todos os pedidos de uma vez
+        const { data: allOrders } = await (supabase
+          .from("atelie_orders" as any)
+          .select("code, value, paid, status, delivery_date, created_at, customer_name")
+          .eq("empresa_id", userEmpresa.empresa_id)
+          .in("customer_name", allCustomerNames)
+          .order("created_at", { ascending: false }) as any);
+        
+        // Buscar todos os orçamentos de uma vez
+        const { data: allQuotes } = await (supabase
+          .from("atelie_quotes" as any)
+          .select("code, total_value, status, date, created_at, customer_name")
+          .eq("empresa_id", userEmpresa.empresa_id)
+          .in("customer_name", allCustomerNames)
+          .order("created_at", { ascending: false }) as any);
+        
+        // Agrupar pedidos e orçamentos por cliente
+        const ordersByCustomer = new Map<string, any[]>();
+        const quotesByCustomer = new Map<string, any[]>();
+        
+        (allOrders || []).forEach((order: any) => {
+          if (order.customer_name) {
+            if (!ordersByCustomer.has(order.customer_name)) {
+              ordersByCustomer.set(order.customer_name, []);
             }
-
-            // Buscar pedidos do cliente (filtrado por empresa)
-            const { data: orders } = await supabase
-              .from("atelie_orders")
-              .select("code, value, paid, status, delivery_date, created_at")
-              .eq("customer_name", client.name)
-              .eq("empresa_id", userEmpresa.empresa_id)
-              .order("created_at", { ascending: false });
-            
-            // Buscar orçamentos do cliente (filtrado por empresa)
-            const { data: quotes } = await supabase
-              .from("atelie_quotes")
-              .select("code, total_value, status, date, created_at")
-              .eq("customer_name", client.name)
-              .eq("empresa_id", userEmpresa.empresa_id)
-              .order("created_at", { ascending: false });
-            
-            // Calcular estatísticas reais
-            const totalOrders = orders?.length || 0;
-            const totalQuotes = quotes?.length || 0;
-            const lastOrderDate = orders?.[0]?.created_at ? 
-              new Date(orders[0].created_at).toISOString().split('T')[0] : null;
-            const lastQuoteDate = quotes?.[0]?.created_at ? 
-              new Date(quotes[0].created_at).toISOString().split('T')[0] : null;
-            
-            // Determinar tipo de cliente baseado no histórico
-            const totalValue = orders?.reduce((sum, order) => sum + (order.value || 0), 0) || 0;
-            const type = totalValue > 1000 ? "VIP" : "Regular";
-            
-            return {
-              ...client,
-              orders: totalOrders,
-              quotes: totalQuotes,
-              lastOrder: lastOrderDate,
-              lastQuote: lastQuoteDate,
-              totalValue: totalValue,
-              type: type,
-              ordersList: orders || [],
-              quotesList: quotes || []
-            };
-          })
-        );
+            ordersByCustomer.get(order.customer_name)!.push(order);
+          }
+        });
+        
+        (allQuotes || []).forEach((quote: any) => {
+          if (quote.customer_name) {
+            if (!quotesByCustomer.has(quote.customer_name)) {
+              quotesByCustomer.set(quote.customer_name, []);
+            }
+            quotesByCustomer.get(quote.customer_name)!.push(quote);
+          }
+        });
+        
+        // Processar clientes válidos com histórico
+        const clientsWithHistory = validClients.map((client) => {
+          const orders = ordersByCustomer.get(client.name) || [];
+          const quotes = quotesByCustomer.get(client.name) || [];
+          
+          const totalOrders = orders.length;
+          const totalQuotes = quotes.length;
+          const lastOrderDate = orders[0]?.created_at ? 
+            new Date(orders[0].created_at).toISOString().split('T')[0] : null;
+          const lastQuoteDate = quotes[0]?.created_at ? 
+            new Date(quotes[0].created_at).toISOString().split('T')[0] : null;
+          
+          const totalValue = orders.reduce((sum, order) => sum + (order.value || 0), 0);
+          const type = totalValue > 1000 ? "VIP" : "Regular";
+          
+          return {
+            ...client,
+            orders: totalOrders,
+            quotes: totalQuotes,
+            lastOrder: lastOrderDate,
+            lastQuote: lastQuoteDate,
+            totalValue: totalValue,
+            type: type,
+            ordersList: orders,
+            quotesList: quotes
+          };
+        });
+        
+        // Adicionar clientes inválidos sem histórico (para que possam ser editados)
+        const invalidClientsWithoutHistory = invalidClients.map(client => ({
+          ...client,
+          orders: 0,
+          quotes: 0,
+          lastOrder: null,
+          lastQuote: null,
+          totalValue: 0,
+          type: "Regular",
+          ordersList: [],
+          quotesList: []
+        }));
+        
+        // Combinar clientes válidos e inválidos
+        const allClientsWithHistory = [...clientsWithHistory, ...invalidClientsWithoutHistory];
         
         console.log(`✅ [CLIENTES] Processamento concluído. Retornando ${clientsWithHistory.length} clientes com histórico`);
         return clientsWithHistory;
@@ -371,8 +454,8 @@ export default function Clientes() {
       }
     },
     retry: false,
-    staleTime: 0, // Sem cache para sempre buscar dados atualizados
-    refetchOnWindowFocus: true,
+    staleTime: 30000, // Cache de 30 segundos para melhorar performance
+    refetchOnWindowFocus: false, // Não refetch automático para melhorar performance
     refetchOnMount: true,
   });
 
@@ -441,14 +524,32 @@ export default function Clientes() {
               <p className="text-xs md:text-sm text-muted-foreground truncate">Gerencie seus clientes</p>
             </div>
           </div>
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button size="sm" className="w-full md:w-auto bg-primary hover:bg-primary/90 text-xs md:text-sm">
-                <Plus className="w-4 h-4 mr-1 md:mr-2" />
-                <span className="hidden md:inline">Novo Cliente</span>
-                <span className="md:hidden">Novo</span>
+          <div className="flex gap-2 w-full md:w-auto">
+            <ImportContacts onImportComplete={() => {
+              queryClient.invalidateQueries({ queryKey: ["customers"] });
+              refetch();
+            }} />
+            {realClients.length > 0 && (
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="flex-1 md:flex-none text-xs md:text-sm border-destructive/50 text-destructive hover:bg-destructive/10"
+                onClick={handleCleanInvalidCustomers}
+                title="Limpar clientes com nomes inválidos (BR, AO, AR, etc.)"
+              >
+                <Trash className="w-4 h-4 mr-1 md:mr-2" />
+                <span className="hidden md:inline">Limpar Inválidos</span>
+                <span className="md:hidden">Limpar</span>
               </Button>
-            </DialogTrigger>
+            )}
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button size="sm" className="flex-1 md:flex-none bg-primary hover:bg-primary/90 text-xs md:text-sm">
+                  <Plus className="w-4 h-4 mr-1 md:mr-2" />
+                  <span className="hidden md:inline">Novo Cliente</span>
+                  <span className="md:hidden">Novo</span>
+                </Button>
+              </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Novo Cliente</DialogTitle>
@@ -486,7 +587,7 @@ export default function Clientes() {
                       {
                         name: validateName,
                         phone: validatePhone,
-                        email: (value) => value ? validateEmail(value) : { isValid: true, errors: [] }
+                        email: (value) => value && typeof value === 'string' ? validateEmail(value) : { isValid: true, errors: [] }
                       }
                     );
                     
@@ -534,6 +635,7 @@ export default function Clientes() {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
       </header>
 

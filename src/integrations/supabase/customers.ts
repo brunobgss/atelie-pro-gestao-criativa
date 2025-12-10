@@ -214,6 +214,74 @@ export async function deleteCustomer(id: string): Promise<{ ok: boolean; error?:
   }
 }
 
+export async function deleteInvalidCustomers(): Promise<{ ok: boolean; deletedCount?: number; error?: string }> {
+  try {
+    console.log("🧹 Limpando clientes inválidos do banco...");
+    
+    const empresa_id = await getCurrentEmpresaId();
+    if (!empresa_id) {
+      return { ok: false, error: "Erro ao obter empresa do usuário" };
+    }
+    
+    // Buscar todos os clientes da empresa
+    const { data: customers, error: fetchError } = await supabase
+      .from("customers")
+      .select("id, name")
+      .eq("empresa_id", empresa_id);
+    
+    if (fetchError) {
+      console.error("❌ Erro ao buscar clientes:", fetchError);
+      return { ok: false, error: "Erro ao buscar clientes" };
+    }
+    
+    if (!customers || customers.length === 0) {
+      return { ok: true, deletedCount: 0 };
+    }
+    
+    // Identificar clientes inválidos (nomes muito curtos ou códigos de país)
+    const countryCodes = ['BR', 'AO', 'AR', 'BD', 'CO', 'CR', 'IN', 'MX', 'MZ', 'NI', 'PK', 'PT', 'TM'];
+    const invalidCustomers = customers.filter(customer => {
+      const name = customer.name?.trim() || "";
+      return name.length <= 3 || countryCodes.includes(name.toUpperCase());
+    });
+    
+    if (invalidCustomers.length === 0) {
+      console.log("✅ Nenhum cliente inválido encontrado");
+      return { ok: true, deletedCount: 0 };
+    }
+    
+    console.log(`🗑️ Encontrados ${invalidCustomers.length} clientes inválidos para exclusão`);
+    
+    // Excluir clientes inválidos em lotes (Supabase tem limite de 1000 por vez)
+    const batchSize = 100;
+    let deletedCount = 0;
+    
+    for (let i = 0; i < invalidCustomers.length; i += batchSize) {
+      const batch = invalidCustomers.slice(i, i + batchSize);
+      const ids = batch.map(c => c.id);
+      
+      const { error: deleteError } = await supabase
+        .from("customers")
+        .delete()
+        .in("id", ids);
+      
+      if (deleteError) {
+        console.error("❌ Erro ao excluir lote de clientes:", deleteError);
+        return { ok: false, error: `Erro ao excluir clientes: ${deleteError.message}` };
+      }
+      
+      deletedCount += batch.length;
+      console.log(`✅ Lote ${Math.floor(i / batchSize) + 1} excluído: ${batch.length} clientes`);
+    }
+    
+    console.log(`✅ Limpeza concluída: ${deletedCount} clientes inválidos excluídos`);
+    return { ok: true, deletedCount };
+  } catch (e: unknown) {
+    console.error("❌ Erro ao limpar clientes inválidos:", e);
+    return { ok: false, error: (e as any)?.message ?? "Erro ao limpar clientes inválidos" };
+  }
+}
+
 export async function getCustomers(): Promise<CustomerRow[]> {
   try {
     console.log("🔍 Buscando clientes...");

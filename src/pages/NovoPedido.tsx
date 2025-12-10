@@ -7,13 +7,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, Upload, Save, Plus, Trash2, Copy, CheckCircle, XCircle } from "lucide-react";
+import { ArrowLeft, Upload, Save, Plus, Trash2, Copy, CheckCircle, XCircle, Wrench } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { createOrder, generateOrderCode } from "@/integrations/supabase/orders";
 import { uploadOrderFile } from "@/integrations/supabase/storage";
 import { getProducts } from "@/integrations/supabase/products";
 import { getMedidasByCliente } from "@/integrations/supabase/medidas";
+import { listServicos } from "@/integrations/supabase/servicos";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { useSync } from "@/contexts/SyncContext";
@@ -45,6 +46,12 @@ export default function NovoPedido() {
     queryKey: ["products"],
     queryFn: getProducts,
   });
+
+  // Buscar serviços
+  const { data: servicos = [] } = useQuery({
+    queryKey: ["servicos"],
+    queryFn: () => listServicos({ ativo: true }),
+  });
   
   // Estado para cliente
   const [clientName, setClientName] = useState<string>("");
@@ -60,6 +67,7 @@ export default function NovoPedido() {
   const [size, setSize] = useState<string>("");
   const [type, setType] = useState<string>("");
   const [selectedProduct, setSelectedProduct] = useState<string>("");
+  const [selectedServico, setSelectedServico] = useState<string>("");
   const [isKitMode, setIsKitMode] = useState<boolean>(false);
   const [kitItems, setKitItems] = useState<Array<{id: string, size: string, quantity: number}>>([
     { id: generateId(), size: "P", quantity: 0 },
@@ -117,11 +125,11 @@ export default function NovoPedido() {
       console.log("Buscando medidas para cliente:", nomeCliente);
       
       // Buscar medidas que contenham o nome do cliente
-      const { data: medidasEncontradas, error } = await supabase
-        .from('atelie_medidas')
+      const { data: medidasEncontradas, error } = await (supabase
+        .from('atelie_medidas' as any)
         .select('*')
         .ilike('cliente_nome', `%${nomeCliente}%`)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false }) as any);
 
       if (error) {
         console.error("Erro ao buscar medidas:", error);
@@ -269,11 +277,11 @@ export default function NovoPedido() {
       { client, type, description, value, delivery, quantity },
       {
         client: validateName,
-        type: (value) => value && value.trim() !== "" ? { isValid: true, errors: [] } : { isValid: false, errors: ['Tipo do pedido é obrigatório'] },
+        type: (value) => value && typeof value === 'string' && value.trim() !== "" ? { isValid: true, errors: [] } : { isValid: false, errors: ['Tipo do pedido é obrigatório'] },
         description: validateDescription,
         value: validateMoney,
         delivery: validateDate,
-        quantity: (value) => value > 0 ? { isValid: true, errors: [] } : { isValid: false, errors: ['Quantidade deve ser maior que zero'] }
+        quantity: (value) => typeof value === 'number' && value > 0 ? { isValid: true, errors: [] } : { isValid: false, errors: ['Quantidade deve ser maior que zero'] }
       }
     );
     
@@ -380,9 +388,13 @@ export default function NovoPedido() {
     
     console.log("Pedido criado com sucesso! Redirecionando para:", `/pedidos/${code}`);
     toast.success("Pedido criado com sucesso!");
-    // Sincronização automática
-    syncAfterCreate('orders', result.data);
+    // Sincronização automática - invalidar cache de pedidos E receitas
+    if (result.id) {
+      syncAfterCreate('orders', result.id);
+    }
     invalidateRelated('orders');
+    invalidateRelated('receitas'); // Garantir que receitas sejam atualizadas
+    queryClient.invalidateQueries({ queryKey: ["receitas"] }); // Invalidar explicitamente
     navigate(`/pedidos/${code}`);
   };
 
@@ -535,6 +547,75 @@ export default function NovoPedido() {
                       ) : null;
                     })()}
                   </div>
+                )}
+              </div>
+
+              {/* Seletor de Serviços */}
+              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center gap-2 mb-3">
+                  <Wrench className="w-4 h-4 text-green-600" />
+                  <Label className="text-green-800 font-medium">Adicionar Serviço Rápido</Label>
+                </div>
+                <div className="flex gap-3">
+                  <Select value={selectedServico} onValueChange={setSelectedServico}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Selecione um serviço pré-cadastrado" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {servicos.map((servico) => (
+                        <SelectItem key={servico.id} value={servico.id}>
+                          {servico.nome}
+                          {servico.preco_padrao > 0 && ` - R$ ${servico.preco_padrao.toFixed(2)}`}
+                          {servico.categoria && ` (${servico.categoria})`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      if (!selectedServico) {
+                        toast.error("Selecione um serviço");
+                        return;
+                      }
+                      const servico = servicos.find(s => s.id === selectedServico);
+                      if (servico) {
+                        const descriptionInput = document.getElementById("description") as HTMLTextAreaElement;
+                        const valueInput = document.getElementById("value") as HTMLInputElement;
+                        
+                        if (descriptionInput) {
+                          const currentDesc = descriptionInput.value;
+                          descriptionInput.value = currentDesc 
+                            ? `${currentDesc}\n${servico.nome}${servico.descricao ? ` - ${servico.descricao}` : ""}`
+                            : `${servico.nome}${servico.descricao ? ` - ${servico.descricao}` : ""}`;
+                        }
+                        
+                        if (valueInput && servico.preco_padrao > 0) {
+                          const currentValue = parseFloat(valueInput.value) || 0;
+                          valueInput.value = (currentValue + servico.preco_padrao).toFixed(2);
+                        }
+                        
+                        // Só definir tipo como "outro" se o usuário ainda não tiver selecionado um tipo
+                        // Isso preserva a escolha do usuário (ex: "Outros")
+                        // Usamos "outro" porque "servico" não é uma opção válida no Select
+                        if (!type || type.trim() === "") {
+                          setType("outro");
+                        }
+                        toast.success(`Serviço "${servico.nome}" adicionado!`);
+                        setSelectedServico("");
+                      }
+                    }}
+                    disabled={!selectedServico}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Adicionar
+                  </Button>
+                </div>
+                {servicos.length === 0 && (
+                  <p className="text-xs text-green-700 mt-2">
+                    Nenhum serviço cadastrado. <a href="/servicos" className="underline">Cadastre serviços aqui</a>
+                  </p>
                 )}
               </div>
 
