@@ -973,6 +973,363 @@ export default function PedidoDetalhe() {
     }
   };
 
+  // Função para gerar Cupom (Não Fiscal) - Otimizado para impressora térmica
+  const generateCupomFiscal = () => {
+    if (!order || !empresa) {
+      toast.error("Dados insuficientes para gerar cupom");
+      return;
+    }
+
+    // Formatar CNPJ
+    const formatCNPJ = (cnpj: string | undefined) => {
+      if (!cnpj) return "";
+      const cleaned = cnpj.replace(/\D/g, "");
+      if (cleaned.length === 14) {
+        return `${cleaned.slice(0, 2)}.${cleaned.slice(2, 5)}.${cleaned.slice(5, 8)}/${cleaned.slice(8, 12)}-${cleaned.slice(12)}`;
+      }
+      return cnpj;
+    };
+
+    // Formatar telefone
+    const formatPhone = (phone: string | undefined) => {
+      if (!phone) return "";
+      const cleaned = phone.replace(/\D/g, "");
+      if (cleaned.length === 11) {
+        return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 7)}-${cleaned.slice(7)}`;
+      } else if (cleaned.length === 10) {
+        return `(${cleaned.slice(0, 2)}) ${cleaned.slice(2, 6)}-${cleaned.slice(6)}`;
+      }
+      return phone;
+    };
+
+    // Formatar valor monetário
+    const formatCurrency = (value: number) => {
+      return new Intl.NumberFormat("pt-BR", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(value);
+    };
+
+    const now = new Date();
+    const dateStr = now.toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+    const timeStr = now.toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    // Gerar número do cupom (usar código do pedido ou timestamp)
+    const cupomNumber = order.id || now.getTime().toString().slice(-6);
+
+    // Calcular valores
+    const subtotal = order.value;
+    const total = order.value;
+    const paid = order.paid;
+    const remaining = total - paid;
+
+    // Gerar HTML do cupom otimizado para impressora térmica
+    const cupomHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Cupom - ${order.id}</title>
+          <meta charset="utf-8">
+          <style>
+            * { 
+              margin: 0; 
+              padding: 0; 
+              box-sizing: border-box; 
+            }
+            body { 
+              font-family: 'Courier New', 'Courier', monospace; 
+              font-size: 11px; 
+              line-height: 1.2; 
+              color: #000; 
+              background: white; 
+              padding: 5px;
+              width: 80mm;
+              max-width: 80mm;
+              margin: 0 auto;
+            }
+            .header { 
+              text-align: center; 
+              margin-bottom: 8px; 
+            }
+            .header h1 { 
+              font-size: 14px; 
+              font-weight: bold; 
+              margin-bottom: 4px; 
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+            }
+            .header p { 
+              font-size: 9px; 
+              margin: 1px 0;
+            }
+            .fiscal-notice {
+              text-align: center;
+              font-weight: bold;
+              font-size: 10px;
+              margin: 6px 0;
+              padding: 4px 0;
+              border-top: 1px solid #000;
+              border-bottom: 1px solid #000;
+            }
+            .info-section {
+              margin-bottom: 6px;
+              text-align: center;
+            }
+            .info-line {
+              font-size: 10px;
+              margin: 1px 0;
+            }
+            .info-label {
+              font-weight: bold;
+              text-transform: uppercase;
+            }
+            .customer-section {
+              margin: 6px 0;
+              text-align: center;
+              font-size: 10px;
+            }
+            .item-section {
+              margin: 6px 0;
+            }
+            .item-header {
+              display: flex;
+              justify-content: space-between;
+              font-size: 8px;
+              font-weight: bold;
+              margin-bottom: 3px;
+              text-transform: uppercase;
+            }
+            .item-row {
+              font-size: 10px;
+              margin: 3px 0;
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-start;
+            }
+            .item-number {
+              width: 25px;
+              text-align: left;
+            }
+            .item-description {
+              flex: 1;
+              margin: 0 3px;
+              text-align: left;
+              word-wrap: break-word;
+            }
+            .item-code {
+              width: 40px;
+              text-align: center;
+            }
+            .item-quantity {
+              width: 70px;
+              text-align: right;
+              white-space: nowrap;
+            }
+            .item-value {
+              width: 60px;
+              text-align: right;
+              white-space: nowrap;
+            }
+            .summary {
+              margin-top: 6px;
+              border-top: 1px solid #000;
+              padding-top: 4px;
+            }
+            .summary-line {
+              display: flex;
+              justify-content: space-between;
+              font-size: 10px;
+              margin: 2px 0;
+            }
+            .summary-total {
+              font-weight: bold;
+              font-size: 11px;
+            }
+            .payment-info {
+              margin: 6px 0;
+              padding: 4px 0;
+              border-top: 1px dashed #000;
+              border-bottom: 1px dashed #000;
+            }
+            .payment-line {
+              font-size: 10px;
+              margin: 2px 0;
+              display: flex;
+              justify-content: space-between;
+            }
+            .footer {
+              margin-top: 8px;
+              text-align: center;
+              font-size: 9px;
+            }
+            .footer p {
+              margin: 2px 0;
+            }
+            .policies {
+              margin: 6px 0;
+              font-size: 8px;
+              padding: 4px 0;
+              border-top: 1px dashed #000;
+              border-bottom: 1px dashed #000;
+            }
+            .policies p {
+              margin: 2px 0;
+              text-align: center;
+            }
+            .legal-notice {
+              font-size: 8px;
+              margin-top: 6px;
+              text-align: center;
+              padding: 4px 0;
+            }
+            .legal-notice p {
+              margin: 2px 0;
+            }
+            .contact {
+              margin-top: 6px;
+              font-size: 9px;
+              text-align: center;
+            }
+            @media print {
+              body { 
+                padding: 0;
+                margin: 0;
+              }
+              @page { 
+                size: 80mm auto;
+                margin: 0;
+                padding: 0;
+              }
+              * {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>${empresa.nome || "ATELIÊ PRO"}</h1>
+            ${empresa.endereco ? `<p>${empresa.endereco}</p>` : ""}
+            ${empresa.cpf_cnpj ? `<p>CNPJ: ${formatCNPJ(empresa.cpf_cnpj)}</p>` : ""}
+            ${empresa.telefone ? `<p>IE: ${formatPhone(empresa.telefone)}</p>` : ""}
+          </div>
+
+          <div class="fiscal-notice">
+            NAO E DOCUMENTO FISCAL
+          </div>
+
+          <div class="info-section">
+            <div class="info-line">
+              <span class="info-label">VENDA SIMPLES</span>
+            </div>
+            <div class="info-line">
+              <span>Numero: ${cupomNumber}</span>
+            </div>
+            <div class="info-line">
+              <span>${dateStr} ${timeStr}</span>
+            </div>
+          </div>
+
+          <div class="customer-section">
+            <div class="info-line">
+              <span class="info-label">Cliente</span>
+            </div>
+            <div class="info-line">
+              <span>${order.client || "CONSUMIDOR"}</span>
+            </div>
+          </div>
+
+          <div class="item-section">
+            <div class="item-header">
+              <span class="item-number">###</span>
+              <span class="item-description">DESCRICAO</span>
+              <span class="item-code">COD</span>
+              <span class="item-quantity">QTD UN</span>
+              <span class="item-value">VL ITEM</span>
+            </div>
+            <div class="item-row">
+              <span class="item-number">001</span>
+              <span class="item-description">${(order.description || order.type || "PRODUTO/SERVIÇO").toUpperCase()}</span>
+              <span class="item-code">${order.id.slice(0, 5)}</span>
+              <span class="item-quantity">1,000 UN x ${formatCurrency(order.value)}</span>
+              <span class="item-value">${formatCurrency(order.value)}</span>
+            </div>
+          </div>
+
+          <div class="summary">
+            <div class="summary-line">
+              <span>SUBTOTAL</span>
+              <span>${formatCurrency(subtotal)}</span>
+            </div>
+            <div class="summary-line summary-total">
+              <span>TOTAL</span>
+              <span>${formatCurrency(total)}</span>
+            </div>
+            ${paid > 0 ? `
+            <div class="summary-line">
+              <span>CREDITO (${paid >= total ? 'PAGO' : 'PARCIAL'})</span>
+              <span>${formatCurrency(paid)}</span>
+            </div>
+            ` : ""}
+          </div>
+
+          ${paid > 0 && remaining > 0 ? `
+          <div class="payment-info">
+            <div class="payment-line">
+              <span>RESTANTE:</span>
+              <span>${formatCurrency(remaining)}</span>
+            </div>
+          </div>
+          ` : ""}
+
+          <div class="footer">
+            <p>PDU No.: 1</p>
+            <p>Operador: Sistema</p>
+            ${empresa.responsavel ? `<p>Vendedor(a): ${empresa.responsavel.toUpperCase()}</p>` : ""}
+          </div>
+
+          <div class="policies">
+            <p>*** NAO EFETUAMOS TROCAS EM DIAS DE LIQUIDACAO ***</p>
+            <p>*** NAO EFETUAMOS TROCAS DE PECAS NA PROMOCAO ***</p>
+          </div>
+
+          <div class="legal-notice">
+            <p>Sonegar e Crime! Quem paga por ele? Voce!</p>
+            <p>Sua unica defesa: Exija a nota fiscal</p>
+          </div>
+
+          <div class="contact">
+            ${empresa.telefone ? `<p>Telefone: ${formatPhone(empresa.telefone)}</p>` : ""}
+          </div>
+        </body>
+      </html>
+    `;
+
+    // Abrir nova janela com o cupom
+    const newWindow = window.open("", "_blank");
+    if (newWindow) {
+      newWindow.document.write(cupomHtml);
+      newWindow.document.close();
+
+      // Aguardar carregamento e abrir diálogo de impressão
+      newWindow.onload = () => {
+        setTimeout(() => {
+          newWindow.print();
+        }, 250);
+      };
+    } else {
+      toast.error("Não foi possível abrir a janela. Verifique se os pop-ups estão bloqueados.");
+    }
+  };
+
   const steps = useMemo(() => {
     const defaultMap = new Map(DEFAULT_ORDER_STATUS_DETAILS.map((detail) => [detail.key, detail]));
     const baseSteps: Array<{ key: OrderItem["status"]; icon: any }> = [
@@ -1801,6 +2158,14 @@ export default function PedidoDetalhe() {
               >
                 <Users className="w-4 h-4 mr-2" />
                 Ficha Técnica Funcionários
+              </Button>
+              <Button
+                onClick={generateCupomFiscal}
+                variant="outline"
+                className="w-full sm:flex-1"
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                Imprimir Cupom
               </Button>
               <Dialog open={isStatusDialogOpen} onOpenChange={setIsStatusDialogOpen}>
                 <DialogTrigger asChild>
