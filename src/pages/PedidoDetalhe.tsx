@@ -1045,55 +1045,65 @@ export default function PedidoDetalhe() {
             }
             body { 
               font-family: 'Courier New', 'Courier', monospace; 
-              font-size: 11px; 
-              line-height: 1.2; 
-              color: #000; 
+              font-size: 13px; 
+              line-height: 1.4; 
+              color: #000000 !important; 
               background: white; 
               padding: 5px;
               width: 80mm;
               max-width: 80mm;
               margin: 0 auto;
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+            * {
+              color: #000000 !important;
             }
             .header { 
               text-align: center; 
               margin-bottom: 8px; 
             }
             .header h1 { 
-              font-size: 14px; 
+              font-size: 16px; 
               font-weight: bold; 
               margin-bottom: 4px; 
               text-transform: uppercase;
               letter-spacing: 0.5px;
+              color: #000000 !important;
             }
             .header p { 
-              font-size: 9px; 
+              font-size: 11px; 
               margin: 1px 0;
+              color: #000000 !important;
             }
             .fiscal-notice {
               text-align: center;
               font-weight: bold;
-              font-size: 10px;
+              font-size: 12px;
               margin: 6px 0;
               padding: 4px 0;
-              border-top: 1px solid #000;
-              border-bottom: 1px solid #000;
+              border-top: 2px solid #000000;
+              border-bottom: 2px solid #000000;
+              color: #000000 !important;
             }
             .info-section {
               margin-bottom: 6px;
               text-align: center;
             }
             .info-line {
-              font-size: 10px;
-              margin: 1px 0;
+              font-size: 12px;
+              margin: 2px 0;
+              color: #000000 !important;
             }
             .info-label {
               font-weight: bold;
               text-transform: uppercase;
+              color: #000000 !important;
             }
             .customer-section {
               margin: 6px 0;
               text-align: center;
-              font-size: 10px;
+              font-size: 12px;
             }
             .item-section {
               margin: 6px 0;
@@ -1101,106 +1111,132 @@ export default function PedidoDetalhe() {
             .item-header {
               display: flex;
               justify-content: space-between;
-              font-size: 8px;
+              font-size: 10px;
               font-weight: bold;
               margin-bottom: 3px;
               text-transform: uppercase;
+              color: #000000 !important;
             }
             .item-row {
-              font-size: 10px;
+              font-size: 12px;
               margin: 3px 0;
               display: flex;
               justify-content: space-between;
               align-items: flex-start;
+              color: #000000 !important;
             }
             .item-number {
               width: 25px;
               text-align: left;
+              color: #000000 !important;
+              font-weight: bold;
             }
             .item-description {
               flex: 1;
               margin: 0 3px;
               text-align: left;
               word-wrap: break-word;
+              color: #000000 !important;
+              font-weight: bold;
             }
             .item-code {
               width: 40px;
               text-align: center;
+              color: #000000 !important;
             }
             .item-quantity {
               width: 70px;
               text-align: right;
               white-space: nowrap;
+              color: #000000 !important;
+              font-weight: bold;
             }
             .item-value {
               width: 60px;
               text-align: right;
               white-space: nowrap;
+              color: #000000 !important;
+              font-weight: bold;
             }
             .summary {
               margin-top: 6px;
-              border-top: 1px solid #000;
+              border-top: 2px solid #000000;
               padding-top: 4px;
             }
             .summary-line {
               display: flex;
               justify-content: space-between;
-              font-size: 10px;
+              font-size: 12px;
               margin: 2px 0;
+              color: #000000 !important;
             }
             .summary-total {
               font-weight: bold;
-              font-size: 11px;
+              font-size: 14px;
+              color: #000000 !important;
             }
             .payment-info {
               margin: 6px 0;
               padding: 4px 0;
-              border-top: 1px dashed #000;
-              border-bottom: 1px dashed #000;
+              border-top: 2px dashed #000000;
+              border-bottom: 2px dashed #000000;
             }
             .payment-line {
-              font-size: 10px;
+              font-size: 12px;
               margin: 2px 0;
               display: flex;
               justify-content: space-between;
+              color: #000000 !important;
+              font-weight: bold;
             }
             .footer {
               margin-top: 8px;
               text-align: center;
-              font-size: 9px;
+              font-size: 11px;
             }
             .footer p {
               margin: 2px 0;
+              color: #000000 !important;
             }
             .policies {
               margin: 6px 0;
-              font-size: 8px;
+              font-size: 10px;
               padding: 4px 0;
-              border-top: 1px dashed #000;
-              border-bottom: 1px dashed #000;
+              border-top: 2px dashed #000000;
+              border-bottom: 2px dashed #000000;
             }
             .policies p {
               margin: 2px 0;
               text-align: center;
+              color: #000000 !important;
+              font-weight: bold;
             }
             .legal-notice {
-              font-size: 8px;
+              font-size: 10px;
               margin-top: 6px;
               text-align: center;
               padding: 4px 0;
             }
             .legal-notice p {
               margin: 2px 0;
+              color: #000000 !important;
+              font-weight: bold;
             }
             .contact {
               margin-top: 6px;
-              font-size: 9px;
+              font-size: 11px;
               text-align: center;
+            }
+            .contact p {
+              color: #000000 !important;
             }
             @media print {
               body { 
                 padding: 0;
                 margin: 0;
+                font-size: 13px !important;
+                color: #000000 !important;
+                background: white !important;
               }
               @page { 
                 size: 80mm auto;
@@ -1208,8 +1244,25 @@ export default function PedidoDetalhe() {
                 padding: 0;
               }
               * {
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                color: #000000 !important;
+                background: white !important;
+              }
+              .header h1,
+              .fiscal-notice,
+              .info-line,
+              .info-label,
+              .item-row,
+              .summary-line,
+              .summary-total,
+              .payment-line,
+              .footer p,
+              .policies p,
+              .legal-notice p,
+              .contact p {
+                color: #000000 !important;
+                font-weight: bold;
               }
             }
           </style>
