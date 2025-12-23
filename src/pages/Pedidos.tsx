@@ -1,19 +1,26 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { Plus, Search, Filter, Package, Calendar, User, Copy, Edit, X, FileText } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Plus, Search, Filter, Package, Calendar, User, Copy, Edit, X, FileText, XCircle } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listOrders, updateOrderStatus } from "@/integrations/supabase/orders";
 import { toast } from "sonner";
-import { getOrderStatusColor } from "@/utils/statusConstants";
+import { getOrderStatusColor, ORDER_STATUS_OPTIONS } from "@/utils/statusConstants";
 import { useInternationalization } from "@/contexts/InternationalizationContext";
 
 export default function Pedidos() {
   const [searchTerm, setSearchTerm] = useState("");
+  const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
+  const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [filterType, setFilterType] = useState<string>("all");
+  const [filterPeriod, setFilterPeriod] = useState<string>("all");
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { formatCurrency } = useInternationalization();
@@ -42,6 +49,85 @@ export default function Pedidos() {
 
   const getStatusColor = (status: string) => {
     return getOrderStatusColor(status);
+  };
+
+  // Obter tipos únicos de pedidos
+  const orderTypes = useMemo(() => {
+    const types = new Set<string>();
+    orders.forEach(order => {
+      if (order.type) {
+        types.add(order.type);
+      }
+    });
+    return Array.from(types).sort();
+  }, [orders]);
+
+  // Filtrar pedidos
+  const filteredOrders = useMemo(() => {
+    let filtered = [...orders];
+
+    // Filtro de busca
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(order =>
+        order.client?.toLowerCase().includes(term) ||
+        order.type?.toLowerCase().includes(term) ||
+        order.id?.toLowerCase().includes(term) ||
+        order.description?.toLowerCase().includes(term)
+      );
+    }
+
+    // Filtro de status
+    if (filterStatus !== "all") {
+      filtered = filtered.filter(order => order.status === filterStatus);
+    }
+
+    // Filtro de tipo
+    if (filterType !== "all") {
+      filtered = filtered.filter(order => order.type === filterType);
+    }
+
+    // Filtro de período
+    if (filterPeriod !== "all") {
+      const now = new Date();
+      let startDate: Date | null = null;
+      let endDate: Date | null = null;
+
+      if (filterPeriod === "current_month") {
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+      } else if (filterPeriod === "last_month") {
+        startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        endDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+      } else if (filterPeriod === "last_7_days") {
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        endDate = now;
+      } else if (filterPeriod === "last_30_days") {
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        endDate = now;
+      }
+
+      if (startDate && endDate) {
+        filtered = filtered.filter(order => {
+          if (!order.delivery) return false;
+          const deliveryDate = new Date(order.delivery);
+          return deliveryDate >= startDate! && deliveryDate <= endDate!;
+        });
+      }
+    }
+
+    return filtered;
+  }, [orders, searchTerm, filterStatus, filterType, filterPeriod]);
+
+  // Verificar se há filtros ativos
+  const hasActiveFilters = filterStatus !== "all" || filterType !== "all" || filterPeriod !== "all";
+
+  // Limpar filtros
+  const clearFilters = () => {
+    setFilterStatus("all");
+    setFilterType("all");
+    setFilterPeriod("all");
+    setIsFilterDialogOpen(false);
   };
 
   const duplicateOrder = (order: unknown) => {
@@ -312,17 +398,60 @@ export default function Pedidos() {
                   className="pl-10 border-input"
                 />
               </div>
-              <Button variant="outline" className="border-border">
+              <Button 
+                variant="outline" 
+                className={`border-border ${hasActiveFilters ? 'bg-primary/10 border-primary' : ''}`}
+                onClick={() => setIsFilterDialogOpen(true)}
+              >
                 <Filter className="w-4 h-4 mr-2" />
                 Filtrar
+                {hasActiveFilters && (
+                  <Badge variant="secondary" className="ml-2 h-5 w-5 rounded-full p-0 flex items-center justify-center">
+                    <span className="text-xs">!</span>
+                  </Badge>
+                )}
               </Button>
             </div>
           </CardContent>
         </Card>
 
+        {/* Contador de resultados */}
+        {(searchTerm || hasActiveFilters) && (
+          <div className="text-sm text-muted-foreground">
+            Mostrando {filteredOrders.length} de {orders.length} pedido(s)
+            {hasActiveFilters && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearFilters}
+                className="ml-2 h-auto p-1 text-xs"
+              >
+                <XCircle className="w-3 h-3 mr-1" />
+                Limpar filtros
+              </Button>
+            )}
+          </div>
+        )}
+
         {/* Orders List */}
         <div className="grid gap-4">
-          {orders.map((order) => (
+          {filteredOrders.length === 0 ? (
+            <Card className="border-border">
+              <CardContent className="p-8 text-center">
+                <p className="text-muted-foreground">Nenhum pedido encontrado com os filtros aplicados.</p>
+                {hasActiveFilters && (
+                  <Button
+                    variant="outline"
+                    onClick={clearFilters}
+                    className="mt-4"
+                  >
+                    Limpar filtros
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            filteredOrders.map((order) => (
             <Card
               key={order.id}
               className="border-border hover:shadow-md transition-all animate-fade-in cursor-pointer"
@@ -360,7 +489,7 @@ export default function Pedidos() {
                       <div>
                         <p className="text-xs text-muted-foreground">Entrega</p>
                         <p className="text-sm font-medium text-foreground">
-                          {new Date(order.delivery).toLocaleDateString('pt-BR')}
+                          {order.delivery ? new Date(order.delivery).toLocaleDateString('pt-BR') : 'Não definida'}
                         </p>
                       </div>
                     </div>
@@ -420,9 +549,83 @@ export default function Pedidos() {
                 </div>
               </CardContent>
             </Card>
-          ))}
+            ))
+          )}
         </div>
       </div>
+
+      {/* Dialog de Filtros */}
+      <Dialog open={isFilterDialogOpen} onOpenChange={setIsFilterDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Filtrar Pedidos</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            {/* Filtro de Status */}
+            <div className="space-y-2">
+              <Label htmlFor="status-filter">Status</Label>
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger id="status-filter">
+                  <SelectValue placeholder="Selecione um status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os status</SelectItem>
+                  {ORDER_STATUS_OPTIONS.map((status) => (
+                    <SelectItem key={status.value} value={status.value}>
+                      {status.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Filtro de Tipo */}
+            <div className="space-y-2">
+              <Label htmlFor="type-filter">Tipo de Pedido</Label>
+              <Select value={filterType} onValueChange={setFilterType}>
+                <SelectTrigger id="type-filter">
+                  <SelectValue placeholder="Selecione um tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os tipos</SelectItem>
+                  {orderTypes.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Filtro de Período */}
+            <div className="space-y-2">
+              <Label htmlFor="period-filter">Período</Label>
+              <Select value={filterPeriod} onValueChange={setFilterPeriod}>
+                <SelectTrigger id="period-filter">
+                  <SelectValue placeholder="Selecione um período" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todo o período</SelectItem>
+                  <SelectItem value="last_7_days">Últimos 7 dias</SelectItem>
+                  <SelectItem value="last_30_days">Últimos 30 dias</SelectItem>
+                  <SelectItem value="current_month">Mês atual</SelectItem>
+                  <SelectItem value="last_month">Mês anterior</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={clearFilters}>
+              Limpar Filtros
+            </Button>
+            <Button onClick={() => setIsFilterDialogOpen(false)}>
+              Aplicar Filtros
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
