@@ -31,6 +31,7 @@ import {
   deleteServico,
   type ServicoRow 
 } from "@/integrations/supabase/servicos";
+import { ImportServicos } from "@/components/ImportServicos";
 import { formatCurrency } from "@/utils/formatCurrency";
 
 export default function Servicos() {
@@ -186,10 +187,17 @@ export default function Servicos() {
               <p className="text-xs md:text-sm text-muted-foreground truncate">Gerencie seus serviços para lançamento rápido</p>
             </div>
           </div>
-          <Button onClick={() => handleOpenDialog()} size="sm" className="w-full md:w-auto">
-            <Plus className="w-4 h-4 mr-2" />
-            Novo Serviço
-          </Button>
+          <div className="flex gap-2">
+            <ImportServicos 
+              onImportComplete={() => {
+                queryClient.invalidateQueries({ queryKey: ["servicos"] });
+              }} 
+            />
+            <Button onClick={() => handleOpenDialog()} size="sm" className="w-full md:w-auto">
+              <Plus className="w-4 h-4 mr-2" />
+              Novo Serviço
+            </Button>
+          </div>
         </div>
       </header>
 

@@ -14,6 +14,7 @@ import { getProducts, createProduct, updateProduct, deleteProduct } from "@/inte
 import { uploadProductImage } from "@/integrations/supabase/storage";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { DialogVariacoesProduto } from "@/components/DialogVariacoesProduto";
+import { ImportProducts } from "@/components/ImportProducts";
 import { useSync } from "@/contexts/SyncContext";
 import { useSyncOperations } from "@/hooks/useSyncOperations";
 import { useInternationalization } from "@/contexts/InternationalizationContext";
@@ -396,14 +397,21 @@ _Orçamento gerado pelo Ateliê Pro_
             </div>
           </div>
           
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" className="w-full md:w-auto bg-gray-900 text-white hover:bg-gray-800 shadow-lg text-xs md:text-sm">
-                <Plus className="w-4 h-4 mr-1 md:mr-2" />
-                <span className="hidden md:inline">Novo Produto</span>
-                <span className="md:hidden">Novo</span>
-              </Button>
-            </DialogTrigger>
+          <div className="flex gap-2">
+            <ImportProducts 
+              onImportComplete={() => {
+                refetch();
+                queryClient.invalidateQueries({ queryKey: ["products"] });
+              }} 
+            />
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" className="w-full md:w-auto bg-gray-900 text-white hover:bg-gray-800 shadow-lg text-xs md:text-sm">
+                  <Plus className="w-4 h-4 mr-1 md:mr-2" />
+                  <span className="hidden md:inline">Novo Produto</span>
+                  <span className="md:hidden">Novo</span>
+                </Button>
+              </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
               <DialogHeader className="flex-shrink-0">
                 <DialogTitle>
@@ -614,6 +622,7 @@ _Orçamento gerado pelo Ateliê Pro_
               </form>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
       </div>
 
