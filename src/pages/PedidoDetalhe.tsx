@@ -579,9 +579,48 @@ export default function PedidoDetalhe() {
     enabled: !!empresa?.id && !!orderDb?.customer_name,
   });
   
+  // Função para remover duplicatas das personalizações
+  const removeDuplicatePersonalizations = useCallback((personalizations: OrderRow["personalizations"] = []) => {
+    if (!personalizations || personalizations.length === 0) return [];
+    
+    // Primeiro, tentar usar IDs únicos se disponíveis
+    const seenIds = new Set<string>();
+    const seenKeys = new Map<string, typeof personalizations[0]>();
+    const uniqueItems: typeof personalizations = [];
+    
+    personalizations.forEach((item) => {
+      // Se o item tem um ID único, usar ele para verificar duplicatas
+      if (item.id) {
+        if (!seenIds.has(item.id)) {
+          seenIds.add(item.id);
+          uniqueItems.push(item);
+        } else {
+          console.warn(`Personalização duplicada encontrada (ID: ${item.id}):`, item);
+        }
+      } else {
+        // Se não tem ID, usar uma combinação de campos como chave
+        const key = `${item.person_name || ''}_${item.size || ''}_${item.quantity || 1}_${item.notes || ''}`;
+        
+        if (!seenKeys.has(key)) {
+          seenKeys.set(key, item);
+          uniqueItems.push(item);
+        } else {
+          console.warn(`Personalização duplicada encontrada (chave: ${key}):`, item);
+        }
+      }
+    });
+    
+    if (personalizations.length !== uniqueItems.length) {
+      console.log(`Removidas ${personalizations.length - uniqueItems.length} personalizações duplicadas. Original: ${personalizations.length}, Único: ${uniqueItems.length}`);
+    }
+    
+    return uniqueItems;
+  }, []);
+
   const order = useMemo(() => {
     if (orderDb) {
       console.log("Dados do pedido recebidos:", orderDb, "forceUpdate:", forceUpdate);
+      const personalizations = removeDuplicatePersonalizations(orderDb.personalizations);
       return {
         id: orderDb.code,
         client: orderDb.customer_name,
@@ -592,11 +631,11 @@ export default function PedidoDetalhe() {
         delivery: orderDb.delivery_date ?? "",
         status: orderDb.status,
         file: orderDb.file_url ?? undefined,
-        personalizations: orderDb.personalizations ?? [],
+        personalizations: personalizations,
       } as OrderItem;
     }
     return null;
-  }, [orderDb, forceUpdate]);
+  }, [orderDb, forceUpdate, removeDuplicatePersonalizations]);
 
   // Função para determinar o status de pagamento
   const getPaymentStatus = () => {
@@ -1593,27 +1632,31 @@ export default function PedidoDetalhe() {
                     </span>
                   </div>
                   <div className="space-y-2">
-                    {order.personalizations.map((item) => (
-                      <div
-                        key={item.id}
-                        className="flex flex-col gap-1 rounded-md border border-border/80 bg-muted/20 p-3 text-xs sm:flex-row sm:items-center sm:justify-between"
-                      >
-                        <div className="flex flex-col">
-                          <span className="text-sm font-medium text-foreground">{item.person_name}</span>
-                          <span className="text-muted-foreground">
-                            {item.size ? `Tamanho: ${item.size}` : "Tamanho não informado"}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-3 text-muted-foreground">
-                          <span>Qtd: {item.quantity}</span>
-                          {item.notes && (
-                            <span className="max-w-[240px] truncate text-muted-foreground/90">
-                              {item.notes}
+                    {order.personalizations.map((item, index) => {
+                      // Criar uma chave única: usar ID se disponível, senão usar índice + campos únicos
+                      const uniqueKey = item.id || `${index}-${item.person_name}-${item.size}-${item.quantity}-${item.notes}`;
+                      return (
+                        <div
+                          key={uniqueKey}
+                          className="flex flex-col gap-1 rounded-md border border-border/80 bg-muted/20 p-3 text-xs sm:flex-row sm:items-center sm:justify-between"
+                        >
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium text-foreground">{item.person_name}</span>
+                            <span className="text-muted-foreground">
+                              {item.size ? `Tamanho: ${item.size}` : "Tamanho não informado"}
                             </span>
-                          )}
+                          </div>
+                          <div className="flex items-center gap-3 text-muted-foreground">
+                            <span>Qtd: {item.quantity}</span>
+                            {item.notes && (
+                              <span className="max-w-[240px] truncate text-muted-foreground/90">
+                                {item.notes}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
