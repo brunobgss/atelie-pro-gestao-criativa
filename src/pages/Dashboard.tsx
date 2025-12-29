@@ -433,12 +433,12 @@ _${empresa?.nome || 'Atelie'}_`;
             </>
           ) : (
             <>
-              <Card className="bg-white border border-purple-200/40 shadow-md">
+              <Card className="bg-gradient-to-br from-white via-purple-50/30 to-white border border-purple-200/40 shadow-lg hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 animate-scale-in">
                 <CardHeader className="flex flex-row items-center justify-between pb-3 px-4 md:px-6 pt-4 md:pt-6">
                   <CardTitle className="text-sm font-medium text-gray-600">
                     Pedidos em Andamento
                   </CardTitle>
-                  <div className="w-12 h-12 md:w-14 md:h-14 rounded-3xl bg-purple-100 flex items-center justify-center flex-shrink-0">
+                  <div className="w-12 h-12 md:w-14 md:h-14 rounded-3xl bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center shadow-md flex-shrink-0">
                     <Package className="h-6 w-6 md:h-7 md:w-7 text-purple-700" />
                   </div>
                 </CardHeader>
@@ -453,12 +453,12 @@ _${empresa?.nome || 'Atelie'}_`;
                 </CardContent>
               </Card>
 
-              <Card className="bg-white border border-blue-200/40 shadow-md">
+              <Card className="bg-gradient-to-br from-white via-blue-50/30 to-white border border-blue-200/40 shadow-lg hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 animate-scale-in">
                 <CardHeader className="flex flex-row items-center justify-between pb-3 px-4 md:px-6 pt-4 md:pt-6">
                   <CardTitle className="text-sm font-medium text-gray-600">
                     Em Producao
                   </CardTitle>
-                  <div className="w-12 h-12 md:w-14 md:h-14 rounded-3xl bg-blue-100 flex items-center justify-center flex-shrink-0">
+                  <div className="w-12 h-12 md:w-14 md:h-14 rounded-3xl bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center shadow-md flex-shrink-0">
                     <Clock className="h-6 w-6 md:h-7 md:w-7 text-blue-700" />
                   </div>
                 </CardHeader>
@@ -474,12 +474,12 @@ _${empresa?.nome || 'Atelie'}_`;
                 </CardContent>
               </Card>
 
-              <Card className="bg-white border border-green-200/40 shadow-md">
+              <Card className="bg-gradient-to-br from-white via-green-50/30 to-white border border-green-200/40 shadow-lg hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 animate-scale-in">
                 <CardHeader className="flex flex-row items-center justify-between pb-3 px-4 md:px-6 pt-4 md:pt-6">
                   <CardTitle className="text-sm font-medium text-gray-600">
                     Concluidos Hoje
                   </CardTitle>
-                  <div className="w-12 h-12 md:w-14 md:h-14 rounded-3xl bg-green-100 flex items-center justify-center flex-shrink-0">
+                  <div className="w-12 h-12 md:w-14 md:h-14 rounded-3xl bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center shadow-md flex-shrink-0">
                     <CheckCircle className="h-6 w-6 md:h-7 md:w-7 text-green-700" />
                   </div>
                 </CardHeader>
@@ -495,12 +495,12 @@ _${empresa?.nome || 'Atelie'}_`;
                 </CardContent>
               </Card>
 
-              <Card className="bg-white border-2 border-purple-400 shadow-md">
+              <Card className="bg-gradient-to-br from-purple-100 via-pink-50 to-white border-2 border-purple-400 shadow-2xl hover:shadow-3xl hover:scale-[1.03] ring-2 ring-purple-200/30 hover:ring-purple-300/50 transition-all duration-300 animate-scale-in">
                 <CardHeader className="flex flex-row items-center justify-between pb-3 px-4 md:px-6 pt-4 md:pt-6">
                   <CardTitle className="text-sm font-medium text-purple-700">
                     Receita do Mes
                   </CardTitle>
-                  <div className="w-12 h-12 md:w-14 md:h-14 rounded-3xl bg-purple-200 flex items-center justify-center flex-shrink-0">
+                  <div className="w-12 h-12 md:w-14 md:h-14 rounded-3xl bg-gradient-to-br from-purple-200 to-purple-300 flex items-center justify-center shadow-lg flex-shrink-0">
                     <TrendingUp className="h-6 w-6 md:h-7 md:w-7 text-purple-800" />
                   </div>
                 </CardHeader>
@@ -554,9 +554,9 @@ _${empresa?.nome || 'Atelie'}_`;
                 <MobileCard 
                   onClick={() => navigate("/calculadora")}
                   interactive
-                  className="h-28 flex flex-col items-center justify-center gap-3 bg-blue-50 border border-blue-200 rounded-lg"
+                  className="h-28 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-blue-100 via-blue-50 to-blue-100 border-2 border-blue-300/40 hover:border-blue-400 hover:shadow-xl hover:scale-105 rounded-3xl transition-all animate-fade-in-up"
                 >
-                  <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-3xl bg-blue-200 flex items-center justify-center">
                     <Calculator className="w-7 h-7 text-blue-700" />
                   </div>
                   <span className="text-blue-800 font-bold text-sm text-center">Calculadora de Preços</span>
@@ -565,9 +565,9 @@ _${empresa?.nome || 'Atelie'}_`;
                 <MobileCard 
                   onClick={() => navigate("/catalogo")}
                   interactive
-                  className="h-28 flex flex-col items-center justify-center gap-3 bg-green-50 border border-green-200 rounded-lg"
+                  className="h-28 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-green-100 via-green-50 to-green-100 border-2 border-green-300/40 hover:border-green-400 hover:shadow-xl hover:scale-105 rounded-3xl transition-all animate-fade-in-up"
                 >
-                  <div className="w-12 h-12 rounded-lg bg-green-100 flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-3xl bg-green-200 flex items-center justify-center">
                     <BookOpen className="w-7 h-7 text-green-700" />
                   </div>
                   <span className="text-green-800 font-bold text-sm text-center">Catálogo de Produtos</span>
@@ -603,9 +603,9 @@ _${empresa?.nome || 'Atelie'} - Qualidade e criatividade em cada peça_`;
                     window.open(whatsappUrl, '_blank');
                   }}
                   interactive
-                  className="h-28 flex flex-col items-center justify-center gap-3 bg-emerald-50 border border-emerald-200 rounded-lg"
+                  className="h-28 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-emerald-100 via-emerald-50 to-emerald-100 border-2 border-emerald-300/40 hover:border-emerald-400 hover:shadow-xl hover:scale-105 rounded-3xl transition-all animate-fade-in-up"
                 >
-                  <div className="w-12 h-12 rounded-lg bg-emerald-100 flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-3xl bg-emerald-200 flex items-center justify-center">
                     <MessageCircle className="w-7 h-7 text-emerald-700" />
                   </div>
                   <span className="text-emerald-800 font-bold text-sm text-center">Template WhatsApp</span>
@@ -614,9 +614,9 @@ _${empresa?.nome || 'Atelie'} - Qualidade e criatividade em cada peça_`;
                 <MobileCard 
                   onClick={() => navigate("/relatorios")}
                   interactive
-                  className="h-28 flex flex-col items-center justify-center gap-3 bg-purple-50 border border-purple-200 rounded-lg"
+                  className="h-28 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-purple-100 via-purple-50 to-purple-100 border-2 border-purple-300/40 hover:border-purple-400 hover:shadow-xl hover:scale-105 rounded-3xl transition-all animate-fade-in-up"
                 >
-                  <div className="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-3xl bg-purple-200 flex items-center justify-center">
                     <TrendingUp className="w-7 h-7 text-purple-700" />
                   </div>
                   <span className="text-purple-800 font-bold text-sm text-center">Relatórios</span>
@@ -631,7 +631,7 @@ _${empresa?.nome || 'Atelie'} - Qualidade e criatividade em cada peça_`;
 
         {/* Centro de Alertas Inteligentes */}
         <FadeIn>
-          <Card className="bg-white border border-purple-200/50 shadow-md">
+          <Card className="bg-gradient-to-br from-white via-purple-50/20 to-white border border-purple-200/50 shadow-xl">
           <CardHeader className="border-b border-purple-100 px-4 md:px-6 pt-4 md:pt-6 pb-4 md:pb-5">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-0">
               <div className="flex items-center gap-2 md:gap-3 flex-wrap">
@@ -691,21 +691,21 @@ _${empresa?.nome || 'Atelie'} - Qualidade e criatividade em cada peça_`;
                   return (
                     <div
                       key={alert.id}
-                      className={`p-4 md:p-6 rounded-lg border cursor-pointer ${
-                        alert.color === 'red' ? 'bg-red-50 border-red-200' :
-                        alert.color === 'orange' ? 'bg-orange-50 border-orange-200' :
-                        alert.color === 'blue' ? 'bg-blue-50 border-blue-200' :
-                        'bg-green-50 border-green-200'
+                      className={`p-4 md:p-6 rounded-2xl border-2 hover:shadow-xl hover:scale-[1.02] transition-all duration-300 cursor-pointer ${
+                        alert.color === 'red' ? 'bg-gradient-to-br from-red-50 to-red-100/50 border-red-300 hover:border-red-400' :
+                        alert.color === 'orange' ? 'bg-gradient-to-br from-orange-50 to-orange-100/50 border-orange-300 hover:border-orange-400' :
+                        alert.color === 'blue' ? 'bg-gradient-to-br from-blue-50 to-blue-100/50 border-blue-300 hover:border-blue-400' :
+                        'bg-gradient-to-br from-green-50 to-green-100/50 border-green-300 hover:border-green-400'
                       }`}
                       onClick={alert.action}
                     >
                       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                         <div className="flex items-center gap-3 md:gap-5">
-                          <div className={`w-12 h-12 md:w-16 md:h-16 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                            alert.color === 'red' ? 'bg-red-100' :
-                            alert.color === 'orange' ? 'bg-orange-100' :
-                            alert.color === 'blue' ? 'bg-blue-100' :
-                            'bg-green-100'
+                          <div className={`w-12 h-12 md:w-16 md:h-16 rounded-2xl flex items-center justify-center shadow-md flex-shrink-0 ${
+                            alert.color === 'red' ? 'bg-gradient-to-br from-red-100 to-red-200' :
+                            alert.color === 'orange' ? 'bg-gradient-to-br from-orange-100 to-orange-200' :
+                            alert.color === 'blue' ? 'bg-gradient-to-br from-blue-100 to-blue-200' :
+                            'bg-gradient-to-br from-green-100 to-green-200'
                           }`}>
                             <IconComponent className={`w-6 h-6 md:w-8 md:h-8 ${
                               alert.color === 'red' ? 'text-red-700' :
@@ -746,7 +746,7 @@ _${empresa?.nome || 'Atelie'} - Qualidade e criatividade em cada peça_`;
                               e.stopPropagation();
                               alert.action();
                             }}
-                            className="w-full md:w-auto text-green-700 border-green-400 hover:bg-green-50 font-semibold"
+                            className="w-full md:w-auto text-green-700 border-green-400 hover:bg-gradient-to-r hover:from-green-100 hover:to-green-50 hover:border-green-500 font-semibold shadow-sm hover:shadow-md transition-all"
                           >
                             <MessageCircle className="w-4 h-4 mr-1" />
                             WhatsApp
