@@ -19,15 +19,17 @@ import { startStockAlerts, checkStockNow } from "@/utils/stockAlerts";
 import { LoadingCard, SkeletonCard } from "@/components/ui/loading";
 import { PageTransition, StaggeredAnimation, FadeIn } from "@/components/ui/page-transition";
 import { MobileCard, MobileGrid } from "@/components/ui/mobile-form";
-import { OnboardingChecklist } from "@/components/OnboardingChecklist";
-import { ValueDashboard } from "@/components/ValueDashboard";
-import { AchievementsBadges } from "@/components/AchievementsBadges";
-import { InAppMessages } from "@/components/InAppMessages";
-import { ReferralProgram } from "@/components/ReferralProgram";
-import { ChatWidget } from "@/components/ChatWidget";
 import { DashboardControls, useDashboardControls } from "@/components/DashboardControls";
 import { supabase } from "@/integrations/supabase/client";
-import React from "react";
+import React, { useMemo, lazy, Suspense } from "react";
+
+// Lazy loading de componentes pesados para melhorar performance
+const ChatWidget = lazy(() => import("@/components/ChatWidget").then(m => ({ default: m.ChatWidget })));
+const OnboardingChecklist = lazy(() => import("@/components/OnboardingChecklist").then(m => ({ default: m.OnboardingChecklist })));
+const ValueDashboard = lazy(() => import("@/components/ValueDashboard").then(m => ({ default: m.ValueDashboard })));
+const AchievementsBadges = lazy(() => import("@/components/AchievementsBadges").then(m => ({ default: m.AchievementsBadges })));
+const ReferralProgram = lazy(() => import("@/components/ReferralProgram").then(m => ({ default: m.ReferralProgram })));
+const InAppMessages = lazy(() => import("@/components/InAppMessages").then(m => ({ default: m.InAppMessages })));
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -106,26 +108,80 @@ export default function Dashboard() {
   // Mostrar loading apenas se orders ainda estiver carregando (conteúdo crítico)
   const isCriticalLoading = ordersLoading;
 
-  // Funcao para enviar WhatsApp
-  const sendWhatsApp = (message: string) => {
+  // Funcao para enviar WhatsApp (memoizada)
+  const sendWhatsApp = React.useCallback((message: string) => {
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
     toast.success("Mensagem do WhatsApp preparada!");
-  };
+  }, []);
 
-  // Processar alertas inteligentes
-  const getIntelligentAlerts = () => {
-    const alerts = [];
-
-    // 1. Pedidos atrasados (da Agenda)
-    const overdueOrders = orders.filter(order => {
+  // Memoizar cálculos pesados para evitar recálculos desnecessários
+  const ordersStats = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const activeOrders = orders.filter(o => o.status !== "Cancelado");
+    const inProduction = activeOrders.filter(o => o.status === "Em produção");
+    const ready = activeOrders.filter(o => o.status === "Pronto");
+    const awaitingPickup = activeOrders.filter(o => o.status === "Aguardando retirada");
+    
+    const overdueOrders = activeOrders.filter(order => {
       if (!order.delivery_date) return false;
       const deliveryDate = new Date(order.delivery_date);
-      const today = new Date();
-      return today > deliveryDate && order.status !== "Entregue" && order.status !== "Cancelado"; // Excluir pedidos cancelados
+      deliveryDate.setHours(0, 0, 0, 0);
+      return deliveryDate < today && order.status !== "Entregue";
     });
 
-    overdueOrders.forEach(order => {
+    const urgentOrders = activeOrders.filter(order => {
+      if (!order.delivery_date) return false;
+      const deliveryDate = new Date(order.delivery_date);
+      deliveryDate.setHours(0, 0, 0, 0);
+      const diffTime = deliveryDate.getTime() - today.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return diffDays <= 3 && diffDays >= 0 && order.status !== "Entregue";
+    });
+
+    const pendingPayments = activeOrders.filter(order => {
+      const totalValue = Number(order.value || 0);
+      const paidAmount = Number(order.paid || 0);
+      return totalValue > paidAmount;
+    });
+
+    const totalRevenue = activeOrders.reduce((sum, order) => sum + (Number(order.value) || 0), 0);
+
+    return {
+      total: activeOrders.length,
+      inProduction: inProduction.length,
+      ready: ready.length,
+      awaitingPickup: awaitingPickup.length,
+      overdue: overdueOrders,
+      urgent: urgentOrders,
+      pendingPayments: pendingPayments.slice(0, 3),
+      totalRevenue
+    };
+  }, [orders]);
+
+  // Memoizar receitas total
+  const receitasTotal = useMemo(() => {
+    return receitas.reduce((sum, receita) => sum + (Number(receita.amount) || 0), 0);
+  }, [receitas]);
+
+  // Memoizar estoque crítico
+  const criticalItems = useMemo(() => {
+    return inventoryLoading ? [] : inventory.filter(item => item.status === "critical").slice(0, 2);
+  }, [inventory, inventoryLoading]);
+
+  // Memoizar orçamentos pendentes
+  const pendingQuotes = useMemo(() => {
+    return quotesLoading ? [] : quotes.filter((quote: any) => quote.status === "pending").slice(0, 2);
+  }, [quotes, quotesLoading]);
+
+  // Processar alertas inteligentes (memoizado)
+  const intelligentAlerts = useMemo(() => {
+    const alerts = [];
+
+    // 1. Pedidos atrasados
+    ordersStats.overdue.forEach(order => {
       alerts.push({
         id: `overdue-${order.id}`,
         type: "overdue",
@@ -152,14 +208,8 @@ _${empresa?.nome || 'Atelie'}_`;
       });
     });
 
-    // 2. Pagamentos pendentes (do Financeiro)
-    const pendingPayments = orders.filter(order => {
-      const totalValue = Number(order.value || 0);
-      const paidAmount = Number(order.paid || 0);
-      return totalValue > paidAmount && order.status !== "Cancelado"; // Excluir pedidos cancelados
-    });
-
-    pendingPayments.slice(0, 3).forEach(order => {
+    // 2. Pagamentos pendentes
+    ordersStats.pendingPayments.forEach(order => {
       const totalValue = Number(order.value || 0);
       const paidAmount = Number(order.paid || 0);
       const remaining = totalValue - paidAmount;
@@ -190,10 +240,8 @@ _${empresa?.nome || 'Atelie'}_`;
       });
     });
 
-    // 3. Estoque crítico (do Estoque) - apenas se inventory já carregou
-    const criticalItems = inventoryLoading ? [] : inventory.filter(item => item.status === "critical");
-    
-    criticalItems.slice(0, 2).forEach(item => {
+    // 3. Estoque crítico
+    criticalItems.forEach(item => {
       alerts.push({
         id: `stock-${item.id}`,
         type: "stock",
@@ -215,10 +263,8 @@ E necessario repor urgentemente este item!`;
       });
     });
 
-    // 4. Orçamentos aguardando aprovação - apenas se quotes já carregou
-    const pendingQuotes = quotesLoading ? [] : quotes.filter(quote => quote.status === "pending");
-    
-    pendingQuotes.slice(0, 2).forEach(quote => {
+    // 4. Orçamentos aguardando aprovação
+    pendingQuotes.forEach((quote: any) => {
       alerts.push({
         id: `quote-${quote.id}`,
         type: "quote",
@@ -242,17 +288,8 @@ _${empresa?.nome || 'Atelie'}_`;
       });
     });
 
-    // 5. Pedidos próximos do prazo (próximos 3 dias)
-    const urgentOrders = orders.filter(order => {
-      if (!order.delivery_date) return false;
-      const deliveryDate = new Date(order.delivery_date);
-      const today = new Date();
-      const diffTime = deliveryDate.getTime() - today.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      return diffDays <= 3 && diffDays >= 0 && order.status !== "Entregue" && order.status !== "Cancelado"; // Excluir pedidos cancelados
-    });
-
-    urgentOrders.slice(0, 2).forEach(order => {
+    // 5. Pedidos próximos do prazo
+    ordersStats.urgent.forEach(order => {
       const deliveryDate = new Date(order.delivery_date);
       const today = new Date();
       const diffTime = deliveryDate.getTime() - today.getTime();
@@ -285,14 +322,14 @@ _${empresa?.nome || 'Atelie'}_`;
       const priorityOrder = { high: 3, medium: 2, low: 1 };
       return priorityOrder[b.priority] - priorityOrder[a.priority];
     });
-  };
-
-  const intelligentAlerts = getIntelligentAlerts();
+  }, [ordersStats, criticalItems, pendingQuotes, empresa?.nome, sendWhatsApp]);
 
   return (
     <PageTransition className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-slate-50">
-      {/* Chat Widget para Suporte Proativo */}
-      <ChatWidget />
+      {/* Chat Widget para Suporte Proativo - Lazy loaded */}
+      <Suspense fallback={null}>
+        <ChatWidget />
+      </Suspense>
       
       {/* Header */}
       <FadeIn className="bg-white/90 backdrop-blur-lg border-b border-purple-100 sticky top-0 z-30 shadow-lg">
@@ -375,11 +412,15 @@ _${empresa?.nome || 'Atelie'}_`;
           onEngagementChange={setEngagementVisible}
         />
 
-        {/* Onboarding Checklist */}
-        <OnboardingChecklist />
+        {/* Onboarding Checklist - Lazy loaded */}
+        <Suspense fallback={null}>
+          <OnboardingChecklist />
+        </Suspense>
         
-        {/* In-App Messages e Notificações */}
-        <InAppMessages />
+        {/* In-App Messages e Notificações - Lazy loaded */}
+        <Suspense fallback={null}>
+          <InAppMessages />
+        </Suspense>
         
         {/* Stats Cards */}
         <div className="grid gap-4 md:gap-6 grid-cols-2 md:grid-cols-2 lg:grid-cols-4">
@@ -392,87 +433,80 @@ _${empresa?.nome || 'Atelie'}_`;
             </>
           ) : (
             <>
-              <Card className="bg-gradient-to-br from-white via-purple-50/30 to-white border border-purple-200/40 shadow-lg hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 animate-scale-in">
+              <Card className="bg-white border border-purple-200/40 shadow-md">
                 <CardHeader className="flex flex-row items-center justify-between pb-3 px-4 md:px-6 pt-4 md:pt-6">
                   <CardTitle className="text-sm font-medium text-gray-600">
                     Pedidos em Andamento
                   </CardTitle>
-                  <div className="w-12 h-12 md:w-14 md:h-14 rounded-3xl bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center shadow-md flex-shrink-0">
+                  <div className="w-12 h-12 md:w-14 md:h-14 rounded-3xl bg-purple-100 flex items-center justify-center flex-shrink-0">
                     <Package className="h-6 w-6 md:h-7 md:w-7 text-purple-700" />
                   </div>
                 </CardHeader>
                 <CardContent className="px-4 md:px-6">
-                  <div className="text-3xl md:text-5xl font-bold text-gray-900 mb-2 md:mb-3">{orders.length}</div>
+                  <div className="text-3xl md:text-5xl font-bold text-gray-900 mb-2 md:mb-3">{ordersStats.total}</div>
                   <div className="flex items-center gap-2 mt-2 md:mt-3">
                     <TrendingUp className="w-4 h-4 text-purple-600 flex-shrink-0" />
                     <p className="text-xs md:text-sm text-gray-600 font-medium truncate">
-                      {orders.filter(o => o.status === "Em produção" && o.status !== "Cancelado").length} em produção
+                      {ordersStats.inProduction} em produção
                     </p>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-gradient-to-br from-white via-blue-50/30 to-white border border-blue-200/40 shadow-lg hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 animate-scale-in">
+              <Card className="bg-white border border-blue-200/40 shadow-md">
                 <CardHeader className="flex flex-row items-center justify-between pb-3 px-4 md:px-6 pt-4 md:pt-6">
                   <CardTitle className="text-sm font-medium text-gray-600">
                     Em Producao
                   </CardTitle>
-                  <div className="w-12 h-12 md:w-14 md:h-14 rounded-3xl bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center shadow-md flex-shrink-0">
+                  <div className="w-12 h-12 md:w-14 md:h-14 rounded-3xl bg-blue-100 flex items-center justify-center flex-shrink-0">
                     <Clock className="h-6 w-6 md:h-7 md:w-7 text-blue-700" />
                   </div>
                 </CardHeader>
                 <CardContent className="px-4 md:px-6">
                   <div className="text-3xl md:text-5xl font-bold text-gray-900 mb-2 md:mb-3">
-                    {orders.filter(o => o.status === "Em produção" && o.status !== "Cancelado").length}
+                    {ordersStats.inProduction}
                   </div>
                   <div className="flex items-center gap-2 mt-2 md:mt-3">
                     <p className="text-xs md:text-sm text-gray-600 font-medium truncate">
-                      {orders.filter(o => {
-                        if (!o.delivery_date) return false;
-                        const deliveryDate = new Date(o.delivery_date);
-                        const today = new Date();
-                        const diffTime = deliveryDate.getTime() - today.getTime();
-                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                        return diffDays <= 3 && diffDays >= 0 && o.status !== "Cancelado"; // Excluir pedidos cancelados
-                      }).length} com prazo proximo
+                      {ordersStats.urgent.length} com prazo proximo
                     </p>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-gradient-to-br from-white via-green-50/30 to-white border border-green-200/40 shadow-lg hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 animate-scale-in">
+              <Card className="bg-white border border-green-200/40 shadow-md">
                 <CardHeader className="flex flex-row items-center justify-between pb-3 px-4 md:px-6 pt-4 md:pt-6">
                   <CardTitle className="text-sm font-medium text-gray-600">
                     Concluidos Hoje
                   </CardTitle>
-                  <div className="w-12 h-12 md:w-14 md:h-14 rounded-3xl bg-gradient-to-br from-green-100 to-green-200 flex items-center justify-center shadow-md flex-shrink-0">
+                  <div className="w-12 h-12 md:w-14 md:h-14 rounded-3xl bg-green-100 flex items-center justify-center flex-shrink-0">
                     <CheckCircle className="h-6 w-6 md:h-7 md:w-7 text-green-700" />
                   </div>
                 </CardHeader>
                 <CardContent className="px-4 md:px-6">
                   <div className="text-3xl md:text-5xl font-bold text-gray-900 mb-2 md:mb-3">
-                    {orders.filter(o => o.status === "Pronto" && o.status !== "Cancelado").length}
+                    {ordersStats.ready}
                   </div>
                   <div className="flex items-center gap-2 mt-2 md:mt-3">
                     <p className="text-xs md:text-sm text-gray-600 font-medium truncate">
-                      {orders.filter(o => o.status === "Aguardando retirada" && o.status !== "Cancelado").length} aguardando retirada
+                      {ordersStats.awaitingPickup} aguardando retirada
                     </p>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-gradient-to-br from-purple-100 via-pink-50 to-white border-2 border-purple-400 shadow-2xl hover:shadow-3xl hover:scale-[1.03] ring-2 ring-purple-200/30 hover:ring-purple-300/50 transition-all duration-300 animate-scale-in">
+              <Card className="bg-white border-2 border-purple-400 shadow-md">
                 <CardHeader className="flex flex-row items-center justify-between pb-3 px-4 md:px-6 pt-4 md:pt-6">
                   <CardTitle className="text-sm font-medium text-purple-700">
                     Receita do Mes
                   </CardTitle>
-                  <div className="w-12 h-12 md:w-14 md:h-14 rounded-3xl bg-gradient-to-br from-purple-200 to-purple-300 flex items-center justify-center shadow-lg flex-shrink-0">
+                  <div className="w-12 h-12 md:w-14 md:h-14 rounded-3xl bg-purple-200 flex items-center justify-center flex-shrink-0">
                     <TrendingUp className="h-6 w-6 md:h-7 md:w-7 text-purple-800" />
                   </div>
                 </CardHeader>
                 <CardContent className="px-4 md:px-6 pb-4 md:pb-6">
                   <div className="text-3xl md:text-5xl font-bold text-purple-700 mb-2 md:mb-3 break-words">
-                    {formatCurrency(orders.filter(o => o.status !== "Cancelado").reduce((sum, order) => sum + (Number(order.value) || 0), 0))}
+                    {formatCurrency(ordersStats.totalRevenue)}
                   </div>
                   <div className="flex items-center gap-2 mt-2 md:mt-3">
                     <TrendingUp className="w-4 h-4 text-purple-600 flex-shrink-0" />
@@ -480,7 +514,7 @@ _${empresa?.nome || 'Atelie'}_`;
                       {receitasLoading ? (
                         <span className="text-gray-400">Carregando...</span>
                       ) : (
-                        formatCurrency(receitas.reduce((sum, receita) => sum + (Number(receita.amount) || 0), 0)) + " recebido"
+                        formatCurrency(receitasTotal) + " recebido"
                       )}
                     </p>
                   </div>
@@ -490,18 +524,20 @@ _${empresa?.nome || 'Atelie'}_`;
           )}
         </div>
 
-        {/* Seções de Engajamento - Controladas pelo toggle (entre Stats Cards e Ações Rápidas) */}
+        {/* Seções de Engajamento - Controladas pelo toggle (entre Stats Cards e Ações Rápidas) - Lazy loaded */}
         {engagementVisible && (
-          <div className={compactMode ? "space-y-4 md:space-y-6" : "space-y-8 md:space-y-10"}>
-            {/* Dashboard de Valor (ROI) */}
-            <ValueDashboard />
-            
-            {/* Badges e Achievements */}
-            <AchievementsBadges />
-            
-            {/* Programa de Referência */}
-            <ReferralProgram />
-          </div>
+          <Suspense fallback={<div className="h-32 bg-gray-100 rounded-lg animate-pulse" />}>
+            <div className={compactMode ? "space-y-4 md:space-y-6" : "space-y-8 md:space-y-10"}>
+              {/* Dashboard de Valor (ROI) */}
+              <ValueDashboard />
+              
+              {/* Badges e Achievements */}
+              <AchievementsBadges />
+              
+              {/* Programa de Referência */}
+              <ReferralProgram />
+            </div>
+          </Suspense>
         )}
 
         {/* Acoes Rapidass */}
@@ -518,9 +554,9 @@ _${empresa?.nome || 'Atelie'}_`;
                 <MobileCard 
                   onClick={() => navigate("/calculadora")}
                   interactive
-                  className="h-28 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-blue-100 via-blue-50 to-blue-100 border-2 border-blue-300/40 hover:border-blue-400 hover:shadow-xl hover:scale-105 rounded-3xl transition-all animate-fade-in-up"
+                  className="h-28 flex flex-col items-center justify-center gap-3 bg-blue-50 border border-blue-200 rounded-lg"
                 >
-                  <div className="w-12 h-12 rounded-3xl bg-blue-200 flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center">
                     <Calculator className="w-7 h-7 text-blue-700" />
                   </div>
                   <span className="text-blue-800 font-bold text-sm text-center">Calculadora de Preços</span>
@@ -529,9 +565,9 @@ _${empresa?.nome || 'Atelie'}_`;
                 <MobileCard 
                   onClick={() => navigate("/catalogo")}
                   interactive
-                  className="h-28 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-green-100 via-green-50 to-green-100 border-2 border-green-300/40 hover:border-green-400 hover:shadow-xl hover:scale-105 rounded-3xl transition-all animate-fade-in-up"
+                  className="h-28 flex flex-col items-center justify-center gap-3 bg-green-50 border border-green-200 rounded-lg"
                 >
-                  <div className="w-12 h-12 rounded-3xl bg-green-200 flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-lg bg-green-100 flex items-center justify-center">
                     <BookOpen className="w-7 h-7 text-green-700" />
                   </div>
                   <span className="text-green-800 font-bold text-sm text-center">Catálogo de Produtos</span>
@@ -567,9 +603,9 @@ _${empresa?.nome || 'Atelie'} - Qualidade e criatividade em cada peça_`;
                     window.open(whatsappUrl, '_blank');
                   }}
                   interactive
-                  className="h-28 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-emerald-100 via-emerald-50 to-emerald-100 border-2 border-emerald-300/40 hover:border-emerald-400 hover:shadow-xl hover:scale-105 rounded-3xl transition-all animate-fade-in-up"
+                  className="h-28 flex flex-col items-center justify-center gap-3 bg-emerald-50 border border-emerald-200 rounded-lg"
                 >
-                  <div className="w-12 h-12 rounded-3xl bg-emerald-200 flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-lg bg-emerald-100 flex items-center justify-center">
                     <MessageCircle className="w-7 h-7 text-emerald-700" />
                   </div>
                   <span className="text-emerald-800 font-bold text-sm text-center">Template WhatsApp</span>
@@ -578,9 +614,9 @@ _${empresa?.nome || 'Atelie'} - Qualidade e criatividade em cada peça_`;
                 <MobileCard 
                   onClick={() => navigate("/relatorios")}
                   interactive
-                  className="h-28 flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-purple-100 via-purple-50 to-purple-100 border-2 border-purple-300/40 hover:border-purple-400 hover:shadow-xl hover:scale-105 rounded-3xl transition-all animate-fade-in-up"
+                  className="h-28 flex flex-col items-center justify-center gap-3 bg-purple-50 border border-purple-200 rounded-lg"
                 >
-                  <div className="w-12 h-12 rounded-3xl bg-purple-200 flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center">
                     <TrendingUp className="w-7 h-7 text-purple-700" />
                   </div>
                   <span className="text-purple-800 font-bold text-sm text-center">Relatórios</span>
@@ -595,7 +631,7 @@ _${empresa?.nome || 'Atelie'} - Qualidade e criatividade em cada peça_`;
 
         {/* Centro de Alertas Inteligentes */}
         <FadeIn>
-          <Card className="bg-gradient-to-br from-white via-purple-50/20 to-white border border-purple-200/50 shadow-xl">
+          <Card className="bg-white border border-purple-200/50 shadow-md">
           <CardHeader className="border-b border-purple-100 px-4 md:px-6 pt-4 md:pt-6 pb-4 md:pb-5">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-0">
               <div className="flex items-center gap-2 md:gap-3 flex-wrap">
@@ -655,21 +691,21 @@ _${empresa?.nome || 'Atelie'} - Qualidade e criatividade em cada peça_`;
                   return (
                     <div
                       key={alert.id}
-                      className={`p-4 md:p-6 rounded-2xl border-2 hover:shadow-xl hover:scale-[1.02] transition-all duration-300 cursor-pointer ${
-                        alert.color === 'red' ? 'bg-gradient-to-br from-red-50 to-red-100/50 border-red-300 hover:border-red-400' :
-                        alert.color === 'orange' ? 'bg-gradient-to-br from-orange-50 to-orange-100/50 border-orange-300 hover:border-orange-400' :
-                        alert.color === 'blue' ? 'bg-gradient-to-br from-blue-50 to-blue-100/50 border-blue-300 hover:border-blue-400' :
-                        'bg-gradient-to-br from-green-50 to-green-100/50 border-green-300 hover:border-green-400'
+                      className={`p-4 md:p-6 rounded-lg border cursor-pointer ${
+                        alert.color === 'red' ? 'bg-red-50 border-red-200' :
+                        alert.color === 'orange' ? 'bg-orange-50 border-orange-200' :
+                        alert.color === 'blue' ? 'bg-blue-50 border-blue-200' :
+                        'bg-green-50 border-green-200'
                       }`}
                       onClick={alert.action}
                     >
                       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                         <div className="flex items-center gap-3 md:gap-5">
-                          <div className={`w-12 h-12 md:w-16 md:h-16 rounded-2xl flex items-center justify-center shadow-md flex-shrink-0 ${
-                            alert.color === 'red' ? 'bg-gradient-to-br from-red-100 to-red-200' :
-                            alert.color === 'orange' ? 'bg-gradient-to-br from-orange-100 to-orange-200' :
-                            alert.color === 'blue' ? 'bg-gradient-to-br from-blue-100 to-blue-200' :
-                            'bg-gradient-to-br from-green-100 to-green-200'
+                          <div className={`w-12 h-12 md:w-16 md:h-16 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                            alert.color === 'red' ? 'bg-red-100' :
+                            alert.color === 'orange' ? 'bg-orange-100' :
+                            alert.color === 'blue' ? 'bg-blue-100' :
+                            'bg-green-100'
                           }`}>
                             <IconComponent className={`w-6 h-6 md:w-8 md:h-8 ${
                               alert.color === 'red' ? 'text-red-700' :
@@ -710,7 +746,7 @@ _${empresa?.nome || 'Atelie'} - Qualidade e criatividade em cada peça_`;
                               e.stopPropagation();
                               alert.action();
                             }}
-                            className="w-full md:w-auto text-green-700 border-green-400 hover:bg-gradient-to-r hover:from-green-100 hover:to-green-50 hover:border-green-500 font-semibold shadow-sm hover:shadow-md transition-all"
+                            className="w-full md:w-auto text-green-700 border-green-400 hover:bg-green-50 font-semibold"
                           >
                             <MessageCircle className="w-4 h-4 mr-1" />
                             WhatsApp
