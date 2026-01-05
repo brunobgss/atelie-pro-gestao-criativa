@@ -1,16 +1,20 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { ArrowLeft, Save, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Save, Plus, Trash2, Package, Check, ChevronsUpDown } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { getQuoteByCode, updateQuote } from "@/integrations/supabase/quotes";
+import { getProducts } from "@/integrations/supabase/products";
 import { PersonalizationListEditor, PersonalizationEntry, createEmptyPersonalization } from "@/components/PersonalizationListEditor";
+import { cn } from "@/lib/utils";
 
 interface QuoteItem {
   id: string;
@@ -31,6 +35,28 @@ export default function EditarOrcamento() {
     { id: "1", description: "", quantity: 1, value: 0 }
   ]);
   const [personalizations, setPersonalizations] = useState<PersonalizationEntry[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<string>("");
+  const [productSearchTerm, setProductSearchTerm] = useState<string>("");
+  const [productPopoverOpen, setProductPopoverOpen] = useState(false);
+
+  // Query para buscar produtos do catálogo
+  const { data: products = [] } = useQuery({
+    queryKey: ["products"],
+    queryFn: getProducts,
+  });
+
+  // Filtrar produtos baseado no termo de busca
+  const filteredProducts = useMemo(() => {
+    if (!productSearchTerm.trim()) {
+      return products;
+    }
+    const searchLower = productSearchTerm.toLowerCase().trim();
+    return products.filter((product) =>
+      product.name.toLowerCase().includes(searchLower) ||
+      product.type?.toLowerCase().includes(searchLower) ||
+      product.materials?.some((material: string) => material.toLowerCase().includes(searchLower))
+    );
+  }, [products, productSearchTerm]);
 
   const { data: quoteData, isLoading } = useQuery({
     queryKey: ["quote", id],
@@ -255,6 +281,117 @@ export default function EditarOrcamento() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Seletor de Catálogo - Sempre visível */}
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center gap-2 mb-3">
+                  <Package className="w-4 h-4 text-blue-600" />
+                  <Label className="text-blue-800 font-medium">Adicionar do Catálogo</Label>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex gap-3">
+                    <Popover open={productPopoverOpen} onOpenChange={setProductPopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={productPopoverOpen}
+                          className="flex-1 justify-between"
+                        >
+                          {selectedProduct
+                            ? products.find((product) => product.id === selectedProduct)?.name || "Selecione um produto"
+                            : "Selecione um produto do catálogo"}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[400px] p-0" align="start">
+                        <Command>
+                          <CommandInput 
+                            placeholder="Pesquisar produto por nome, tipo ou material..." 
+                            value={productSearchTerm}
+                            onValueChange={setProductSearchTerm}
+                          />
+                          <CommandList>
+                            <CommandEmpty>Nenhum produto encontrado.</CommandEmpty>
+                            <CommandGroup>
+                              {filteredProducts.map((product) => (
+                                <CommandItem
+                                  key={product.id}
+                                  value={`${product.name} ${product.type || ""} ${product.materials?.join(" ") || ""}`}
+                                  onSelect={() => {
+                                    setSelectedProduct(product.id);
+                                    setProductPopoverOpen(false);
+                                    setProductSearchTerm("");
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      selectedProduct === product.id ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">{product.name}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                      R$ {product.unit_price.toFixed(2)}
+                                      {product.type && ` • ${product.type}`}
+                                    </span>
+                                  </div>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        if (!selectedProduct) {
+                          toast.error("Selecione um produto");
+                          return;
+                        }
+                        const product = products.find(p => p.id === selectedProduct);
+                        if (product) {
+                          // Adicionar o produto como um novo item
+                          const newItem: QuoteItem = {
+                            id: Date.now().toString(),
+                            description: `${product.name}${product.type ? ` - ${product.type}` : ""}${product.materials && product.materials.length > 0 ? ` (${product.materials.join(", ")})` : ""}`,
+                            quantity: 1,
+                            value: product.unit_price
+                          };
+                          setItems([...items, newItem]);
+                          setSelectedProduct("");
+                          toast.success("Produto adicionado ao orçamento!");
+                        }
+                      }}
+                      disabled={!selectedProduct}
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Adicionar
+                    </Button>
+                  </div>
+                </div>
+                {selectedProduct && (
+                  <div className="mt-3 text-sm text-blue-700 bg-blue-100 p-2 rounded">
+                    {(() => {
+                      const product = products.find(p => p.id === selectedProduct);
+                      return product ? (
+                        <div>
+                          <p><strong>Nome:</strong> {product.name}</p>
+                          <p><strong>Preço:</strong> R$ {product.unit_price.toFixed(2)}</p>
+                          <p><strong>Tempo estimado:</strong> {product.work_hours}h</p>
+                          <p><strong>Tipo:</strong> {product.type}</p>
+                          {product.materials && product.materials.length > 0 && (
+                            <p><strong>Materiais:</strong> {product.materials.join(", ")}</p>
+                          )}
+                        </div>
+                      ) : null;
+                    })()}
+                  </div>
+                )}
+              </div>
+
               {items.map((item, index) => (
                 <div key={item.id} className="grid grid-cols-1 md:grid-cols-12 gap-4 p-4 border border-border rounded-lg">
                   <div className="md:col-span-6">
