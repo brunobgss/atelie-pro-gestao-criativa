@@ -207,4 +207,71 @@ export async function getProducts(): Promise<ProductRow[]> {
   }
 }
 
+export type InventoryCreateInput = {
+  name: string;
+  quantity: number;
+  unit: string;
+  min_quantity: number;
+  item_type: InventoryItemType;
+  category?: string | null;
+  supplier?: string | null;
+  cost_per_unit?: number | null;
+  metadata?: Record<string, unknown> | null;
+};
+
+export async function createInventoryItem(input: InventoryCreateInput): Promise<{ ok: boolean; id?: string; error?: string }> {
+  try {
+    // Obter empresa_id do usuário
+    const { data: userEmpresa } = await supabase
+      .from("user_empresas")
+      .select("empresa_id")
+      .eq("user_id", (await supabase.auth.getUser()).data.user?.id)
+      .single();
+
+    if (!userEmpresa?.empresa_id) {
+      return { ok: false, error: "Usuário não tem empresa associada" };
+    }
+
+    // Calcular status baseado na quantidade e mínimo
+    let status = "ok";
+    if (input.quantity <= 0) {
+      status = "critical";
+    } else if (input.quantity < input.min_quantity) {
+      status = "low";
+    }
+
+    // Calcular total_cost
+    const total_cost = input.cost_per_unit !== null && input.cost_per_unit !== undefined
+      ? input.cost_per_unit * input.quantity
+      : null;
+
+    const { data, error } = await supabase
+      .from("inventory_items")
+      .insert({
+        empresa_id: userEmpresa.empresa_id,
+        name: input.name.trim(),
+        quantity: input.quantity,
+        unit: input.unit.trim() || "unidades",
+        min_quantity: input.min_quantity,
+        status,
+        item_type: input.item_type,
+        category: input.category?.trim() || null,
+        supplier: input.supplier?.trim() || null,
+        cost_per_unit: input.cost_per_unit ?? null,
+        total_cost,
+        metadata: input.metadata ?? {},
+      })
+      .select("id")
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    return { ok: true, id: data?.id };
+  } catch (e: unknown) {
+    return { ok: false, error: (e as { message?: string })?.message ?? "Erro ao criar item de estoque" };
+  }
+}
+
 

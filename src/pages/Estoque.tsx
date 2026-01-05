@@ -40,6 +40,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
+import { ImportInventory } from "@/components/ImportInventory";
 
 const ITEM_TYPE_OPTIONS: Array<{
   value: InventoryItemType;
@@ -520,7 +521,7 @@ export default function Estoque() {
               <p className="text-sm text-muted-foreground">Controle centralizado de matéria-prima, tecidos e produtos</p>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex items-center gap-2 flex-nowrap">
             <Dialog
               open={isAlertsDialogOpen}
               onOpenChange={(open) => {
@@ -783,13 +784,16 @@ export default function Estoque() {
                 </div>
             </DialogContent>
           </Dialog>
+            <ImportInventory onImportComplete={() => {
+              queryClient.invalidateQueries({ queryKey: ["inventory"] });
+            }} />
             <Button variant="outline" size="sm" onClick={() => exportInventoryToCSV(filteredItems)}>
               <Download className="mr-2 h-4 w-4" />
               Exportar CSV
             </Button>
             <Dialog open={newItemModalOpen} onOpenChange={(open) => (open ? setNewItemModalOpen(true) : setNewItemModalOpen(false))}>
               <DialogTrigger asChild>
-                <Button onClick={() => setNewItemModalOpen(true)}>
+                <Button size="sm" onClick={() => setNewItemModalOpen(true)}>
                   <Plus className="mr-2 h-4 w-4" />
                   Novo item
                 </Button>
