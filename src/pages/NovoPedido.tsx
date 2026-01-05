@@ -5,9 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, Upload, Save, Plus, Trash2, Copy, CheckCircle, XCircle, Wrench, Search } from "lucide-react";
+import { ArrowLeft, Upload, Save, Plus, Trash2, Copy, CheckCircle, XCircle, Wrench, Search, Check, ChevronsUpDown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { createOrder, generateOrderCode } from "@/integrations/supabase/orders";
@@ -26,6 +28,7 @@ import { performanceMonitor } from "@/utils/performanceMonitor";
 import { PersonalizationListEditor, PersonalizationEntry } from "@/components/PersonalizationListEditor";
 import { ClientSearch } from "@/components/ClientSearch";
 import { CLOTHING_SIZES } from "@/constants/sizes";
+import { cn } from "@/lib/utils";
 
 // Função auxiliar para gerar IDs únicos
 const generateId = () => {
@@ -82,6 +85,7 @@ export default function NovoPedido() {
   const [selectedProduct, setSelectedProduct] = useState<string>("");
   const [selectedServico, setSelectedServico] = useState<string>("");
   const [productSearchTerm, setProductSearchTerm] = useState<string>("");
+  const [productPopoverOpen, setProductPopoverOpen] = useState(false);
   const [isKitMode, setIsKitMode] = useState<boolean>(false);
   const [kitItems, setKitItems] = useState<Array<{id: string, size: string, quantity: number}>>([
     { id: generateId(), size: "P", quantity: 0 },
@@ -477,36 +481,61 @@ export default function NovoPedido() {
                 {type === "catalogo" && (
                   <div className="space-y-2">
                     <Label htmlFor="product">Produto do Catálogo</Label>
-                    {/* Campo de busca */}
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                      <Input
-                        type="text"
-                        placeholder="Pesquisar produto por nome, tipo ou material..."
-                        value={productSearchTerm}
-                        onChange={(e) => setProductSearchTerm(e.target.value)}
-                        className="pl-10 w-full"
-                        disabled={isUploading}
-                      />
-                    </div>
-                    <Select value={selectedProduct} onValueChange={setSelectedProduct} disabled={isUploading}>
-                      <SelectTrigger className="border-input" disabled={isUploading}>
-                        <SelectValue placeholder="Selecione um produto do catálogo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {filteredProducts.length > 0 ? (
-                          filteredProducts.map((product) => (
-                            <SelectItem key={product.id} value={product.id}>
-                              {product.name} - R$ {product.unit_price.toFixed(2)}
-                            </SelectItem>
-                          ))
-                        ) : (
-                          <div className="px-2 py-6 text-center text-sm text-gray-500">
-                            Nenhum produto encontrado
-                          </div>
-                        )}
-                      </SelectContent>
-                    </Select>
+                    <Popover open={productPopoverOpen} onOpenChange={setProductPopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={productPopoverOpen}
+                          className="w-full justify-between"
+                          disabled={isUploading}
+                        >
+                          {selectedProduct
+                            ? products.find((product) => product.id === selectedProduct)?.name || "Selecione um produto"
+                            : "Selecione um produto do catálogo"}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[400px] p-0" align="start">
+                        <Command>
+                          <CommandInput 
+                            placeholder="Pesquisar produto por nome, tipo ou material..." 
+                            value={productSearchTerm}
+                            onValueChange={setProductSearchTerm}
+                          />
+                          <CommandList>
+                            <CommandEmpty>Nenhum produto encontrado.</CommandEmpty>
+                            <CommandGroup>
+                              {filteredProducts.map((product) => (
+                                <CommandItem
+                                  key={product.id}
+                                  value={`${product.name} ${product.type || ""} ${product.materials?.join(" ") || ""}`}
+                                  onSelect={() => {
+                                    setSelectedProduct(product.id);
+                                    setProductPopoverOpen(false);
+                                    setProductSearchTerm("");
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      selectedProduct === product.id ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">{product.name}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                      R$ {product.unit_price.toFixed(2)}
+                                      {product.type && ` • ${product.type}`}
+                                    </span>
+                                  </div>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                     {selectedProduct && (
                       <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded">
                         {(() => {
