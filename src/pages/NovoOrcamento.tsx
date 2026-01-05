@@ -7,10 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, Save, Share2, Plus, Trash2, MessageCircle, Printer, Package, Upload, CheckCircle, XCircle, Wrench } from "lucide-react";
+import { ArrowLeft, Save, Share2, Plus, Trash2, MessageCircle, Printer, Package, Upload, CheckCircle, XCircle, Wrench, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { createQuote, generateQuoteCode } from "@/integrations/supabase/quotes";
 import { getProducts } from "@/integrations/supabase/products";
 import { listServicos } from "@/integrations/supabase/servicos";
@@ -37,6 +37,7 @@ export default function NovoOrcamento() {
   const [items, setItems] = useState([{ description: "", quantity: 1, value: 0 }]);
   const [selectedProduct, setSelectedProduct] = useState<string>("");
   const [selectedServico, setSelectedServico] = useState<string>("");
+  const [productSearchTerm, setProductSearchTerm] = useState<string>("");
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [quantityModalOpen, setQuantityModalOpen] = useState(false);
@@ -71,6 +72,19 @@ export default function NovoOrcamento() {
     queryKey: ["products"],
     queryFn: getProducts,
   });
+
+  // Filtrar produtos baseado no termo de busca
+  const filteredProducts = useMemo(() => {
+    if (!productSearchTerm.trim()) {
+      return products;
+    }
+    const searchLower = productSearchTerm.toLowerCase().trim();
+    return products.filter((product) =>
+      product.name.toLowerCase().includes(searchLower) ||
+      product.type?.toLowerCase().includes(searchLower) ||
+      product.materials?.some((material: string) => material.toLowerCase().includes(searchLower))
+    );
+  }, [products, productSearchTerm]);
 
   // Buscar serviços
   const { data: servicos = [] } = useQuery({
@@ -824,28 +838,47 @@ Aguardo seu retorno! 😊`;
                     <Package className="w-4 h-4 text-blue-600" />
                     <Label className="text-blue-800 font-medium">Adicionar do Catálogo</Label>
                   </div>
-                  <div className="flex gap-3">
-                    <Select value={selectedProduct} onValueChange={setSelectedProduct}>
-                      <SelectTrigger className="flex-1">
-                        <SelectValue placeholder="Selecione um produto do catálogo" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {products.map((product) => (
-                          <SelectItem key={product.id} value={product.id}>
-                            {product.name} - R$ {product.unit_price.toFixed(2)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      type="button"
-                      onClick={openQuantityModal}
-                      disabled={!selectedProduct}
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Adicionar
-                    </Button>
+                  <div className="space-y-3">
+                    {/* Campo de busca */}
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                      <Input
+                        type="text"
+                        placeholder="Pesquisar produto por nome, tipo ou material..."
+                        value={productSearchTerm}
+                        onChange={(e) => setProductSearchTerm(e.target.value)}
+                        className="pl-10 w-full"
+                      />
+                    </div>
+                    <div className="flex gap-3">
+                      <Select value={selectedProduct} onValueChange={setSelectedProduct}>
+                        <SelectTrigger className="flex-1">
+                          <SelectValue placeholder="Selecione um produto do catálogo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {filteredProducts.length > 0 ? (
+                            filteredProducts.map((product) => (
+                              <SelectItem key={product.id} value={product.id}>
+                                {product.name} - R$ {product.unit_price.toFixed(2)}
+                              </SelectItem>
+                            ))
+                          ) : (
+                            <div className="px-2 py-6 text-center text-sm text-gray-500">
+                              Nenhum produto encontrado
+                            </div>
+                          )}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        onClick={openQuantityModal}
+                        disabled={!selectedProduct}
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Adicionar
+                      </Button>
+                    </div>
                   </div>
                   {selectedProduct && (
                     <div className="mt-3 text-sm text-blue-700 bg-blue-100 p-2 rounded">

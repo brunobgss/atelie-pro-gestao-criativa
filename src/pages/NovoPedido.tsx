@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, Upload, Save, Plus, Trash2, Copy, CheckCircle, XCircle, Wrench } from "lucide-react";
+import { ArrowLeft, Upload, Save, Plus, Trash2, Copy, CheckCircle, XCircle, Wrench, Search } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { createOrder, generateOrderCode } from "@/integrations/supabase/orders";
@@ -47,6 +47,19 @@ export default function NovoPedido() {
     queryFn: getProducts,
   });
 
+  // Filtrar produtos baseado no termo de busca
+  const filteredProducts = useMemo(() => {
+    if (!productSearchTerm.trim()) {
+      return products;
+    }
+    const searchLower = productSearchTerm.toLowerCase().trim();
+    return products.filter((product) =>
+      product.name.toLowerCase().includes(searchLower) ||
+      product.type?.toLowerCase().includes(searchLower) ||
+      product.materials?.some((material: string) => material.toLowerCase().includes(searchLower))
+    );
+  }, [products, productSearchTerm]);
+
   // Buscar serviços
   const { data: servicos = [] } = useQuery({
     queryKey: ["servicos"],
@@ -68,6 +81,7 @@ export default function NovoPedido() {
   const [type, setType] = useState<string>("");
   const [selectedProduct, setSelectedProduct] = useState<string>("");
   const [selectedServico, setSelectedServico] = useState<string>("");
+  const [productSearchTerm, setProductSearchTerm] = useState<string>("");
   const [isKitMode, setIsKitMode] = useState<boolean>(false);
   const [kitItems, setKitItems] = useState<Array<{id: string, size: string, quantity: number}>>([
     { id: generateId(), size: "P", quantity: 0 },
@@ -463,16 +477,34 @@ export default function NovoPedido() {
                 {type === "catalogo" && (
                   <div className="space-y-2">
                     <Label htmlFor="product">Produto do Catálogo</Label>
+                    {/* Campo de busca */}
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                      <Input
+                        type="text"
+                        placeholder="Pesquisar produto por nome, tipo ou material..."
+                        value={productSearchTerm}
+                        onChange={(e) => setProductSearchTerm(e.target.value)}
+                        className="pl-10 w-full"
+                        disabled={isUploading}
+                      />
+                    </div>
                     <Select value={selectedProduct} onValueChange={setSelectedProduct} disabled={isUploading}>
                       <SelectTrigger className="border-input" disabled={isUploading}>
                         <SelectValue placeholder="Selecione um produto do catálogo" />
                       </SelectTrigger>
                       <SelectContent>
-                        {products.map((product) => (
-                          <SelectItem key={product.id} value={product.id}>
-                            {product.name} - R$ {product.unit_price.toFixed(2)}
-                          </SelectItem>
-                        ))}
+                        {filteredProducts.length > 0 ? (
+                          filteredProducts.map((product) => (
+                            <SelectItem key={product.id} value={product.id}>
+                              {product.name} - R$ {product.unit_price.toFixed(2)}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <div className="px-2 py-6 text-center text-sm text-gray-500">
+                            Nenhum produto encontrado
+                          </div>
+                        )}
                       </SelectContent>
                     </Select>
                     {selectedProduct && (
