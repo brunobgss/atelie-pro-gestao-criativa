@@ -9,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, Upload, Save, Plus, Trash2, Copy, CheckCircle, XCircle, Wrench, Search, Check, ChevronsUpDown } from "lucide-react";
+import { ArrowLeft, Upload, Save, Plus, Trash2, Copy, CheckCircle, XCircle, Wrench, Search, Check, ChevronsUpDown, Package } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { createOrder, generateOrderCode } from "@/integrations/supabase/orders";
@@ -679,6 +679,130 @@ export default function NovoPedido() {
                   <p className="text-xs text-green-700 mt-2">
                     Nenhum serviço cadastrado. <a href="/servicos" className="underline">Cadastre serviços aqui</a>
                   </p>
+                )}
+              </div>
+
+              {/* Seletor de Catálogo - Sempre visível */}
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center gap-2 mb-3">
+                  <Package className="w-4 h-4 text-blue-600" />
+                  <Label className="text-blue-800 font-medium">Adicionar do Catálogo</Label>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex gap-3">
+                    <Popover open={productPopoverOpen} onOpenChange={setProductPopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={productPopoverOpen}
+                          className="flex-1 justify-between"
+                          disabled={isUploading}
+                        >
+                          {selectedProduct
+                            ? products.find((product) => product.id === selectedProduct)?.name || "Selecione um produto"
+                            : "Selecione um produto do catálogo"}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[400px] p-0" align="start">
+                        <Command>
+                          <CommandInput 
+                            placeholder="Pesquisar produto por nome, tipo ou material..." 
+                            value={productSearchTerm}
+                            onValueChange={setProductSearchTerm}
+                          />
+                          <CommandList>
+                            <CommandEmpty>Nenhum produto encontrado.</CommandEmpty>
+                            <CommandGroup>
+                              {filteredProducts.map((product) => (
+                                <CommandItem
+                                  key={product.id}
+                                  value={`${product.name} ${product.type || ""} ${product.materials?.join(" ") || ""}`}
+                                  onSelect={() => {
+                                    setSelectedProduct(product.id);
+                                    setProductPopoverOpen(false);
+                                    setProductSearchTerm("");
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      selectedProduct === product.id ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  <div className="flex flex-col">
+                                    <span className="font-medium">{product.name}</span>
+                                    <span className="text-xs text-muted-foreground">
+                                      R$ {product.unit_price.toFixed(2)}
+                                      {product.type && ` • ${product.type}`}
+                                    </span>
+                                  </div>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        if (!selectedProduct) {
+                          toast.error("Selecione um produto");
+                          return;
+                        }
+                        const product = products.find(p => p.id === selectedProduct);
+                        if (product) {
+                          const descriptionInput = document.getElementById("description") as HTMLTextAreaElement;
+                          const valueInput = document.getElementById("value") as HTMLInputElement;
+                          
+                          if (descriptionInput) {
+                            const currentDesc = descriptionInput.value;
+                            descriptionInput.value = currentDesc 
+                              ? `${currentDesc}\n${product.name}${product.type ? ` - ${product.type}` : ""}${product.materials && product.materials.length > 0 ? ` (${product.materials.join(", ")})` : ""}`
+                              : `${product.name}${product.type ? ` - ${product.type}` : ""}${product.materials && product.materials.length > 0 ? ` (${product.materials.join(", ")})` : ""}`;
+                          }
+                          
+                          if (valueInput && product.unit_price > 0) {
+                            const currentValue = parseFloat(valueInput.value.replace(",", ".")) || 0;
+                            valueInput.value = (currentValue + product.unit_price).toFixed(2).replace(".", ",");
+                          }
+                          
+                          // Definir tipo como "catalogo" se ainda não tiver selecionado
+                          if (!type || type.trim() === "") {
+                            setType("catalogo");
+                          }
+                          
+                          setSelectedProduct("");
+                          toast.success("Produto adicionado à descrição!");
+                        }
+                      }}
+                      disabled={!selectedProduct || isUploading}
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Adicionar
+                    </Button>
+                  </div>
+                </div>
+                {selectedProduct && (
+                  <div className="mt-3 text-sm text-blue-700 bg-blue-100 p-2 rounded">
+                    {(() => {
+                      const product = products.find(p => p.id === selectedProduct);
+                      return product ? (
+                        <div>
+                          <p><strong>Nome:</strong> {product.name}</p>
+                          <p><strong>Preço:</strong> R$ {product.unit_price.toFixed(2)}</p>
+                          <p><strong>Tempo estimado:</strong> {product.work_hours}h</p>
+                          <p><strong>Tipo:</strong> {product.type}</p>
+                          {product.materials && product.materials.length > 0 && (
+                            <p><strong>Materiais:</strong> {product.materials.join(", ")}</p>
+                          )}
+                        </div>
+                      ) : null;
+                    })()}
+                  </div>
                 )}
               </div>
 
