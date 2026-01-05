@@ -44,6 +44,11 @@ export default function NovoPedido() {
   const { invalidateRelated } = useSync();
   const { syncAfterCreate } = useSyncOperations();
 
+  // Estados para produtos (precisam estar antes do useMemo)
+  const [selectedProduct, setSelectedProduct] = useState<string>("");
+  const [productSearchTerm, setProductSearchTerm] = useState<string>("");
+  const [productPopoverOpen, setProductPopoverOpen] = useState(false);
+
   // Buscar produtos do catálogo
   const { data: products = [] } = useQuery({
     queryKey: ["products"],
@@ -82,10 +87,7 @@ export default function NovoPedido() {
   const [color, setColor] = useState<string>("");
   const [size, setSize] = useState<string>("");
   const [type, setType] = useState<string>("");
-  const [selectedProduct, setSelectedProduct] = useState<string>("");
   const [selectedServico, setSelectedServico] = useState<string>("");
-  const [productSearchTerm, setProductSearchTerm] = useState<string>("");
-  const [productPopoverOpen, setProductPopoverOpen] = useState(false);
   const [isKitMode, setIsKitMode] = useState<boolean>(false);
   const [kitItems, setKitItems] = useState<Array<{id: string, size: string, quantity: number}>>([
     { id: generateId(), size: "P", quantity: 0 },
