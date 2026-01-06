@@ -1,6 +1,10 @@
 import { supabase } from "./client";
 import { getCurrentEmpresaId } from "./auth-utils";
 import { checkDatabaseHealth } from "./config";
+import { listInventory } from "./inventory";
+import { criarMovimentacao } from "./movimentacoes-estoque";
+import { getProductById } from "./products";
+import { getServico } from "./servicos";
 
 export type OrderRow = {
   id: string;
@@ -165,6 +169,385 @@ export async function getOrderByCode(code: string): Promise<OrderRow | null> {
   }
 }
 
+// Função auxiliar para fazer baixa automática de estoque quando um produto do catálogo é vendido
+async function baixarEstoqueAutomatico(
+  productId: string,
+  quantity: number,
+  orderCode: string,
+  orderId: string, // ID do pedido (UUID) para origem_id
+  empresaId: string
+): Promise<void> {
+  try {
+    console.log(`📦 Iniciando baixa automática de estoque para produto ${productId}, quantidade: ${quantity}`);
+    
+    // Buscar produto do catálogo
+    const product = await getProductById(productId);
+    if (!product) {
+      console.warn(`⚠️ Produto ${productId} não encontrado, pulando baixa de estoque`);
+      return;
+    }
+
+    // Buscar todos os itens de estoque da empresa
+    const allInventoryItems = await listInventory();
+    if (allInventoryItems.length === 0) {
+      console.log("ℹ️ Nenhum item de estoque encontrado, pulando baixa");
+      return;
+    }
+
+    const itemsParaBaixar: Array<{ item: typeof allInventoryItems[0]; quantidade: number }> = [];
+
+    // Parse JSON fields se necessário (Supabase pode retornar como string ou array)
+    let productInventoryItemIds: string[] = [];
+    let productInventoryQuantities: number[] = [];
+    
+    if (product.inventory_items) {
+      if (typeof product.inventory_items === 'string') {
+        try {
+          productInventoryItemIds = JSON.parse(product.inventory_items);
+        } catch (e) {
+          console.warn("⚠️ Erro ao fazer parse de inventory_items:", e);
+          productInventoryItemIds = [];
+        }
+      } else if (Array.isArray(product.inventory_items)) {
+        productInventoryItemIds = product.inventory_items;
+      }
+    }
+    
+    if (product.inventory_quantities) {
+      if (typeof product.inventory_quantities === 'string') {
+        try {
+          productInventoryQuantities = JSON.parse(product.inventory_quantities);
+        } catch (e) {
+          console.warn("⚠️ Erro ao fazer parse de inventory_quantities:", e);
+          productInventoryQuantities = [];
+        }
+      } else if (Array.isArray(product.inventory_quantities)) {
+        productInventoryQuantities = product.inventory_quantities;
+      }
+    }
+    
+    console.log("📋 Dados do produto:", {
+      productId: product.id,
+      productName: product.name,
+      productInventoryItemIds,
+      productInventoryQuantities,
+      rawInventoryItems: product.inventory_items,
+      rawInventoryQuantities: product.inventory_quantities,
+      totalInventoryItemsAvailable: allInventoryItems.length
+    });
+
+    // PRIORIDADE 1: Usar vínculos explícitos se configurados
+    if (productInventoryItemIds && Array.isArray(productInventoryItemIds) && productInventoryItemIds.length > 0) {
+      console.log(`🔗 Usando vínculos explícitos de estoque (${productInventoryItemIds.length} item(ns))`);
+      
+      const quantities = productInventoryQuantities || [];
+      
+      for (let i = 0; i < productInventoryItemIds.length; i++) {
+        const inventoryItemId = productInventoryItemIds[i];
+        const quantityPerUnit = quantities[i] ?? 1; // Default: 1 unidade por produto
+        
+        const inventoryItem = allInventoryItems.find(item => item.id === inventoryItemId);
+        
+        if (inventoryItem) {
+          const totalQuantity = quantity * quantityPerUnit;
+          itemsParaBaixar.push({ 
+            item: inventoryItem, 
+            quantidade: totalQuantity 
+          });
+          console.log(`✅ Vínculo encontrado: ${inventoryItem.name} - ${totalQuantity} ${inventoryItem.unit} (${quantityPerUnit} por unidade × ${quantity} produtos)`);
+        } else {
+          console.warn(`⚠️ Item de estoque ${inventoryItemId} não encontrado (pode ter sido deletado)`);
+        }
+      }
+    } else {
+      // PRIORIDADE 2: Busca inteligente (fallback) - apenas se não houver vínculos
+      console.log("🔍 Nenhum vínculo explícito encontrado, usando busca inteligente como fallback");
+      
+      // Função para normalizar strings (remover acentos, converter para minúsculas)
+      const normalizeString = (str: string): string => {
+        return str
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .trim();
+      };
+
+      // 1. Tentar encontrar item de estoque com nome exato do produto (produto acabado)
+      const produtoAcabado = allInventoryItems.find(
+        item => normalizeString(item.name) === normalizeString(product.name) && item.item_type === "produto_acabado"
+      );
+      if (produtoAcabado) {
+        itemsParaBaixar.push({ item: produtoAcabado, quantidade: quantity });
+        console.log(`✅ Encontrado produto acabado: ${produtoAcabado.name}`);
+      }
+
+      // 2. Tentar encontrar itens de estoque que correspondam aos materiais do produto
+      if (product.materials && Array.isArray(product.materials) && product.materials.length > 0) {
+        for (const material of product.materials) {
+          const materialNormalizado = normalizeString(material);
+          
+          // Buscar item de estoque que tenha o nome do material
+          const itemMaterial = allInventoryItems.find(
+            item => {
+              const itemNameNormalizado = normalizeString(item.name);
+              // Verificar se o nome do item contém o material ou vice-versa
+              return itemNameNormalizado.includes(materialNormalizado) || 
+                     materialNormalizado.includes(itemNameNormalizado);
+            }
+          );
+
+          if (itemMaterial && !itemsParaBaixar.find(i => i.item.id === itemMaterial.id)) {
+            // Para materiais, baixar a quantidade vendida (assumindo 1 unidade de material por produto)
+            itemsParaBaixar.push({ item: itemMaterial, quantidade: quantity });
+            console.log(`✅ Encontrado material: ${itemMaterial.name} (${material})`);
+          }
+        }
+      }
+    }
+
+    // Criar movimentações de saída para cada item encontrado
+    if (itemsParaBaixar.length === 0) {
+      console.log("ℹ️ Nenhum item de estoque correspondente encontrado para baixa automática");
+      console.log("💡 Dica: Configure vínculos explícitos no produto do catálogo para baixa automática precisa");
+      console.log("📋 Informações do produto:", {
+        productId: product.id,
+        productName: product.name,
+        hasInventoryItems: !!product.inventory_items,
+        productInventoryItemIdsCount: productInventoryItemIds?.length || 0,
+        materials: product.materials,
+        inventoryItemsAvailable: allInventoryItems.length,
+        inventoryItemsNames: allInventoryItems.map(i => i.name)
+      });
+      return;
+    }
+
+    console.log(`📝 Criando ${itemsParaBaixar.length} movimentação(ões) de saída...`);
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const { item, quantidade } of itemsParaBaixar) {
+      try {
+        console.log(`🔄 Criando movimentação para: ${item.name} (${quantidade} ${item.unit})`);
+        console.log(`📋 Dados da movimentação:`, {
+          inventory_item_id: item.id,
+          produto_id: productId,
+          tipo_movimentacao: "saida",
+          quantidade: quantidade,
+          empresa_id: empresaId,
+          orderCode: orderCode
+        });
+        
+        const result = await criarMovimentacao({
+          inventory_item_id: item.id,
+          produto_id: productId,
+          tipo_movimentacao: "saida",
+          quantidade: quantidade,
+          motivo: `Venda automática - Pedido ${orderCode} - Produto: ${product.name}`,
+          origem: "pedido",
+          origem_id: orderId, // Usar ID do pedido (UUID) como origem_id
+        });
+
+        if (result.ok) {
+          console.log(`✅ Baixa de estoque criada com sucesso: ${item.name} - ${quantidade} ${item.unit}`);
+          if (result.data) {
+            console.log(`📊 Dados da movimentação criada:`, {
+              id: result.data.id,
+              quantidade_anterior: result.data.quantidade_anterior,
+              quantidade_atual: result.data.quantidade_atual,
+              inventory_item: result.data.inventory_item
+            });
+          }
+          successCount++;
+        } else {
+          console.error(`❌ Erro ao criar baixa para ${item.name}:`, result.error);
+          errorCount++;
+        }
+      } catch (error: any) {
+        console.error(`❌ Erro ao processar baixa para ${item.name}:`, error);
+        console.error(`📋 Detalhes do erro:`, {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        });
+        errorCount++;
+      }
+    }
+
+    console.log(`✅ Baixa automática de estoque concluída para pedido ${orderCode}`, {
+      total: itemsParaBaixar.length,
+      sucesso: successCount,
+      erros: errorCount
+    });
+  } catch (error: any) {
+    console.error("❌ Erro na baixa automática de estoque:", error);
+    // Não falhar o pedido por causa de erro na baixa de estoque
+  }
+}
+
+// Função auxiliar para fazer baixa automática de estoque quando um serviço rápido é realizado
+async function baixarEstoqueServico(
+  servicoId: string,
+  quantity: number,
+  orderCode: string,
+  orderId: string, // ID do pedido (UUID) para origem_id
+  empresaId: string
+): Promise<void> {
+  try {
+    console.log(`🔧 Iniciando baixa automática de estoque para serviço ${servicoId}, quantidade: ${quantity}`);
+    
+    // Buscar serviço
+    const servico = await getServico(servicoId);
+    if (!servico) {
+      console.warn(`⚠️ Serviço ${servicoId} não encontrado, pulando baixa de estoque`);
+      return;
+    }
+
+    // Buscar todos os itens de estoque da empresa
+    const allInventoryItems = await listInventory();
+    if (allInventoryItems.length === 0) {
+      console.log("ℹ️ Nenhum item de estoque encontrado, pulando baixa");
+      return;
+    }
+
+    const itemsParaBaixar: Array<{ item: typeof allInventoryItems[0]; quantidade: number }> = [];
+
+    // Parse JSON fields se necessário
+    let servicoInventoryItemIds: string[] = [];
+    let servicoInventoryQuantities: number[] = [];
+    
+    if (servico.inventory_items) {
+      if (typeof servico.inventory_items === 'string') {
+        try {
+          servicoInventoryItemIds = JSON.parse(servico.inventory_items);
+        } catch (e) {
+          console.warn("⚠️ Erro ao fazer parse de inventory_items:", e);
+          servicoInventoryItemIds = [];
+        }
+      } else if (Array.isArray(servico.inventory_items)) {
+        servicoInventoryItemIds = servico.inventory_items;
+      }
+    }
+    
+    if (servico.inventory_quantities) {
+      if (typeof servico.inventory_quantities === 'string') {
+        try {
+          servicoInventoryQuantities = JSON.parse(servico.inventory_quantities);
+        } catch (e) {
+          console.warn("⚠️ Erro ao fazer parse de inventory_quantities:", e);
+          servicoInventoryQuantities = [];
+        }
+      } else if (Array.isArray(servico.inventory_quantities)) {
+        servicoInventoryQuantities = servico.inventory_quantities;
+      }
+    }
+    
+    console.log("📋 Dados do serviço:", {
+      servicoId: servico.id,
+      servicoNome: servico.nome,
+      servicoInventoryItemIds,
+      servicoInventoryQuantities,
+      totalInventoryItemsAvailable: allInventoryItems.length
+    });
+
+    // Usar vínculos explícitos se configurados
+    if (servicoInventoryItemIds && Array.isArray(servicoInventoryItemIds) && servicoInventoryItemIds.length > 0) {
+      console.log(`🔗 Usando vínculos explícitos de estoque (${servicoInventoryItemIds.length} item(ns))`);
+      
+      const quantities = servicoInventoryQuantities || [];
+      
+      for (let i = 0; i < servicoInventoryItemIds.length; i++) {
+        const inventoryItemId = servicoInventoryItemIds[i];
+        const quantityPerService = quantities[i] ?? 1; // Default: 1 unidade por serviço
+        
+        const inventoryItem = allInventoryItems.find(item => item.id === inventoryItemId);
+        
+        if (inventoryItem) {
+          const totalQuantity = quantity * quantityPerService;
+          itemsParaBaixar.push({ 
+            item: inventoryItem, 
+            quantidade: totalQuantity 
+          });
+          console.log(`✅ Vínculo encontrado: ${inventoryItem.name} - ${totalQuantity} ${inventoryItem.unit} (${quantityPerService} por serviço × ${quantity} serviços)`);
+        } else {
+          console.warn(`⚠️ Item de estoque ${inventoryItemId} não encontrado (pode ter sido deletado)`);
+        }
+      }
+    } else {
+      console.log("ℹ️ Nenhum vínculo explícito configurado para este serviço");
+      console.log("💡 Dica: Configure vínculos explícitos no serviço para baixa automática precisa");
+      return;
+    }
+
+    // Criar movimentações de saída para cada item encontrado
+    if (itemsParaBaixar.length === 0) {
+      console.log("ℹ️ Nenhum item de estoque correspondente encontrado para baixa automática");
+      return;
+    }
+
+    console.log(`📝 Criando ${itemsParaBaixar.length} movimentação(ões) de saída...`);
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const { item, quantidade } of itemsParaBaixar) {
+      try {
+        console.log(`🔄 Criando movimentação para: ${item.name} (${quantidade} ${item.unit})`);
+        console.log(`📋 Dados da movimentação:`, {
+          inventory_item_id: item.id,
+          servico_id: servicoId,
+          tipo_movimentacao: "saida",
+          quantidade: quantidade,
+          empresa_id: empresaId,
+          orderCode: orderCode
+        });
+        
+        const result = await criarMovimentacao({
+          inventory_item_id: item.id,
+          tipo_movimentacao: "saida",
+          quantidade: quantidade,
+          motivo: `Serviço realizado - Pedido ${orderCode} - Serviço: ${servico.nome}`,
+          origem: "pedido",
+          origem_id: orderId, // Usar ID do pedido (UUID) como origem_id
+        });
+
+        if (result.ok) {
+          console.log(`✅ Baixa de estoque criada com sucesso: ${item.name} - ${quantidade} ${item.unit}`);
+          if (result.data) {
+            console.log(`📊 Dados da movimentação criada:`, {
+              id: result.data.id,
+              quantidade_anterior: result.data.quantidade_anterior,
+              quantidade_atual: result.data.quantidade_atual,
+              inventory_item: result.data.inventory_item
+            });
+          }
+          successCount++;
+        } else {
+          console.error(`❌ Erro ao criar baixa para ${item.name}:`, result.error);
+          errorCount++;
+        }
+      } catch (error: any) {
+        console.error(`❌ Erro ao processar baixa para ${item.name}:`, error);
+        console.error(`📋 Detalhes do erro:`, {
+          message: error.message,
+          stack: error.stack,
+          name: error.name
+        });
+        errorCount++;
+      }
+    }
+
+    console.log(`✅ Baixa automática de estoque concluída para pedido ${orderCode}`, {
+      total: itemsParaBaixar.length,
+      sucesso: successCount,
+      erros: errorCount
+    });
+  } catch (error: any) {
+    console.error("❌ Erro na baixa automática de estoque do serviço:", error);
+    // Não falhar o pedido por causa de erro na baixa de estoque
+  }
+}
+
 export async function createOrder(input: {
   code?: string;
   customer_name: string;
@@ -179,6 +562,10 @@ export async function createOrder(input: {
   observations?: string;
   file_url?: string;
   personalizations?: OrderPersonalizationInput[];
+  product_id?: string; // ID do produto do catálogo (quando type === "catalogo") - DEPRECATED: usar products
+  quantity?: number; // Quantidade vendida - DEPRECATED: usar products
+  products?: Array<{ id: string; quantity: number }>; // Lista de produtos do catálogo com suas quantidades
+  services?: Array<{ id: string; quantity: number }>; // Lista de serviços rápidos com suas quantidades
 }): Promise<{ ok: boolean; id?: string; error?: string }> {
   try {
     const code = input.code ?? generateOrderCode();
@@ -268,6 +655,107 @@ export async function createOrder(input: {
         console.error("Erro ao criar receita:", receitaErr);
         // Não falhar aqui, apenas logar
       }
+    }
+
+    // BAIXA AUTOMÁTICA DE ESTOQUE: Se for pedido do catálogo com produtos selecionados
+    if (input.type === "catalogo") {
+      // Priorizar lista de produtos (nova forma)
+      const productsToProcess = input.products && input.products.length > 0
+        ? input.products
+        : (input.product_id && input.quantity ? [{ id: input.product_id, quantity: input.quantity }] : []);
+      
+      if (productsToProcess.length > 0) {
+        console.log("🚀 Iniciando baixa automática de estoque para pedido do catálogo", {
+          type: input.type,
+          products_count: productsToProcess.length,
+          order_code: orderData.code,
+          empresa_id
+        });
+        
+        // Executar de forma assíncrona mas aguardar um pouco para garantir que o pedido foi salvo
+        // Não bloquear a resposta, mas garantir que execute
+        // IMPORTANTE: Usar Promise para garantir que execute mesmo se houver erro
+        Promise.resolve().then(async () => {
+          // Aguardar um pouco para garantir que o pedido foi salvo
+          await new Promise(resolve => setTimeout(resolve, 500));
+          try {
+            console.log("🔄 Executando baixa automática de estoque para todos os produtos...");
+            
+            // Processar cada produto individualmente
+            let successCount = 0;
+            let errorCount = 0;
+            
+            for (const product of productsToProcess) {
+              try {
+                await baixarEstoqueAutomatico(
+                  product.id,
+                  product.quantity,
+                  orderData.code,
+                  orderData.id, // Passar ID do pedido (UUID) para origem_id
+                  empresa_id
+                );
+                successCount++;
+                console.log(`✅ Baixa de estoque concluída para produto ${product.id} (quantidade: ${product.quantity})`);
+              } catch (error) {
+                errorCount++;
+                console.error(`❌ Erro na baixa de estoque para produto ${product.id}:`, error);
+              }
+            }
+            
+            console.log(`✅ Baixa automática de estoque concluída: ${successCount} sucesso(s), ${errorCount} erro(s)`);
+          } catch (error) {
+            console.error("❌ Erro na baixa automática de estoque (não crítico):", error);
+            console.error("Stack trace:", (error as Error).stack);
+          }
+        }).catch(err => {
+          console.error("❌ Erro ao agendar baixa automática de estoque:", err);
+        });
+      } else {
+        console.log("⚠️ Baixa automática não executada: nenhum produto especificado");
+      }
+    }
+
+    // BAIXA AUTOMÁTICA DE ESTOQUE PARA SERVIÇOS RÁPIDOS
+    if (input.services && input.services.length > 0) {
+      console.log("🚀 Iniciando baixa automática de estoque para serviços rápidos", {
+        services_count: input.services.length,
+        order_code: orderData.code,
+        empresa_id
+      });
+      
+      Promise.resolve().then(async () => {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        try {
+          console.log("🔄 Executando baixa automática de estoque para todos os serviços...");
+          
+          let successCount = 0;
+          let errorCount = 0;
+          
+          for (const service of input.services!) {
+            try {
+              await baixarEstoqueServico(
+                service.id,
+                service.quantity,
+                orderData.code,
+                orderData.id,
+                empresa_id
+              );
+              successCount++;
+              console.log(`✅ Baixa de estoque concluída para serviço ${service.id} (quantidade: ${service.quantity})`);
+            } catch (error) {
+              errorCount++;
+              console.error(`❌ Erro na baixa de estoque para serviço ${service.id}:`, error);
+            }
+          }
+          
+          console.log(`✅ Baixa automática de estoque para serviços concluída: ${successCount} sucesso(s), ${errorCount} erro(s)`);
+        } catch (error) {
+          console.error("❌ Erro na baixa automática de estoque de serviços (não crítico):", error);
+          console.error("Stack trace:", (error as Error).stack);
+        }
+      }).catch(err => {
+        console.error("❌ Erro ao agendar baixa automática de estoque de serviços:", err);
+      });
     }
 
     return { ok: true, id: orderData.id };
@@ -421,6 +909,8 @@ export async function updateOrder(
     observations: string;
     file_url: string;
     personalizations: OrderPersonalizationInput[];
+    products?: Array<{ id: string; quantity: number }>; // Lista de produtos do catálogo com suas quantidades
+    services?: Array<{ id: string; quantity: number }>; // Lista de serviços rápidos com suas quantidades
   }>
 ): Promise<{ ok: boolean; data?: OrderRow; error?: string }> {
   try {
@@ -441,7 +931,7 @@ export async function updateOrder(
 
     const { column, value } = resolveOrderFilter(orderCode);
 
-    const { personalizations, ...restUpdates } = updates ?? {};
+    const { personalizations, products, services, ...restUpdates } = updates ?? {};
 
     const sanitizedUpdates = Object.fromEntries(
       Object.entries(restUpdates ?? {}).filter(([, v]) => v !== undefined)
@@ -579,6 +1069,93 @@ export async function updateOrder(
       console.error("Erro ao carregar personalizações atualizadas:", personalizationsError);
     } else {
       updatedOrder.personalizations = orderPersonalizations ?? [];
+    }
+
+    // BAIXA AUTOMÁTICA DE ESTOQUE: Se produtos ou serviços foram adicionados na edição
+    const empresa_id = updatedOrder.empresa_id ?? (await getCurrentEmpresaId());
+    
+    if (products && products.length > 0) {
+      console.log("🚀 Iniciando baixa automática de estoque para produtos adicionados na edição", {
+        products_count: products.length,
+        order_code: effectiveOrderCode,
+        empresa_id
+      });
+      
+      Promise.resolve().then(async () => {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        try {
+          console.log("🔄 Executando baixa automática de estoque para produtos adicionados...");
+          
+          let successCount = 0;
+          let errorCount = 0;
+          
+          for (const product of products) {
+            try {
+              await baixarEstoqueAutomatico(
+                product.id,
+                product.quantity,
+                effectiveOrderCode,
+                updatedOrder.id,
+                empresa_id
+              );
+              successCount++;
+              console.log(`✅ Baixa de estoque concluída para produto ${product.id} (quantidade: ${product.quantity})`);
+            } catch (error) {
+              errorCount++;
+              console.error(`❌ Erro na baixa de estoque para produto ${product.id}:`, error);
+            }
+          }
+          
+          console.log(`✅ Baixa automática de estoque concluída: ${successCount} sucesso(s), ${errorCount} erro(s)`);
+        } catch (error) {
+          console.error("❌ Erro na baixa automática de estoque (não crítico):", error);
+          console.error("Stack trace:", (error as Error).stack);
+        }
+      }).catch(err => {
+        console.error("❌ Erro ao agendar baixa automática de estoque:", err);
+      });
+    }
+
+    if (services && services.length > 0) {
+      console.log("🚀 Iniciando baixa automática de estoque para serviços adicionados na edição", {
+        services_count: services.length,
+        order_code: effectiveOrderCode,
+        empresa_id
+      });
+      
+      Promise.resolve().then(async () => {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        try {
+          console.log("🔄 Executando baixa automática de estoque para serviços adicionados...");
+          
+          let successCount = 0;
+          let errorCount = 0;
+          
+          for (const service of services) {
+            try {
+              await baixarEstoqueServico(
+                service.id,
+                service.quantity,
+                effectiveOrderCode,
+                updatedOrder.id,
+                empresa_id
+              );
+              successCount++;
+              console.log(`✅ Baixa de estoque concluída para serviço ${service.id} (quantidade: ${service.quantity})`);
+            } catch (error) {
+              errorCount++;
+              console.error(`❌ Erro na baixa de estoque para serviço ${service.id}:`, error);
+            }
+          }
+          
+          console.log(`✅ Baixa automática de estoque para serviços concluída: ${successCount} sucesso(s), ${errorCount} erro(s)`);
+        } catch (error) {
+          console.error("❌ Erro na baixa automática de estoque de serviços (não crítico):", error);
+          console.error("Stack trace:", (error as Error).stack);
+        }
+      }).catch(err => {
+        console.error("❌ Erro ao agendar baixa automática de estoque de serviços:", err);
+      });
     }
 
     console.log("Pedido atualizado com sucesso:", updatedOrder);

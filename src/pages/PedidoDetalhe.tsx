@@ -854,7 +854,10 @@ export default function PedidoDetalhe() {
                 </div>
                 <div class="item">
                   <div class="label">Data de Entrega</div>
-                  <div class="value">${new Date(order.delivery).toLocaleDateString('pt-BR')}</div>
+                  <div class="value">${order.delivery ? (() => {
+                    const [year, month, day] = order.delivery.split('T')[0].split('-');
+                    return day + '/' + month + '/' + year;
+                  })() : 'N/A'}</div>
                 </div>
               </div>
             </div>
@@ -868,7 +871,10 @@ export default function PedidoDetalhe() {
                 </div>
                 <div class="item">
                   <div class="label">Data de Entrega</div>
-                  <div class="value">${new Date(order.delivery).toLocaleDateString('pt-BR')}</div>
+                  <div class="value">${order.delivery ? (() => {
+                    const [year, month, day] = order.delivery.split('T')[0].split('-');
+                    return day + '/' + month + '/' + year;
+                  })() : 'N/A'}</div>
                 </div>
               </div>
             </div>
@@ -1497,10 +1503,21 @@ export default function PedidoDetalhe() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card className="lg:col-span-2 border-border">
             <CardHeader>
-              <CardTitle className="text-foreground flex items-center gap-2">
-                <Package className="w-5 h-5 text-primary" />
-                Informações do Pedido
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-foreground flex items-center gap-2">
+                  <Package className="w-5 h-5 text-primary" />
+                  Informações do Pedido
+                </CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate(`/pedidos/editar/${order.id}`)}
+                  className="flex items-center gap-2"
+                >
+                  <Edit className="w-4 h-4" />
+                  Editar Pedido
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1516,7 +1533,11 @@ export default function PedidoDetalhe() {
                   <div>
                     <p className="text-xs text-muted-foreground">Entrega</p>
                     <p className="text-sm font-medium text-foreground">
-                      {new Date(order.delivery).toLocaleDateString("pt-BR")}
+                      {order.delivery ? (() => {
+                        // Parse a data como local para evitar problemas de timezone
+                        const [year, month, day] = order.delivery.split('T')[0].split('-');
+                        return `${day}/${month}/${year}`;
+                      })() : 'N/A'}
                     </p>
                   </div>
                 </div>
@@ -1583,9 +1604,109 @@ export default function PedidoDetalhe() {
                 </div>
               </div>
 
+              {/* Lista de Itens do Pedido */}
+              {(() => {
+                // Função para parsear itens da descrição
+                const parseOrderItems = (description: string) => {
+                  if (!description) return [];
+                  
+                  const lines = description.split('\n').filter(line => line.trim());
+                  const items: Array<{
+                    name: string;
+                    quantity: number;
+                    size?: string;
+                    color?: string;
+                    fullText: string;
+                  }> = [];
+                  
+                  lines.forEach(line => {
+                    // Tentar extrair informações estruturadas
+                    const qtdMatch = line.match(/Qtd:\s*(\d+)/i);
+                    const sizeMatch = line.match(/Tamanho:\s*([^|]+)/i);
+                    const colorMatch = line.match(/Cor:\s*([^|]+)/i);
+                    
+                    // Extrair nome do produto (tudo antes do primeiro "|")
+                    const namePart = line.split('|')[0].trim();
+                    // Remover informações entre parênteses que são duplicadas
+                    const cleanName = namePart
+                      .replace(/\s*-\s*[^(]+\([^)]+\)/g, '') // Remove "- Tipo (materiais)"
+                      .replace(/\s*\([^)]+\)/g, '') // Remove parênteses restantes
+                      .trim();
+                    
+                    const quantity = qtdMatch ? parseInt(qtdMatch[1]) : 1;
+                    const size = sizeMatch ? sizeMatch[1].trim() : undefined;
+                    const color = colorMatch ? colorMatch[1].trim() : undefined;
+                    
+                    // Se não encontrou estrutura, usar a linha inteira como nome
+                    if (!qtdMatch && !sizeMatch && !colorMatch) {
+                      items.push({
+                        name: line.trim(),
+                        quantity: 1,
+                        fullText: line.trim()
+                      });
+                    } else {
+                      items.push({
+                        name: cleanName || namePart,
+                        quantity,
+                        size: size && size !== "Não aplicável" ? size : undefined,
+                        color: color || undefined,
+                        fullText: line.trim()
+                      });
+                    }
+                  });
+                  
+                  return items;
+                };
+                
+                const orderItems = parseOrderItems(order.description);
+                
+                if (orderItems.length > 0) {
+                  return (
+                    <div className="space-y-3 border-b border-dashed pb-4 mb-4">
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Itens do Pedido
+                        </p>
+                        <span className="text-xs text-muted-foreground">
+                          {orderItems.length} {orderItems.length === 1 ? 'item' : 'itens'}
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {orderItems.map((item, index) => (
+                          <div
+                            key={index}
+                            className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg border border-border/50"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-foreground">{item.name}</p>
+                              <div className="flex flex-wrap gap-3 mt-1">
+                                <span className="text-xs text-muted-foreground">
+                                  <strong>Qtd:</strong> {item.quantity}
+                                </span>
+                                {item.size && (
+                                  <span className="text-xs text-muted-foreground">
+                                    <strong>Tamanho:</strong> {item.size}
+                                  </span>
+                                )}
+                                {item.color && (
+                                  <span className="text-xs text-muted-foreground">
+                                    <strong>Cor:</strong> {item.color}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+
               <div>
                 <div className="flex items-center justify-between">
-                  <p className="text-xs text-muted-foreground">Descrição</p>
+                  <p className="text-xs text-muted-foreground">Descrição Completa</p>
                   <Dialog>
                     <DialogTrigger asChild>
                       <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
@@ -1599,11 +1720,13 @@ export default function PedidoDetalhe() {
                       <div className="space-y-4">
                         <div>
                           <Label htmlFor="description">Descrição</Label>
-                          <Input
+                          <Textarea
                             id="description"
                             placeholder="Descrição do pedido"
                             defaultValue={order.description}
                             onChange={(e) => setNewDescription(e.target.value)}
+                            rows={6}
+                            className="resize-none"
                           />
                         </div>
                         <div className="flex gap-2">
@@ -1618,7 +1741,7 @@ export default function PedidoDetalhe() {
                     </DialogContent>
                   </Dialog>
                 </div>
-                <p className="text-foreground mt-1">{order.description}</p>
+                <p className="text-foreground mt-1 whitespace-pre-wrap text-sm">{order.description}</p>
               </div>
 
               {order.personalizations && order.personalizations.length > 0 && (
