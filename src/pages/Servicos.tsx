@@ -16,7 +16,8 @@ import {
   Tag,
   Loader2,
   CheckCircle2,
-  XCircle
+  XCircle,
+  Link2
 } from "lucide-react";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -32,7 +33,9 @@ import {
   type ServicoRow 
 } from "@/integrations/supabase/servicos";
 import { ImportServicos } from "@/components/ImportServicos";
+import { DialogVinculosEstoqueServico } from "@/components/DialogVinculosEstoqueServico";
 import { formatCurrency } from "@/utils/formatCurrency";
+import { getServico } from "@/integrations/supabase/servicos";
 
 export default function Servicos() {
   const queryClient = useQueryClient();
@@ -44,6 +47,8 @@ export default function Servicos() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingServico, setEditingServico] = useState<ServicoRow | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [servicoParaVinculos, setServicoParaVinculos] = useState<ServicoRow | null>(null);
+  const [dialogVinculosOpen, setDialogVinculosOpen] = useState(false);
   const [formData, setFormData] = useState({
     nome: "",
     descricao: "",
@@ -314,6 +319,23 @@ export default function Servicos() {
                     <Button
                       variant="outline"
                       size="sm"
+                      onClick={async () => {
+                        // Buscar serviço completo do Supabase
+                        const servicoFull = await getServico(servico.id);
+                        if (servicoFull) {
+                          setServicoParaVinculos(servicoFull);
+                          setDialogVinculosOpen(true);
+                        }
+                      }}
+                      className="flex-1"
+                      title="Vínculos de Estoque"
+                    >
+                      <Link2 className="h-4 w-4 mr-2" />
+                      Vínculos
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={() => handleDelete(servico.id)}
                       disabled={isDeleting === servico.id}
                       className="flex-1"
@@ -430,6 +452,18 @@ export default function Servicos() {
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* Dialog de Vínculos de Estoque */}
+        {servicoParaVinculos && (
+          <DialogVinculosEstoqueServico
+            open={dialogVinculosOpen}
+            onOpenChange={setDialogVinculosOpen}
+            servico={servicoParaVinculos}
+            onSuccess={() => {
+              queryClient.invalidateQueries({ queryKey: ["servicos"] });
+            }}
+          />
+        )}
       </div>
     </div>
   );

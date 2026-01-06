@@ -21,6 +21,7 @@ export const CLOTHING_SIZES = [
   // Opções especiais
   { value: "Único", label: "Único" },
   { value: "Personalizado", label: "Personalizado" },
+  { value: "Não aplicável", label: "Não aplicável" },
 ] as const;
 
 /**

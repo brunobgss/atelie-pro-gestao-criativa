@@ -147,17 +147,57 @@ export default function MovimentacoesEstoque() {
     [inventoryItems]
   );
 
+  // Normalizar texto para busca (remove acentos, espaços extras, caixa)
+  const normalizeSearch = (value: string) =>
+    value
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
   const filteredMovimentacoes = useMemo(() => {
+    if (!searchTerm.trim()) {
+      return movimentacoes.filter((mov) => {
+        const matchesTipo = tipoFiltro === "todos" || mov.tipo_movimentacao === tipoFiltro;
+        const matchesItem = itemFiltro === "todos" || mov.inventory_item_id === itemFiltro;
+        return matchesTipo && matchesItem;
+      });
+    }
+
+    const search = normalizeSearch(searchTerm);
+    if (!search) {
+      return movimentacoes.filter((mov) => {
+        const matchesTipo = tipoFiltro === "todos" || mov.tipo_movimentacao === tipoFiltro;
+        const matchesItem = itemFiltro === "todos" || mov.inventory_item_id === itemFiltro;
+        return matchesTipo && matchesItem;
+      });
+    }
+
+    const searchWords = search.split(" ");
+
     return movimentacoes.filter((mov) => {
       const item = mov.inventory_item_id ? inventoryIndex.get(mov.inventory_item_id) : null;
       const matchesTipo = tipoFiltro === "todos" || mov.tipo_movimentacao === tipoFiltro;
       const matchesItem = itemFiltro === "todos" || mov.inventory_item_id === itemFiltro;
-      const matchesSearch =
-        !searchTerm ||
-        mov.motivo?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item?.supplier?.toLowerCase().includes(searchTerm.toLowerCase());
-      return matchesTipo && matchesItem && matchesSearch;
+      
+      if (!matchesTipo || !matchesItem) return false;
+
+      // Buscar em múltiplos campos: motivo, nome do item, fornecedor
+      const searchableText = [
+        mov.motivo || "",
+        item?.name || "",
+        item?.supplier || "",
+      ]
+        .join(" ")
+        .toString();
+
+      const normalizedText = normalizeSearch(searchableText);
+
+      // Cada palavra digitada deve existir em alguma parte do texto
+      const matchesSearch = searchWords.every((word) => normalizedText.includes(word));
+
+      return matchesSearch;
     });
   }, [movimentacoes, tipoFiltro, itemFiltro, searchTerm, inventoryIndex]);
 

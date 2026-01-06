@@ -431,6 +431,33 @@ export async function approveQuote(quoteCode: string): Promise<{ ok: boolean; er
     const fileUrl = extractFileUrl(quote.observations);
     console.log("URL do arquivo extraída:", fileUrl);
 
+    // Tentar extrair data de entrega das observações, se o usuário preencheu em "Novo Orçamento"
+    // Formato esperado no texto: "Data de entrega estimada: dd/mm/aaaa"
+    const extractDeliveryDateFromObservations = (observations?: string | null): string | null => {
+      if (!observations) return null;
+
+      try {
+        const match = observations.match(/Data de entrega estimada:\s*(\d{1,2}\/\d{1,2}\/\d{4})/i);
+        if (!match || !match[1]) {
+          return null;
+        }
+
+        const [day, month, year] = match[1].split("/").map((part) => parseInt(part, 10));
+        if (!day || !month || !year) return null;
+
+        const date = new Date(year, month - 1, day);
+        if (isNaN(date.getTime())) return null;
+
+        // Salvar apenas a parte de data em formato ISO (YYYY-MM-DD)
+        return date.toISOString().split("T")[0];
+      } catch (e) {
+        console.warn("Não foi possível extrair data de entrega das observações:", e);
+        return null;
+      }
+    };
+
+    const deliveryDateFromQuote = extractDeliveryDateFromObservations(quote.observations);
+
     // Obter empresa_id
     let empresa_id: string;
     try {
@@ -453,10 +480,13 @@ export async function approveQuote(quoteCode: string): Promise<{ ok: boolean; er
         value: totalValue,
         paid: 0,
         type: "catalogo", // Adicionar campo type obrigatório
-        delivery_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 7 dias
+        // Se o orçamento tiver uma data de entrega estimada nas observações, usar essa data.
+        // Caso contrário, manter o padrão de 7 dias a partir de hoje.
+        delivery_date:
+          deliveryDateFromQuote ?? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0],
         status: "Aguardando aprovação",
         file_url: fileUrl || null, // Incluir URL do arquivo se existir
-        empresa_id: empresa_id
+        empresa_id: empresa_id,
       })
       .select("id")
       .single();
@@ -613,33 +643,111 @@ export async function updateQuote(quoteCode: string, input: {
       }
     }
 
-    // Atualizar personalizações se fornecidas
-    if (input.personalizations) {
-      const { error: deletePersonalizationsError } = await supabase
+    // Atualizar personalizações se fornecidas (sempre processar, mesmo se array vazio)
+    if (input.personalizations !== undefined) {
+      console.log(`🔄 Atualizando personalizações do orçamento ${quoteCode}:`, {
+        personalizations_count: input.personalizations.length,
+        quote_id: quote.id,
+        personalizations: input.personalizations
+      });
+      
+      // Obter empresa_id para garantir que a query funcione com RLS
+      const empresa_id = await getCurrentEmpresaId();
+      
+      // Verificar quantas personalizações existem antes de deletar (sem filtrar por empresa_id primeiro)
+      const { data: existingPersonalizations, error: checkError } = await supabase
+        .from("atelie_quote_personalizations")
+        .select("id, quote_id, empresa_id")
+        .eq("quote_id", quote.id);
+      
+      if (checkError) {
+        console.error("❌ Erro ao verificar personalizações existentes:", checkError);
+      } else {
+        console.log(`📊 Personalizações existentes antes de deletar: ${existingPersonalizations?.length || 0}`, {
+          quote_id: quote.id,
+          empresa_id: empresa_id,
+          existing_ids: existingPersonalizations?.map(p => p.id),
+          existing_empresa_ids: existingPersonalizations?.map(p => p.empresa_id)
+        });
+      }
+      
+      // Sempre deletar personalizações existentes primeiro
+      // Tentar deletar apenas por quote_id (RLS pode estar bloqueando quando adicionamos empresa_id)
+      const { data: deletedData, error: deletePersonalizationsError } = await supabase
         .from("atelie_quote_personalizations")
         .delete()
-        .eq("quote_id", quote.id);
+        .eq("quote_id", quote.id)
+        .select();
 
-      if (deletePersonalizationsError) throw deletePersonalizationsError;
+      if (deletePersonalizationsError) {
+        console.error("❌ Erro ao deletar personalizações do orçamento:", deletePersonalizationsError);
+        console.error("Detalhes do erro:", {
+          message: deletePersonalizationsError.message,
+          details: deletePersonalizationsError.details,
+          hint: deletePersonalizationsError.hint,
+          code: deletePersonalizationsError.code
+        });
+        throw deletePersonalizationsError;
+      }
+      
+      console.log(`✅ Personalizações antigas deletadas com sucesso. Deletadas: ${deletedData?.length || 0}`, {
+        deleted_ids: deletedData?.map(p => p.id),
+        deleted_count: deletedData?.length
+      });
+      
+      // Se não deletou nada mas existem personalizações, pode ser problema de RLS
+      if ((deletedData?.length || 0) === 0 && (existingPersonalizations?.length || 0) > 0) {
+        console.warn("⚠️ ATENÇÃO: Existem personalizações mas nenhuma foi deletada. Pode ser problema de RLS ou empresa_id diferente.");
+        console.warn("Tentando deletar uma por uma...");
+        
+        // Tentar deletar uma por uma
+        let deletedCount = 0;
+        for (const personalization of existingPersonalizations || []) {
+          const { error: singleDeleteError } = await supabase
+            .from("atelie_quote_personalizations")
+            .delete()
+            .eq("id", personalization.id);
+          
+          if (!singleDeleteError) {
+            deletedCount++;
+          } else {
+            console.error(`❌ Erro ao deletar personalização ${personalization.id}:`, singleDeleteError);
+          }
+        }
+        
+        console.log(`✅ Deletadas ${deletedCount} personalização(ões) individualmente`);
+      }
 
-      const empresa_id = await getCurrentEmpresaId();
-      const personalizations = input.personalizations
-        .filter((p) => p.person_name?.trim())
-        .map((p) => ({
-          quote_id: quote.id,
-          empresa_id,
-          person_name: p.person_name.trim(),
-          size: p.size?.trim() || null,
-          quantity: p.quantity ?? 1,
-          notes: p.notes?.trim() || null,
-        }));
+      // Se há personalizações válidas para inserir, inserir
+      if (input.personalizations.length > 0) {
+        const empresa_id = await getCurrentEmpresaId();
+        const personalizations = input.personalizations
+          .filter((p) => p.person_name?.trim())
+          .map((p) => ({
+            quote_id: quote.id,
+            empresa_id,
+            person_name: p.person_name.trim(),
+            size: p.size?.trim() || null,
+            quantity: p.quantity ?? 1,
+            notes: p.notes?.trim() || null,
+          }));
 
-      if (personalizations.length) {
-        const { error: insertPersonalizationsError } = await supabase
-          .from("atelie_quote_personalizations")
-          .insert(personalizations);
+        if (personalizations.length > 0) {
+          console.log(`📝 Inserindo ${personalizations.length} personalização(ões) válida(s)`);
+          const { error: insertPersonalizationsError } = await supabase
+            .from("atelie_quote_personalizations")
+            .insert(personalizations);
 
-        if (insertPersonalizationsError) throw insertPersonalizationsError;
+          if (insertPersonalizationsError) {
+            console.error("❌ Erro ao inserir personalizações do orçamento:", insertPersonalizationsError);
+            throw insertPersonalizationsError;
+          }
+          console.log("✅ Personalizações inseridas com sucesso");
+        } else {
+          console.log("ℹ️ Nenhuma personalização válida para inserir (apenas deletamos as antigas)");
+        }
+      } else {
+        console.log("ℹ️ Array de personalizações está vazio - apenas deletamos as antigas (não inserimos nada)");
       }
     }
 

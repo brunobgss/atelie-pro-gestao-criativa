@@ -10,7 +10,7 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 import { ArrowLeft, Save, Plus, Trash2, Package, Check, ChevronsUpDown } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getQuoteByCode, updateQuote } from "@/integrations/supabase/quotes";
 import { getProducts } from "@/integrations/supabase/products";
 import { PersonalizationListEditor, PersonalizationEntry, createEmptyPersonalization } from "@/components/PersonalizationListEditor";
@@ -26,6 +26,7 @@ interface QuoteItem {
 export default function EditarOrcamento() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const queryClient = useQueryClient();
   
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
@@ -45,17 +46,40 @@ export default function EditarOrcamento() {
     queryFn: getProducts,
   });
 
+  // Normalizar texto para busca (remove acentos, espaços extras, caixa)
+  const normalizeSearch = (value: string) =>
+    value
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
   // Filtrar produtos baseado no termo de busca
   const filteredProducts = useMemo(() => {
     if (!productSearchTerm.trim()) {
       return products;
     }
-    const searchLower = productSearchTerm.toLowerCase().trim();
-    return products.filter((product) =>
-      product.name.toLowerCase().includes(searchLower) ||
-      product.type?.toLowerCase().includes(searchLower) ||
-      product.materials?.some((material: string) => material.toLowerCase().includes(searchLower))
-    );
+
+    const search = normalizeSearch(productSearchTerm);
+    if (!search) return products;
+
+    const searchWords = search.split(" ");
+
+    return products.filter((product) => {
+      const base = [
+        product.name,
+        product.type || "",
+        ...(Array.isArray(product.materials) ? product.materials : []),
+      ]
+        .join(" ")
+        .toString();
+
+      const normalizedProduct = normalizeSearch(base);
+
+      // Cada palavra digitada deve existir em alguma parte do texto do produto
+      return searchWords.every((word) => normalizedProduct.includes(word));
+    });
   }, [products, productSearchTerm]);
 
   const { data: quoteData, isLoading } = useQuery({
@@ -80,8 +104,40 @@ export default function EditarOrcamento() {
         })));
       }
 
+      // Remover personalizações duplicadas antes de carregar
+      const removeDuplicatePersonalizations = (personalizations: typeof quotePersonalizations = []) => {
+        if (!personalizations || personalizations.length === 0) return [];
+        
+        // Sempre usar conteúdo para verificar duplicatas, mesmo se houver ID
+        const seenKeys = new Map<string, typeof personalizations[0]>();
+        const uniqueItems: typeof personalizations = [];
+        
+        personalizations.forEach((item) => {
+          // Criar chave baseada no conteúdo (normalizar para comparação)
+          const personName = (item.person_name || '').trim().toLowerCase();
+          const size = (item.size || '').trim().toLowerCase();
+          const quantity = item.quantity || 1;
+          const notes = (item.notes || '').trim().toLowerCase();
+          
+          const key = `${personName}_${size}_${quantity}_${notes}`;
+          
+          if (!seenKeys.has(key)) {
+            seenKeys.set(key, item);
+            uniqueItems.push(item);
+          }
+        });
+        
+        if (personalizations.length !== uniqueItems.length) {
+          console.log(`✅ Removidas ${personalizations.length - uniqueItems.length} personalizações duplicadas ao editar orçamento. Original: ${personalizations.length}, Único: ${uniqueItems.length}`);
+        }
+        
+        return uniqueItems;
+      };
+
+      const uniquePersonalizations = removeDuplicatePersonalizations(quotePersonalizations ?? []);
+
       setPersonalizations(
-        (quotePersonalizations ?? []).map((item) => ({
+        uniquePersonalizations.map((item) => ({
           id: item.id ?? createEmptyPersonalization().id,
           personName: item.person_name ?? "",
           size: item.size ?? "",
@@ -132,6 +188,22 @@ export default function EditarOrcamento() {
     }
 
     try {
+      // Preparar personalizações - sempre enviar array, mesmo se vazio
+      const validPersonalizations = personalizations
+        .filter((p) => p.personName.trim())
+        .map((p) => ({
+          person_name: p.personName.trim(),
+          size: p.size?.trim() || undefined,
+          quantity: p.quantity ?? 1,
+          notes: p.notes?.trim() || undefined,
+        }));
+
+      console.log("📝 Enviando personalizações para updateQuote:", {
+        total: personalizations.length,
+        valid: validPersonalizations.length,
+        personalizations: validPersonalizations
+      });
+
       const result = await updateQuote(id!, {
         customer_name: customerName,
         customer_phone: customerPhone,
@@ -141,17 +213,14 @@ export default function EditarOrcamento() {
           quantity: item.quantity,
           value: item.value
         })),
-        personalizations: personalizations
-          .filter((p) => p.personName.trim())
-          .map((p) => ({
-            person_name: p.personName.trim(),
-            size: p.size?.trim() || undefined,
-            quantity: p.quantity ?? 1,
-            notes: p.notes?.trim() || undefined,
-          })),
+        personalizations: validPersonalizations, // Sempre enviar array, mesmo se vazio
       });
       
       if (result.ok) {
+        // Invalidar queries relacionadas para forçar recarregamento
+        queryClient.invalidateQueries({ queryKey: ["quote", id] });
+        queryClient.invalidateQueries({ queryKey: ["quotes"] });
+        
         toast.success("Orçamento atualizado com sucesso!");
         navigate("/orcamentos");
       } else {

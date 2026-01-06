@@ -86,7 +86,47 @@ export default function VisualizarOrcamento() {
 
   const quote = quoteData.quote;
   const items = quoteData.items || [];
-  const personalizations = quoteData.personalizations || [];
+  
+  // Remover personalizações duplicadas
+  const removeDuplicatePersonalizations = (personalizations: typeof quoteData.personalizations = []) => {
+    if (!personalizations || personalizations.length === 0) return [];
+    
+    // Sempre usar conteúdo para verificar duplicatas, mesmo se houver ID
+    // Isso garante que personalizações idênticas sejam removidas mesmo com IDs diferentes
+    const seenKeys = new Map<string, typeof personalizations[0]>();
+    const uniqueItems: typeof personalizations = [];
+    
+    personalizations.forEach((item) => {
+      // Criar chave baseada no conteúdo (normalizar para comparação)
+      const personName = (item.person_name || '').trim().toLowerCase();
+      const size = (item.size || '').trim().toLowerCase();
+      const quantity = item.quantity || 1;
+      const notes = (item.notes || '').trim().toLowerCase();
+      
+      const key = `${personName}_${size}_${quantity}_${notes}`;
+      
+      if (!seenKeys.has(key)) {
+        seenKeys.set(key, item);
+        uniqueItems.push(item);
+      } else {
+        console.warn(`Personalização duplicada removida:`, {
+          person_name: item.person_name,
+          size: item.size,
+          quantity: item.quantity,
+          notes: item.notes,
+          id: item.id
+        });
+      }
+    });
+    
+    if (personalizations.length !== uniqueItems.length) {
+      console.log(`✅ Removidas ${personalizations.length - uniqueItems.length} personalizações duplicadas do orçamento. Original: ${personalizations.length}, Único: ${uniqueItems.length}`);
+    }
+    
+    return uniqueItems;
+  };
+  
+  const personalizations = removeDuplicatePersonalizations(quoteData.personalizations || []);
   const fileUrl = extractFileUrl(quote.observations);
 
   const total = items.reduce((sum, item) => sum + (item.quantity * item.unit_value), 0);

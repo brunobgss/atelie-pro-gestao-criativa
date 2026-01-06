@@ -7,13 +7,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Package, Plus, Edit, Trash2, Copy, Search, Filter, Clock, Layers, Upload, X, Image as ImageIcon } from "lucide-react";
+import { Package, Plus, Edit, Trash2, Copy, Search, Filter, Clock, Layers, Upload, X, Image as ImageIcon, Link2 } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { toast } from "sonner";
 import { getProducts, createProduct, updateProduct, deleteProduct } from "@/integrations/supabase/products";
 import { uploadProductImage } from "@/integrations/supabase/storage";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { DialogVariacoesProduto } from "@/components/DialogVariacoesProduto";
+import { DialogVinculosEstoque } from "@/components/DialogVinculosEstoque";
 import { ImportProducts } from "@/components/ImportProducts";
 import { useSync } from "@/contexts/SyncContext";
 import { useSyncOperations } from "@/hooks/useSyncOperations";
@@ -55,6 +56,8 @@ export default function CatalogoProdutos() {
   const [testQuantity, setTestQuantity] = useState(1);
   const [dialogVariacoesOpen, setDialogVariacoesOpen] = useState(false);
   const [produtoParaVariacoes, setProdutoParaVariacoes] = useState<Product | null>(null);
+  const [dialogVinculosOpen, setDialogVinculosOpen] = useState(false);
+  const [produtoParaVinculos, setProdutoParaVinculos] = useState<any>(null);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
@@ -724,6 +727,23 @@ _Orçamento gerado pelo Ateliê Pro_
                     <Button
                       variant="ghost"
                       size="sm"
+                      onClick={async () => {
+                        // Buscar produto completo do Supabase
+                        const productsData = await getProducts();
+                        const productFull = productsData.find(p => p.id === product.id);
+                        if (productFull) {
+                          setProdutoParaVinculos(productFull);
+                          setDialogVinculosOpen(true);
+                        }
+                      }}
+                      className="text-orange-600 hover:text-orange-700"
+                      title="Vínculos de Estoque"
+                    >
+                      <Link2 className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => handleDuplicate(product)}
                       className="text-green-600 hover:text-green-700"
                     >
@@ -791,6 +811,19 @@ _Orçamento gerado pelo Ateliê Pro_
             onOpenChange={setDialogVariacoesOpen}
             produtoId={produtoParaVariacoes.id}
             produtoNome={produtoParaVariacoes.name}
+          />
+        )}
+
+        {/* Dialog de Vínculos de Estoque */}
+        {produtoParaVinculos && (
+          <DialogVinculosEstoque
+            open={dialogVinculosOpen}
+            onOpenChange={setDialogVinculosOpen}
+            product={produtoParaVinculos}
+            onSuccess={() => {
+              refetch();
+              queryClient.invalidateQueries({ queryKey: ["products"] });
+            }}
           />
         )}
       </div>

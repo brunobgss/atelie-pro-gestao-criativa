@@ -616,7 +616,7 @@ export default function PedidoDetalhe() {
     
     return uniqueItems;
   }, []);
-
+  
   const order = useMemo(() => {
     if (orderDb) {
       console.log("Dados do pedido recebidos:", orderDb, "forceUpdate:", forceUpdate);
@@ -1504,10 +1504,10 @@ export default function PedidoDetalhe() {
           <Card className="lg:col-span-2 border-border">
             <CardHeader>
               <div className="flex items-center justify-between">
-                <CardTitle className="text-foreground flex items-center gap-2">
-                  <Package className="w-5 h-5 text-primary" />
-                  Informações do Pedido
-                </CardTitle>
+              <CardTitle className="text-foreground flex items-center gap-2">
+                <Package className="w-5 h-5 text-primary" />
+                Informações do Pedido
+              </CardTitle>
                 <Button
                   variant="outline"
                   size="sm"
@@ -1759,25 +1759,25 @@ export default function PedidoDetalhe() {
                       // Criar uma chave única: usar ID se disponível, senão usar índice + campos únicos
                       const uniqueKey = item.id || `${index}-${item.person_name}-${item.size}-${item.quantity}-${item.notes}`;
                       return (
-                        <div
+                      <div
                           key={uniqueKey}
-                          className="flex flex-col gap-1 rounded-md border border-border/80 bg-muted/20 p-3 text-xs sm:flex-row sm:items-center sm:justify-between"
-                        >
-                          <div className="flex flex-col">
-                            <span className="text-sm font-medium text-foreground">{item.person_name}</span>
-                            <span className="text-muted-foreground">
-                              {item.size ? `Tamanho: ${item.size}` : "Tamanho não informado"}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-3 text-muted-foreground">
-                            <span>Qtd: {item.quantity}</span>
-                            {item.notes && (
-                              <span className="max-w-[240px] truncate text-muted-foreground/90">
-                                {item.notes}
-                              </span>
-                            )}
-                          </div>
+                        className="flex flex-col gap-1 rounded-md border border-border/80 bg-muted/20 p-3 text-xs sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div className="flex flex-col">
+                          <span className="text-sm font-medium text-foreground">{item.person_name}</span>
+                          <span className="text-muted-foreground">
+                            {item.size ? `Tamanho: ${item.size}` : "Tamanho não informado"}
+                          </span>
                         </div>
+                        <div className="flex items-center gap-3 text-muted-foreground">
+                          <span>Qtd: {item.quantity}</span>
+                          {item.notes && (
+                            <span className="max-w-[240px] truncate text-muted-foreground/90">
+                              {item.notes}
+                            </span>
+                          )}
+                        </div>
+                      </div>
                       );
                     })}
                   </div>

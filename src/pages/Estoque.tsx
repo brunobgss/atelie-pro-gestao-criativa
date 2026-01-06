@@ -286,13 +286,48 @@ export default function Estoque() {
     queryFn: listInventory,
   });
 
+  // Normalizar texto para busca (remove acentos, espaços extras, caixa)
+  const normalizeSearch = (value: string) =>
+    value
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
   const filteredItems = useMemo(() => {
+    if (!searchTerm.trim()) {
+      // Se não há termo de busca, apenas filtrar por tipo
+      return items.filter((item) => typeFilter === "all" || item.item_type === typeFilter);
+    }
+
+    const search = normalizeSearch(searchTerm);
+    if (!search) {
+      return items.filter((item) => typeFilter === "all" || item.item_type === typeFilter);
+    }
+
+    const searchWords = search.split(" ");
+
     return items.filter((item) => {
       const matchesType = typeFilter === "all" || item.item_type === typeFilter;
-      const matchesSearch =
-        item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (item.supplier ?? "").toLowerCase().includes(searchTerm.toLowerCase());
-      return matchesType && matchesSearch;
+      
+      if (!matchesType) return false;
+
+      // Buscar em múltiplos campos: nome, fornecedor, categoria
+      const searchableText = [
+        item.name || "",
+        item.supplier || "",
+        item.category || "",
+      ]
+        .join(" ")
+        .toString();
+
+      const normalizedText = normalizeSearch(searchableText);
+
+      // Cada palavra digitada deve existir em alguma parte do texto
+      const matchesSearch = searchWords.every((word) => normalizedText.includes(word));
+
+      return matchesSearch;
     });
   }, [items, typeFilter, searchTerm]);
 
@@ -575,6 +610,12 @@ export default function Estoque() {
                             <p className="text-xs text-muted-foreground">
                               Você receberá um único resumo com todos os itens em atenção.
                             </p>
+                            {alertForm.send_email && alertForm.email && (
+                              <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-800">
+                                <strong>ℹ️ Importante:</strong> Os alertas são executados automaticamente uma vez por dia. 
+                                Você também pode clicar em "Executar agora" abaixo para testar imediatamente.
+                              </div>
+                            )}
                 </div>
                 </div>
                         <div className="space-y-3 rounded-lg border border-border/60 bg-muted/10 p-4">
