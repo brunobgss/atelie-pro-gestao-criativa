@@ -12,10 +12,20 @@
 -- IMPORTANTE: Execute este comando PRIMEIRO para fazer backup!
 -- Isso criará uma tabela temporária com todos os produtos da empresa
 
+-- Primeiro, verificar se existem produtos antes do backup
+SELECT 
+  COUNT(*) as total_produtos_antes_backup,
+  'Produtos existentes antes do backup' as status
+FROM atelie_products 
+WHERE empresa_id = '8a9c1c7e-81f1-4186-ac89-ed584f549836';
+
+-- Se a tabela de backup já existe, removê-la primeiro
+DROP TABLE IF EXISTS atelie_products_backup_hfuniformes;
+
 -- Backup completo dos produtos da empresa
 -- EMPRESA_ID: 8a9c1c7e-81f1-4186-ac89-ed584f549836
--- Total de produtos: 790
-CREATE TABLE IF NOT EXISTS atelie_products_backup_hfuniformes AS 
+-- Total de produtos esperado: 790
+CREATE TABLE atelie_products_backup_hfuniformes AS 
 SELECT * FROM atelie_products 
 WHERE empresa_id = '8a9c1c7e-81f1-4186-ac89-ed584f549836';
 
@@ -24,6 +34,14 @@ SELECT
   COUNT(*) as total_produtos_backup,
   'Backup criado com sucesso!' as status
 FROM atelie_products_backup_hfuniformes;
+
+-- Verificar alguns produtos do backup para confirmar
+SELECT 
+  id,
+  name,
+  empresa_id
+FROM atelie_products_backup_hfuniformes
+LIMIT 5;
 
 -- =====================================================
 -- PASSO 1.5: DIAGNÓSTICO - VERIFICAR SE EMPRESA EXISTE
