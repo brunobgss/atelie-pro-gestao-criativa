@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/components/AuthProvider";
 import { useInternationalization } from "@/contexts/InternationalizationContext";
 import { useState } from "react";
+import { fixEncoding } from "@/utils/fixEncoding";
 
 export default function VisualizarOrcamento() {
   const { id } = useParams<{ id: string }>();
@@ -290,7 +291,7 @@ export default function VisualizarOrcamento() {
                     {items.map((item, index) => (
                       <tr key={item.id || index} className="border-b">
                         <td className="py-2 px-3">{index + 1}</td>
-                        <td className="py-2 px-3">{item.description}</td>
+                        <td className="py-2 px-3">{fixEncoding(item.description)}</td>
                         <td className="py-2 px-3 text-right">{item.quantity}</td>
                         <td className="py-2 px-3 text-right">{formatCurrency(item.unit_value)}</td>
                         <td className="py-2 px-3 text-right font-semibold">
