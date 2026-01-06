@@ -263,13 +263,39 @@ async function baixarEstoqueAutomatico(
       // PRIORIDADE 2: Busca inteligente (fallback) - apenas se não houver vínculos
       console.log("🔍 Nenhum vínculo explícito encontrado, usando busca inteligente como fallback");
       
-      // Função para normalizar strings (remover acentos, converter para minúsculas)
+      // Função para normalizar strings (remover acentos, converter para minúsculas, remover espaços extras)
       const normalizeString = (str: string): string => {
         return str
           .toLowerCase()
           .normalize("NFD")
           .replace(/[\u0300-\u036f]/g, "")
+          .replace(/\s+/g, " ")
           .trim();
+      };
+
+      // Função para extrair palavras-chave relevantes (ignorar artigos, preposições, números isolados)
+      const extractKeywords = (text: string): string[] => {
+        const stopWords = new Set(['de', 'da', 'do', 'das', 'dos', 'em', 'na', 'no', 'nas', 'nos', 'a', 'o', 'e', 'ou', 'com', 'para', 'por', 'um', 'uma', 'uns', 'umas']);
+        const normalized = normalizeString(text);
+        const words = normalized.split(/\s+/).filter(word => 
+          word.length > 2 && // Palavras com mais de 2 caracteres
+          !stopWords.has(word) && // Não são stop words
+          !/^\d+$/.test(word) // Não são apenas números
+        );
+        return words;
+      };
+
+      // Função para calcular similaridade entre duas strings (busca por palavras-chave)
+      const calculateSimilarity = (str1: string, str2: string): number => {
+        const words1 = extractKeywords(str1);
+        const words2 = extractKeywords(str2);
+        if (words1.length === 0 || words2.length === 0) return 0;
+        
+        const matches = words1.filter(word => 
+          words2.some(w2 => w2.includes(word) || word.includes(w2))
+        ).length;
+        
+        return matches / Math.max(words1.length, words2.length);
       };
 
       // 1. Tentar encontrar item de estoque com nome exato do produto (produto acabado)
@@ -281,18 +307,66 @@ async function baixarEstoqueAutomatico(
         console.log(`✅ Encontrado produto acabado: ${produtoAcabado.name}`);
       }
 
-      // 2. Tentar encontrar itens de estoque que correspondam aos materiais do produto
+      // 2. Busca inteligente por palavras-chave no nome do produto
+      if (itemsParaBaixar.length === 0) {
+        const productKeywords = extractKeywords(product.name);
+        console.log(`🔍 Palavras-chave extraídas do produto: ${productKeywords.join(", ")}`);
+        
+        // Buscar itens de estoque que contenham palavras-chave do produto
+        const matchingItems = allInventoryItems
+          .map(item => ({
+            item,
+            similarity: calculateSimilarity(product.name, item.name)
+          }))
+          .filter(({ similarity }) => similarity > 0.3) // Pelo menos 30% de similaridade
+          .sort((a, b) => b.similarity - a.similarity); // Ordenar por maior similaridade
+        
+        // Adicionar os 3 itens mais similares (ou todos se forem menos de 3)
+        for (const { item } of matchingItems.slice(0, 3)) {
+          if (!itemsParaBaixar.find(i => i.item.id === item.id)) {
+            itemsParaBaixar.push({ item, quantidade: quantity });
+            console.log(`✅ Encontrado por palavras-chave: ${item.name} (similaridade: ${matchingItems.find(m => m.item.id === item.id)?.similarity.toFixed(2)})`);
+          }
+        }
+      }
+
+      // 3. Tentar encontrar itens de estoque que correspondam aos materiais do produto
       if (product.materials && Array.isArray(product.materials) && product.materials.length > 0) {
         for (const material of product.materials) {
           const materialNormalizado = normalizeString(material);
           
-          // Buscar item de estoque que tenha o nome do material
+          // Mapeamento de sinônimos comuns
+          const synonyms: Record<string, string[]> = {
+            'tecido': ['pano', 'fabric', 'tecido', 'tela', 'malha', 'moletom', 'algodao'],
+            'linha': ['fio', 'linha', 'thread', 'yarn'],
+            'ziper': ['zíper', 'ziper', 'fecho', 'fechamento'],
+            'botao': ['botão', 'botao', 'button'],
+            'elastico': ['elástico', 'elastico', 'elastic'],
+            'forro': ['forro', 'lining'],
+            'avental': ['avental', 'apron'],
+          };
+          
+          // Buscar item de estoque que tenha o nome do material ou sinônimos
           const itemMaterial = allInventoryItems.find(
             item => {
               const itemNameNormalizado = normalizeString(item.name);
-              // Verificar se o nome do item contém o material ou vice-versa
-              return itemNameNormalizado.includes(materialNormalizado) || 
-                     materialNormalizado.includes(itemNameNormalizado);
+              
+              // Verificação direta
+              if (itemNameNormalizado.includes(materialNormalizado) || 
+                  materialNormalizado.includes(itemNameNormalizado)) {
+                return true;
+              }
+              
+              // Verificação por sinônimos
+              for (const [key, syns] of Object.entries(synonyms)) {
+                if (materialNormalizado.includes(key) || key.includes(materialNormalizado)) {
+                  return syns.some(syn => 
+                    itemNameNormalizado.includes(syn) || syn.includes(itemNameNormalizado)
+                  );
+                }
+              }
+              
+              return false;
             }
           );
 
@@ -300,6 +374,31 @@ async function baixarEstoqueAutomatico(
             // Para materiais, baixar a quantidade vendida (assumindo 1 unidade de material por produto)
             itemsParaBaixar.push({ item: itemMaterial, quantidade: quantity });
             console.log(`✅ Encontrado material: ${itemMaterial.name} (${material})`);
+          }
+        }
+      }
+
+      // 4. Busca por tipo de produto (ex: "blusão" → busca "tecido" relacionado)
+      if (itemsParaBaixar.length === 0) {
+        const productNameNormalized = normalizeString(product.name);
+        const productTypeKeywords = ['blusao', 'blusa', 'camisa', 'calca', 'calça', 'vestido', 'saia', 'short', 'bermuda', 'moletom'];
+        
+        const hasProductType = productTypeKeywords.some(keyword => productNameNormalized.includes(keyword));
+        
+        if (hasProductType) {
+          // Se é um produto de roupa, buscar por "tecido" no estoque
+          const tecidoItem = allInventoryItems.find(item => {
+            const itemName = normalizeString(item.name);
+            return itemName.includes('tecido') || 
+                   itemName.includes('pano') || 
+                   itemName.includes('fabric') ||
+                   itemName.includes('malha') ||
+                   itemName.includes('moletom');
+          });
+          
+          if (tecidoItem && !itemsParaBaixar.find(i => i.item.id === tecidoItem.id)) {
+            itemsParaBaixar.push({ item: tecidoItem, quantidade: quantity });
+            console.log(`✅ Encontrado tecido genérico para produto de roupa: ${tecidoItem.name}`);
           }
         }
       }
@@ -474,9 +573,94 @@ async function baixarEstoqueServico(
         }
       }
     } else {
-      console.log("ℹ️ Nenhum vínculo explícito configurado para este serviço");
-      console.log("💡 Dica: Configure vínculos explícitos no serviço para baixa automática precisa");
-      return;
+      // PRIORIDADE 2: Busca inteligente (fallback) - apenas se não houver vínculos
+      console.log("🔍 Nenhum vínculo explícito encontrado, usando busca inteligente como fallback");
+      
+      // Função para normalizar strings (remover acentos, converter para minúsculas, remover espaços extras)
+      const normalizeString = (str: string): string => {
+        return str
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/\s+/g, " ")
+          .trim();
+      };
+
+      // Função para extrair palavras-chave relevantes (ignorar artigos, preposições, números isolados)
+      const extractKeywords = (text: string): string[] => {
+        const stopWords = new Set(['de', 'da', 'do', 'das', 'dos', 'em', 'na', 'no', 'nas', 'nos', 'a', 'o', 'e', 'ou', 'com', 'para', 'por', 'um', 'uma', 'uns', 'umas']);
+        const normalized = normalizeString(text);
+        const words = normalized.split(/\s+/).filter(word => 
+          word.length > 2 && // Palavras com mais de 2 caracteres
+          !stopWords.has(word) && // Não são stop words
+          !/^\d+$/.test(word) // Não são apenas números
+        );
+        return words;
+      };
+
+      // Função para calcular similaridade entre duas strings (busca por palavras-chave)
+      const calculateSimilarity = (str1: string, str2: string): number => {
+        const words1 = extractKeywords(str1);
+        const words2 = extractKeywords(str2);
+        if (words1.length === 0 || words2.length === 0) return 0;
+        
+        const matches = words1.filter(word => 
+          words2.some(w2 => w2.includes(word) || word.includes(w2))
+        ).length;
+        
+        return matches / Math.max(words1.length, words2.length);
+      };
+
+      // 1. Busca inteligente por palavras-chave no nome do serviço
+      const servicoKeywords = extractKeywords(servico.nome);
+      console.log(`🔍 Palavras-chave extraídas do serviço: ${servicoKeywords.join(", ")}`);
+      
+      // Buscar itens de estoque que contenham palavras-chave do serviço
+      const matchingItems = allInventoryItems
+        .map(item => ({
+          item,
+          similarity: calculateSimilarity(servico.nome, item.name)
+        }))
+        .filter(({ similarity }) => similarity > 0.3) // Pelo menos 30% de similaridade
+        .sort((a, b) => b.similarity - a.similarity); // Ordenar por maior similaridade
+      
+      // Adicionar os 3 itens mais similares (ou todos se forem menos de 3)
+      for (const { item } of matchingItems.slice(0, 3)) {
+        if (!itemsParaBaixar.find(i => i.item.id === item.id)) {
+          itemsParaBaixar.push({ item, quantidade: quantity });
+          console.log(`✅ Encontrado por palavras-chave: ${item.name} (similaridade: ${matchingItems.find(m => m.item.id === item.id)?.similarity.toFixed(2)})`);
+        }
+      }
+
+      // 2. Busca por tipo de serviço comum (ex: "troca de zíper" → busca "zíper")
+      if (itemsParaBaixar.length === 0) {
+        const servicoNameNormalized = normalizeString(servico.nome);
+        const serviceTypeKeywords: Record<string, string[]> = {
+          'ziper': ['zíper', 'ziper', 'fecho', 'fechamento'],
+          'botao': ['botão', 'botao', 'button'],
+          'elastico': ['elástico', 'elastico', 'elastic'],
+          'forro': ['forro', 'lining'],
+          'bainha': ['bainha', 'hem'],
+          'costura': ['costura', 'sewing', 'linha', 'fio'],
+        };
+        
+        for (const [serviceType, inventoryKeywords] of Object.entries(serviceTypeKeywords)) {
+          if (servicoNameNormalized.includes(serviceType)) {
+            const matchingItem = allInventoryItems.find(item => {
+              const itemName = normalizeString(item.name);
+              return inventoryKeywords.some(keyword => 
+                itemName.includes(keyword) || keyword.includes(itemName)
+              );
+            });
+            
+            if (matchingItem && !itemsParaBaixar.find(i => i.item.id === matchingItem.id)) {
+              itemsParaBaixar.push({ item: matchingItem, quantidade: quantity });
+              console.log(`✅ Encontrado item por tipo de serviço: ${matchingItem.name} (serviço: ${serviceType})`);
+              break; // Encontrou um item, pode parar
+            }
+          }
+        }
+      }
     }
 
     // Criar movimentações de saída para cada item encontrado
