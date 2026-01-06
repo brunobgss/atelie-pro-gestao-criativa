@@ -115,6 +115,36 @@ Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50`;
     });
   };
 
+  // Função para ler arquivo com detecção de encoding
+  const readFileWithEncoding = async (file: File): Promise<string> => {
+    // Se for Excel, não podemos ler como texto
+    const fileExtension = file.name.substring(file.name.lastIndexOf('.')).toLowerCase();
+    if (fileExtension === '.xlsx' || fileExtension === '.xls') {
+      toast.error("Arquivos Excel (.xlsx, .xls) precisam ser convertidos para CSV antes da importação. Por favor, salve como CSV (UTF-8) no Excel.");
+      throw new Error("Arquivo Excel não suportado diretamente");
+    }
+
+    // Para CSV, tentar diferentes encodings
+    const arrayBuffer = await file.arrayBuffer();
+    const uint8Array = new Uint8Array(arrayBuffer);
+
+    // Tentar UTF-8 primeiro
+    try {
+      const decoder = new TextDecoder('utf-8', { fatal: true });
+      return decoder.decode(uint8Array);
+    } catch (e) {
+      // Se UTF-8 falhar, tentar Windows-1252 (comum no Brasil)
+      try {
+        const decoder = new TextDecoder('windows-1252', { fatal: false });
+        return decoder.decode(uint8Array);
+      } catch (e2) {
+        // Se Windows-1252 falhar, tentar ISO-8859-1
+        const decoder = new TextDecoder('iso-8859-1', { fatal: false });
+        return decoder.decode(uint8Array);
+      }
+    }
+  };
+
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
     if (!selectedFile) return;
@@ -133,7 +163,7 @@ Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50`;
     setIsProcessing(true);
 
     try {
-      const text = await selectedFile.text();
+      const text = await readFileWithEncoding(selectedFile);
       const lines = parseCSV(text);
       
       if (lines.length < 2) {
