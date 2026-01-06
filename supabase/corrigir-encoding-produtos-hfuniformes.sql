@@ -48,7 +48,7 @@ WHERE LOWER(u.email) = LOWER('Hfuniformes12@gmail.com');
 SELECT 
   ue.user_id,
   ue.empresa_id,
-  e.name as nome_empresa,
+  e.nome as nome_empresa,
   u.email,
   'Empresa associada encontrada' as status
 FROM user_empresas ue
@@ -59,7 +59,7 @@ WHERE LOWER(u.email) = LOWER('Hfuniformes12@gmail.com');
 -- Verificar quantos produtos existem para essa empresa
 SELECT 
   ue.empresa_id,
-  e.name as nome_empresa,
+  e.nome as nome_empresa,
   COUNT(p.id) as total_produtos,
   'Produtos encontrados' as status
 FROM user_empresas ue
@@ -67,7 +67,7 @@ JOIN auth.users u ON u.id = ue.user_id
 LEFT JOIN empresas e ON e.id = ue.empresa_id
 LEFT JOIN atelie_products p ON p.empresa_id = ue.empresa_id
 WHERE LOWER(u.email) = LOWER('Hfuniformes12@gmail.com')
-GROUP BY ue.empresa_id, e.name;
+GROUP BY ue.empresa_id, e.nome;
 
 -- =====================================================
 -- PASSO 2: IDENTIFICAR A EMPRESA
@@ -75,7 +75,7 @@ GROUP BY ue.empresa_id, e.name;
 -- Execute esta query para encontrar o empresa_id
 SELECT 
   ue.empresa_id,
-  e.name as nome_empresa,
+  e.nome as nome_empresa,
   u.email as email_usuario,
   COUNT(p.id) as total_produtos
 FROM user_empresas ue
@@ -83,7 +83,7 @@ JOIN auth.users u ON u.id = ue.user_id
 JOIN empresas e ON e.id = ue.empresa_id
 LEFT JOIN atelie_products p ON p.empresa_id = ue.empresa_id
 WHERE LOWER(u.email) = LOWER('Hfuniformes12@gmail.com')
-GROUP BY ue.empresa_id, e.name, u.email;
+GROUP BY ue.empresa_id, e.nome, u.email;
 
 -- =====================================================
 -- PASSO 3: IDENTIFICAR PRODUTOS COM PROBLEMAS
