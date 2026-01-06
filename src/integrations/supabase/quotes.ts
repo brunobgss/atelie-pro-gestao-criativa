@@ -678,55 +678,53 @@ export async function updateQuote(quoteCode: string, input: {
       
       // Sempre deletar personalizações existentes primeiro
       // IMPORTANTE: Incluir empresa_id no DELETE para que RLS funcione corretamente
-      const { data: deletedData, error: deletePersonalizationsError } = await supabase
-        .from("atelie_quote_personalizations")
-        .delete()
-        .eq("quote_id", quote.id)
-        .eq("empresa_id", empresa_id)  // CRÍTICO: Incluir empresa_id para RLS
-        .select();
-
-      if (deletePersonalizationsError) {
-        console.error("❌ Erro ao deletar personalizações do orçamento:", deletePersonalizationsError);
-        console.error("Detalhes do erro:", {
-          message: deletePersonalizationsError.message,
-          details: deletePersonalizationsError.details,
-          hint: deletePersonalizationsError.hint,
-          code: deletePersonalizationsError.code
-        });
-        throw deletePersonalizationsError;
-      }
-      
-      console.log(`✅ Personalizações antigas deletadas com sucesso. Deletadas: ${deletedData?.length || 0}`, {
-        deleted_ids: deletedData?.map(p => p.id),
-        deleted_count: deletedData?.length
+      console.log(`🗑️ Tentando deletar personalizações:`, {
+        quote_id: quote.id,
+        empresa_id: empresa_id,
+        existing_count: existingPersonalizations?.length || 0
       });
+
+      // Primeiro, tentar deletar usando apenas o ID de cada personalização (mais direto)
+      let deletedCount = 0;
+      let deletedIds: string[] = [];
       
-      // Se não deletou nada mas existem personalizações, pode ser problema de RLS
-      if ((deletedData?.length || 0) === 0 && (existingPersonalizations?.length || 0) > 0) {
-        console.warn("⚠️ ATENÇÃO: Existem personalizações mas nenhuma foi deletada. Tentando deletar uma por uma...");
-        
-        // Tentar deletar uma por uma, garantindo que pertencem à empresa correta
-        let deletedCount = 0;
-        for (const personalization of existingPersonalizations || []) {
-          // Verificar se a personalização pertence à empresa correta antes de deletar
-          if (personalization.empresa_id === empresa_id) {
-            const { error: singleDeleteError } = await supabase
-              .from("atelie_quote_personalizations")
-              .delete()
-              .eq("id", personalization.id)
-              .eq("empresa_id", empresa_id);  // Garantir empresa_id também aqui
-            
-            if (!singleDeleteError) {
-              deletedCount++;
-            } else {
-              console.error(`❌ Erro ao deletar personalização ${personalization.id}:`, singleDeleteError);
-            }
+      if (existingPersonalizations && existingPersonalizations.length > 0) {
+        // Deletar uma por uma para garantir que funciona
+        for (const personalization of existingPersonalizations) {
+          console.log(`🗑️ Deletando personalização ${personalization.id}...`);
+          const { data: deletedItem, error: singleDeleteError } = await supabase
+            .from("atelie_quote_personalizations")
+            .delete()
+            .eq("id", personalization.id)
+            .select();
+          
+          if (singleDeleteError) {
+            console.error(`❌ Erro ao deletar personalização ${personalization.id}:`, singleDeleteError);
+            console.error("Detalhes:", {
+              message: singleDeleteError.message,
+              details: singleDeleteError.details,
+              hint: singleDeleteError.hint,
+              code: singleDeleteError.code
+            });
+          } else if (deletedItem && deletedItem.length > 0) {
+            deletedCount++;
+            deletedIds.push(personalization.id);
+            console.log(`✅ Personalização ${personalization.id} deletada com sucesso`);
           } else {
-            console.warn(`⚠️ Personalização ${personalization.id} pertence a outra empresa (${personalization.empresa_id} vs ${empresa_id}). Pulando.`);
+            console.warn(`⚠️ Personalização ${personalization.id} não foi deletada (sem erro, mas sem resultado)`);
           }
         }
-        
-        console.log(`✅ Deletadas ${deletedCount} personalização(ões) individualmente`);
+      }
+      
+      console.log(`✅ Total de personalizações deletadas: ${deletedCount} de ${existingPersonalizations?.length || 0}`, {
+        deleted_ids: deletedIds
+      });
+      
+      // Verificar se todas foram deletadas
+      if (deletedCount < (existingPersonalizations?.length || 0)) {
+        console.warn(`⚠️ ATENÇÃO: Apenas ${deletedCount} de ${existingPersonalizations?.length || 0} personalizações foram deletadas.`);
+        console.warn("Isso pode indicar um problema com as políticas RLS (Row Level Security).");
+        console.warn("Verifique se existe uma política DELETE para atelie_quote_personalizations.");
       }
 
       // Se há personalizações válidas para inserir, inserir
