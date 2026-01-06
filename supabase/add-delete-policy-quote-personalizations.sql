@@ -23,7 +23,10 @@ USING (
   )
 );
 
-RAISE NOTICE 'Política DELETE corrigida com sucesso!';
+DO $$
+BEGIN
+  RAISE NOTICE 'Política DELETE corrigida com sucesso!';
+END $$;
 
 -- Verificar todas as políticas existentes
 SELECT 
