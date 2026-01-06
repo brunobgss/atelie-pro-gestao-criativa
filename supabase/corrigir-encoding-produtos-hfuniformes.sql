@@ -13,16 +13,11 @@
 -- Isso criará uma tabela temporária com todos os produtos da empresa
 
 -- Backup completo dos produtos da empresa
--- NOTA: Se retornar 0 produtos, execute primeiro o PASSO 1.5 para diagnóstico
+-- EMPRESA_ID: 8a9c1c7e-81f1-4186-ac89-ed584f549836
+-- Total de produtos: 790
 CREATE TABLE IF NOT EXISTS atelie_products_backup_hfuniformes AS 
 SELECT * FROM atelie_products 
-WHERE empresa_id = (
-  SELECT ue.empresa_id 
-  FROM user_empresas ue
-  JOIN auth.users u ON u.id = ue.user_id
-  WHERE LOWER(u.email) = LOWER('Hfuniformes12@gmail.com')
-  LIMIT 1
-);
+WHERE empresa_id = '8a9c1c7e-81f1-4186-ac89-ed584f549836';
 
 -- Verificar quantos produtos foram salvos no backup
 SELECT 
@@ -89,7 +84,7 @@ GROUP BY ue.empresa_id, e.nome, u.email;
 -- PASSO 3: IDENTIFICAR PRODUTOS COM PROBLEMAS
 -- =====================================================
 -- Execute esta query para ver quais produtos têm problemas de encoding
--- Substitua 'EMPRESA_ID_AQUI' pelo ID encontrado no PASSO 2
+-- EMPRESA_ID: 8a9c1c7e-81f1-4186-ac89-ed584f549836
 SELECT 
   id,
   name,
@@ -99,13 +94,7 @@ SELECT
     ELSE 'OK'
   END as status
 FROM atelie_products
-WHERE empresa_id = (
-  SELECT ue.empresa_id 
-  FROM user_empresas ue
-  JOIN auth.users u ON u.id = ue.user_id
-  WHERE LOWER(u.email) = LOWER('Hfuniformes12@gmail.com')
-  LIMIT 1
-)
+WHERE empresa_id = '8a9c1c7e-81f1-4186-ac89-ed584f549836'
 AND (name LIKE '%Ã%' OR name LIKE '%â€%')
 ORDER BY name
 LIMIT 50;
@@ -140,13 +129,7 @@ SELECT
   COUNT(*) as produtos_corrigidos,
   'Correção de ~ aplicada' as status
 FROM atelie_products
-WHERE empresa_id = (
-  SELECT ue.empresa_id 
-  FROM user_empresas ue
-  JOIN auth.users u ON u.id = ue.user_id
-  WHERE LOWER(u.email) = LOWER('Hfuniformes12@gmail.com')
-  LIMIT 1
-)
+WHERE empresa_id = '8a9c1c7e-81f1-4186-ac89-ed584f549836'
 AND name LIKE '%~%';
 
 -- 4.2: Corrigir "ç" que foi salvo como "Ã§"
@@ -165,13 +148,7 @@ SELECT
   COUNT(*) as produtos_corrigidos,
   'Correção de ç aplicada' as status
 FROM atelie_products
-WHERE empresa_id = (
-  SELECT ue.empresa_id 
-  FROM user_empresas ue
-  JOIN auth.users u ON u.id = ue.user_id
-  WHERE LOWER(u.email) = LOWER('Hfuniformes12@gmail.com')
-  LIMIT 1
-)
+WHERE empresa_id = '8a9c1c7e-81f1-4186-ac89-ed584f549836'
 AND name LIKE '%ç%';
 
 -- 4.3: Corrigir outros acentos comuns
@@ -199,18 +176,13 @@ AND name LIKE '%Ã%';
 -- PASSO 5: VERIFICAR RESULTADOS
 -- =====================================================
 -- Execute esta query para ver se ainda há produtos com problemas
+-- EMPRESA_ID: 8a9c1c7e-81f1-4186-ac89-ed584f549836
 SELECT 
   id,
   name,
   'Ainda tem problema' as status
 FROM atelie_products
-WHERE empresa_id = (
-  SELECT ue.empresa_id 
-  FROM user_empresas ue
-  JOIN auth.users u ON u.id = ue.user_id
-  WHERE LOWER(u.email) = LOWER('Hfuniformes12@gmail.com')
-  LIMIT 1
-)
+WHERE empresa_id = '8a9c1c7e-81f1-4186-ac89-ed584f549836'
 AND (name LIKE '%Ã%' OR name LIKE '%â€%')
 ORDER BY name
 LIMIT 20;
@@ -225,17 +197,8 @@ DECLARE
   total_produtos INTEGER;
   produtos_com_problema INTEGER;
 BEGIN
-  -- Encontrar empresa_id
-  SELECT ue.empresa_id INTO empresa_id_param
-  FROM user_empresas ue
-  JOIN auth.users u ON u.id = ue.user_id
-  WHERE LOWER(u.email) = LOWER('Hfuniformes12@gmail.com')
-  LIMIT 1;
-  
-  IF empresa_id_param IS NULL THEN
-    RAISE NOTICE '❌ Empresa não encontrada para o email Hfuniformes12@gmail.com';
-    RETURN;
-  END IF;
+  -- Usar empresa_id conhecido
+  empresa_id_param := '8a9c1c7e-81f1-4186-ac89-ed584f549836'::UUID;
   
   SELECT COUNT(*) INTO total_produtos 
   FROM atelie_products 
