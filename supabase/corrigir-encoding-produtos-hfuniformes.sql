@@ -16,10 +16,11 @@
 CREATE TABLE IF NOT EXISTS atelie_products_backup_hfuniformes AS 
 SELECT * FROM atelie_products 
 WHERE empresa_id = (
-  SELECT e.id 
-  FROM empresas e
-  JOIN usuarios u ON u.empresa_id = e.id
+  SELECT ue.empresa_id 
+  FROM user_empresas ue
+  JOIN auth.users u ON u.id = ue.user_id
   WHERE u.email = 'Hfuniformes12@gmail.com'
+  LIMIT 1
 );
 
 -- Verificar quantos produtos foram salvos no backup
@@ -33,15 +34,16 @@ FROM atelie_products_backup_hfuniformes;
 -- =====================================================
 -- Execute esta query para encontrar o empresa_id
 SELECT 
-  e.id as empresa_id,
+  ue.empresa_id,
   e.name as nome_empresa,
   u.email as email_usuario,
   COUNT(p.id) as total_produtos
-FROM empresas e
-JOIN usuarios u ON u.empresa_id = e.id
-LEFT JOIN atelie_products p ON p.empresa_id = e.id
+FROM user_empresas ue
+JOIN auth.users u ON u.id = ue.user_id
+JOIN empresas e ON e.id = ue.empresa_id
+LEFT JOIN atelie_products p ON p.empresa_id = ue.empresa_id
 WHERE u.email = 'Hfuniformes12@gmail.com'
-GROUP BY e.id, e.name, u.email;
+GROUP BY ue.empresa_id, e.name, u.email;
 
 -- =====================================================
 -- PASSO 3: IDENTIFICAR PRODUTOS COM PROBLEMAS
@@ -58,10 +60,11 @@ SELECT
   END as status
 FROM atelie_products
 WHERE empresa_id = (
-  SELECT e.id 
-  FROM empresas e
-  JOIN usuarios u ON u.empresa_id = e.id
+  SELECT ue.empresa_id 
+  FROM user_empresas ue
+  JOIN auth.users u ON u.id = ue.user_id
   WHERE u.email = 'Hfuniformes12@gmail.com'
+  LIMIT 1
 )
 AND (name LIKE '%Ã%' OR name LIKE '%â€%')
 ORDER BY name
@@ -98,10 +101,11 @@ SELECT
   'Correção de ~ aplicada' as status
 FROM atelie_products
 WHERE empresa_id = (
-  SELECT e.id 
-  FROM empresas e
-  JOIN usuarios u ON u.empresa_id = e.id
+  SELECT ue.empresa_id 
+  FROM user_empresas ue
+  JOIN auth.users u ON u.id = ue.user_id
   WHERE u.email = 'Hfuniformes12@gmail.com'
+  LIMIT 1
 )
 AND name LIKE '%~%';
 
@@ -122,10 +126,11 @@ SELECT
   'Correção de ç aplicada' as status
 FROM atelie_products
 WHERE empresa_id = (
-  SELECT e.id 
-  FROM empresas e
-  JOIN usuarios u ON u.empresa_id = e.id
+  SELECT ue.empresa_id 
+  FROM user_empresas ue
+  JOIN auth.users u ON u.id = ue.user_id
   WHERE u.email = 'Hfuniformes12@gmail.com'
+  LIMIT 1
 )
 AND name LIKE '%ç%';
 
@@ -160,10 +165,11 @@ SELECT
   'Ainda tem problema' as status
 FROM atelie_products
 WHERE empresa_id = (
-  SELECT e.id 
-  FROM empresas e
-  JOIN usuarios u ON u.empresa_id = e.id
+  SELECT ue.empresa_id 
+  FROM user_empresas ue
+  JOIN auth.users u ON u.id = ue.user_id
   WHERE u.email = 'Hfuniformes12@gmail.com'
+  LIMIT 1
 )
 AND (name LIKE '%Ã%' OR name LIKE '%â€%')
 ORDER BY name
@@ -180,9 +186,9 @@ DECLARE
   produtos_com_problema INTEGER;
 BEGIN
   -- Encontrar empresa_id
-  SELECT e.id INTO empresa_id_param
-  FROM empresas e
-  JOIN usuarios u ON u.empresa_id = e.id
+  SELECT ue.empresa_id INTO empresa_id_param
+  FROM user_empresas ue
+  JOIN auth.users u ON u.id = ue.user_id
   WHERE u.email = 'Hfuniformes12@gmail.com'
   LIMIT 1;
   
