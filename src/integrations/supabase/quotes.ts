@@ -583,11 +583,18 @@ export async function updateQuote(quoteCode: string, input: {
   personalizations?: QuotePersonalizationInput[];
 }): Promise<{ ok: boolean; error?: string }> {
   try {
+    // Obter empresa_id primeiro para garantir que temos o ID correto
+    const empresa_id = await getCurrentEmpresaId();
+    if (!empresa_id) {
+      return { ok: false, error: ErrorMessages.empresaNotFound() };
+    }
+
     // Buscar o orçamento pelo código
     const { data: quote, error: quoteError } = await supabase
       .from("atelie_quotes")
-      .select("id, status")
+      .select("id, status, empresa_id")
       .eq("code", quoteCode)
+      .eq("empresa_id", empresa_id)  // Garantir que o orçamento pertence à empresa
       .single();
     
     if (quoteError) throw quoteError;
@@ -651,14 +658,12 @@ export async function updateQuote(quoteCode: string, input: {
         personalizations: input.personalizations
       });
       
-      // Obter empresa_id para garantir que a query funcione com RLS
-      const empresa_id = await getCurrentEmpresaId();
-      
-      // Verificar quantas personalizações existem antes de deletar (sem filtrar por empresa_id primeiro)
+      // Verificar quantas personalizações existem antes de deletar
       const { data: existingPersonalizations, error: checkError } = await supabase
         .from("atelie_quote_personalizations")
         .select("id, quote_id, empresa_id")
-        .eq("quote_id", quote.id);
+        .eq("quote_id", quote.id)
+        .eq("empresa_id", empresa_id);  // Filtrar por empresa_id também
       
       if (checkError) {
         console.error("❌ Erro ao verificar personalizações existentes:", checkError);
@@ -672,11 +677,12 @@ export async function updateQuote(quoteCode: string, input: {
       }
       
       // Sempre deletar personalizações existentes primeiro
-      // Tentar deletar apenas por quote_id (RLS pode estar bloqueando quando adicionamos empresa_id)
+      // IMPORTANTE: Incluir empresa_id no DELETE para que RLS funcione corretamente
       const { data: deletedData, error: deletePersonalizationsError } = await supabase
         .from("atelie_quote_personalizations")
         .delete()
         .eq("quote_id", quote.id)
+        .eq("empresa_id", empresa_id)  // CRÍTICO: Incluir empresa_id para RLS
         .select();
 
       if (deletePersonalizationsError) {
@@ -697,21 +703,26 @@ export async function updateQuote(quoteCode: string, input: {
       
       // Se não deletou nada mas existem personalizações, pode ser problema de RLS
       if ((deletedData?.length || 0) === 0 && (existingPersonalizations?.length || 0) > 0) {
-        console.warn("⚠️ ATENÇÃO: Existem personalizações mas nenhuma foi deletada. Pode ser problema de RLS ou empresa_id diferente.");
-        console.warn("Tentando deletar uma por uma...");
+        console.warn("⚠️ ATENÇÃO: Existem personalizações mas nenhuma foi deletada. Tentando deletar uma por uma...");
         
-        // Tentar deletar uma por uma
+        // Tentar deletar uma por uma, garantindo que pertencem à empresa correta
         let deletedCount = 0;
         for (const personalization of existingPersonalizations || []) {
-          const { error: singleDeleteError } = await supabase
-            .from("atelie_quote_personalizations")
-            .delete()
-            .eq("id", personalization.id);
-          
-          if (!singleDeleteError) {
-            deletedCount++;
+          // Verificar se a personalização pertence à empresa correta antes de deletar
+          if (personalization.empresa_id === empresa_id) {
+            const { error: singleDeleteError } = await supabase
+              .from("atelie_quote_personalizations")
+              .delete()
+              .eq("id", personalization.id)
+              .eq("empresa_id", empresa_id);  // Garantir empresa_id também aqui
+            
+            if (!singleDeleteError) {
+              deletedCount++;
+            } else {
+              console.error(`❌ Erro ao deletar personalização ${personalization.id}:`, singleDeleteError);
+            }
           } else {
-            console.error(`❌ Erro ao deletar personalização ${personalization.id}:`, singleDeleteError);
+            console.warn(`⚠️ Personalização ${personalization.id} pertence a outra empresa (${personalization.empresa_id} vs ${empresa_id}). Pulando.`);
           }
         }
         
@@ -720,7 +731,6 @@ export async function updateQuote(quoteCode: string, input: {
 
       // Se há personalizações válidas para inserir, inserir
       if (input.personalizations.length > 0) {
-        const empresa_id = await getCurrentEmpresaId();
         const personalizations = input.personalizations
           .filter((p) => p.person_name?.trim())
           .map((p) => ({
