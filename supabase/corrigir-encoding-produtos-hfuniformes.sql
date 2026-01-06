@@ -13,13 +13,14 @@
 -- Isso criará uma tabela temporária com todos os produtos da empresa
 
 -- Backup completo dos produtos da empresa
+-- NOTA: Se retornar 0 produtos, execute primeiro o PASSO 1.5 para diagnóstico
 CREATE TABLE IF NOT EXISTS atelie_products_backup_hfuniformes AS 
 SELECT * FROM atelie_products 
 WHERE empresa_id = (
   SELECT ue.empresa_id 
   FROM user_empresas ue
   JOIN auth.users u ON u.id = ue.user_id
-  WHERE u.email = 'Hfuniformes12@gmail.com'
+  WHERE LOWER(u.email) = LOWER('Hfuniformes12@gmail.com')
   LIMIT 1
 );
 
@@ -28,6 +29,45 @@ SELECT
   COUNT(*) as total_produtos_backup,
   'Backup criado com sucesso!' as status
 FROM atelie_products_backup_hfuniformes;
+
+-- =====================================================
+-- PASSO 1.5: DIAGNÓSTICO - VERIFICAR SE EMPRESA EXISTE
+-- =====================================================
+-- Execute esta query PRIMEIRO para verificar se encontramos a empresa
+-- e quantos produtos ela tem
+
+-- Verificar se o usuário existe
+SELECT 
+  u.id as user_id,
+  u.email,
+  'Usuário encontrado' as status
+FROM auth.users u
+WHERE LOWER(u.email) = LOWER('Hfuniformes12@gmail.com');
+
+-- Verificar se o usuário tem empresa associada
+SELECT 
+  ue.user_id,
+  ue.empresa_id,
+  e.name as nome_empresa,
+  u.email,
+  'Empresa associada encontrada' as status
+FROM user_empresas ue
+JOIN auth.users u ON u.id = ue.user_id
+LEFT JOIN empresas e ON e.id = ue.empresa_id
+WHERE LOWER(u.email) = LOWER('Hfuniformes12@gmail.com');
+
+-- Verificar quantos produtos existem para essa empresa
+SELECT 
+  ue.empresa_id,
+  e.name as nome_empresa,
+  COUNT(p.id) as total_produtos,
+  'Produtos encontrados' as status
+FROM user_empresas ue
+JOIN auth.users u ON u.id = ue.user_id
+LEFT JOIN empresas e ON e.id = ue.empresa_id
+LEFT JOIN atelie_products p ON p.empresa_id = ue.empresa_id
+WHERE LOWER(u.email) = LOWER('Hfuniformes12@gmail.com')
+GROUP BY ue.empresa_id, e.name;
 
 -- =====================================================
 -- PASSO 2: IDENTIFICAR A EMPRESA
@@ -42,7 +82,7 @@ FROM user_empresas ue
 JOIN auth.users u ON u.id = ue.user_id
 JOIN empresas e ON e.id = ue.empresa_id
 LEFT JOIN atelie_products p ON p.empresa_id = ue.empresa_id
-WHERE u.email = 'Hfuniformes12@gmail.com'
+WHERE LOWER(u.email) = LOWER('Hfuniformes12@gmail.com')
 GROUP BY ue.empresa_id, e.name, u.email;
 
 -- =====================================================
@@ -63,7 +103,7 @@ WHERE empresa_id = (
   SELECT ue.empresa_id 
   FROM user_empresas ue
   JOIN auth.users u ON u.id = ue.user_id
-  WHERE u.email = 'Hfuniformes12@gmail.com'
+  WHERE LOWER(u.email) = LOWER('Hfuniformes12@gmail.com')
   LIMIT 1
 )
 AND (name LIKE '%Ã%' OR name LIKE '%â€%')
@@ -104,7 +144,7 @@ WHERE empresa_id = (
   SELECT ue.empresa_id 
   FROM user_empresas ue
   JOIN auth.users u ON u.id = ue.user_id
-  WHERE u.email = 'Hfuniformes12@gmail.com'
+  WHERE LOWER(u.email) = LOWER('Hfuniformes12@gmail.com')
   LIMIT 1
 )
 AND name LIKE '%~%';
@@ -129,7 +169,7 @@ WHERE empresa_id = (
   SELECT ue.empresa_id 
   FROM user_empresas ue
   JOIN auth.users u ON u.id = ue.user_id
-  WHERE u.email = 'Hfuniformes12@gmail.com'
+  WHERE LOWER(u.email) = LOWER('Hfuniformes12@gmail.com')
   LIMIT 1
 )
 AND name LIKE '%ç%';
@@ -168,7 +208,7 @@ WHERE empresa_id = (
   SELECT ue.empresa_id 
   FROM user_empresas ue
   JOIN auth.users u ON u.id = ue.user_id
-  WHERE u.email = 'Hfuniformes12@gmail.com'
+  WHERE LOWER(u.email) = LOWER('Hfuniformes12@gmail.com')
   LIMIT 1
 )
 AND (name LIKE '%Ã%' OR name LIKE '%â€%')
@@ -189,7 +229,7 @@ BEGIN
   SELECT ue.empresa_id INTO empresa_id_param
   FROM user_empresas ue
   JOIN auth.users u ON u.id = ue.user_id
-  WHERE u.email = 'Hfuniformes12@gmail.com'
+  WHERE LOWER(u.email) = LOWER('Hfuniformes12@gmail.com')
   LIMIT 1;
   
   IF empresa_id_param IS NULL THEN
