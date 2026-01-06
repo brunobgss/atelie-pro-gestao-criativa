@@ -71,7 +71,26 @@ export async function criarFornecedor(fornecedor: Omit<Fornecedor, 'id' | 'creat
 
     if (error) {
       console.error('Erro ao criar fornecedor:', error);
-      return { ok: false, error: error.message };
+      
+      // Tratar erros de constraint única de forma mais amigável
+      if (error.code === '23505') { // Violation of unique constraint
+        if (error.message?.includes('fornecedores_cnpj_key')) {
+          return { ok: false, error: 'Este CNPJ já está cadastrado. Por favor, verifique se o fornecedor já existe ou use um CNPJ diferente.' };
+        }
+        if (error.message?.includes('fornecedores_cpf_key')) {
+          return { ok: false, error: 'Este CPF já está cadastrado. Por favor, verifique se o fornecedor já existe ou use um CPF diferente.' };
+        }
+        if (error.message?.includes('duplicate key')) {
+          return { ok: false, error: 'Já existe um fornecedor com estes dados. Por favor, verifique os dados informados.' };
+        }
+      }
+      
+      // Tratar outros erros
+      if (error.message?.includes('row-level security') || error.message?.includes('RLS')) {
+        return { ok: false, error: 'Você não tem permissão para realizar esta ação.' };
+      }
+      
+      return { ok: false, error: error.message || 'Erro ao criar fornecedor' };
     }
 
     return { ok: true, data: data as Fornecedor };
@@ -101,7 +120,26 @@ export async function atualizarFornecedor(id: string, fornecedor: Partial<Fornec
 
     if (error) {
       console.error('Erro ao atualizar fornecedor:', error);
-      return { ok: false, error: error.message };
+      
+      // Tratar erros de constraint única de forma mais amigável
+      if (error.code === '23505') { // Violation of unique constraint
+        if (error.message?.includes('fornecedores_cnpj_key')) {
+          return { ok: false, error: 'Este CNPJ já está cadastrado para outro fornecedor. Por favor, use um CNPJ diferente.' };
+        }
+        if (error.message?.includes('fornecedores_cpf_key')) {
+          return { ok: false, error: 'Este CPF já está cadastrado para outro fornecedor. Por favor, use um CPF diferente.' };
+        }
+        if (error.message?.includes('duplicate key')) {
+          return { ok: false, error: 'Já existe outro fornecedor com estes dados. Por favor, verifique os dados informados.' };
+        }
+      }
+      
+      // Tratar outros erros
+      if (error.message?.includes('row-level security') || error.message?.includes('RLS')) {
+        return { ok: false, error: 'Você não tem permissão para realizar esta ação.' };
+      }
+      
+      return { ok: false, error: error.message || 'Erro ao atualizar fornecedor' };
     }
 
     return { ok: true, data: data as Fornecedor };

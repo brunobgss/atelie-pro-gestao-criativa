@@ -46,10 +46,30 @@ export async function createCustomer(input: { name: string; phone?: string; emai
     
     if (error) {
       console.error("❌ Erro ao criar cliente:", error);
+      
+      // Tratar erros de constraint única de forma mais amigável
+      if (error.code === '23505') { // Violation of unique constraint
+        if (error.message?.includes('customers_email_key') || error.message?.includes('email')) {
+          return { ok: false, error: 'Este email já está cadastrado. Por favor, verifique se o cliente já existe ou use um email diferente.' };
+        }
+        if (error.message?.includes('customers_phone_key') || error.message?.includes('phone')) {
+          return { ok: false, error: 'Este telefone já está cadastrado. Por favor, verifique se o cliente já existe ou use um telefone diferente.' };
+        }
+        if (error.message?.includes('duplicate key')) {
+          return { ok: false, error: 'Já existe um cliente com estes dados. Por favor, verifique os dados informados.' };
+        }
+      }
+      
       // Melhorar mensagem de erro para RLS
       if (error.message?.includes('row-level security') || error.message?.includes('RLS')) {
         return { ok: false, error: ErrorMessages.permissionDenied() };
       }
+      
+      // Se for erro de fornecedores (pode ser confusão de página)
+      if (error.message?.includes('fornecedores')) {
+        return { ok: false, error: 'Erro ao cadastrar. Verifique se você está na página correta (Clientes, não Fornecedores).' };
+      }
+      
       throw new Error(ErrorMessages.saveError("o cliente"));
     }
     
