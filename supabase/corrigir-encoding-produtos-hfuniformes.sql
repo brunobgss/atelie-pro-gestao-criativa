@@ -106,14 +106,10 @@ LIMIT 50;
 
 -- 4.1: Corrigir "~" que foi salvo como "Ã" (quando não é parte de outro caractere)
 -- ATENÇÃO: Esta query corrige "Ã" para "~" apenas quando não faz parte de "á", "é", "í", "ó", "ú", "ã", "õ", "ç"
+-- EMPRESA_ID: 8a9c1c7e-81f1-4186-ac89-ed584f549836
 UPDATE atelie_products
 SET name = REPLACE(name, 'Ã', '~')
-WHERE empresa_id = (
-  SELECT e.id 
-  FROM empresas e
-  JOIN usuarios u ON u.empresa_id = e.id
-  WHERE u.email = 'Hfuniformes12@gmail.com'
-)
+WHERE empresa_id = '8a9c1c7e-81f1-4186-ac89-ed584f549836'
 AND name LIKE '%Ã%' 
 AND name NOT LIKE '%Ã¡%'  -- não é "á"
 AND name NOT LIKE '%Ã©%'   -- não é "é"
@@ -133,14 +129,10 @@ WHERE empresa_id = '8a9c1c7e-81f1-4186-ac89-ed584f549836'
 AND name LIKE '%~%';
 
 -- 4.2: Corrigir "ç" que foi salvo como "Ã§"
+-- EMPRESA_ID: 8a9c1c7e-81f1-4186-ac89-ed584f549836
 UPDATE atelie_products
 SET name = REPLACE(name, 'Ã§', 'ç')
-WHERE empresa_id = (
-  SELECT e.id 
-  FROM empresas e
-  JOIN usuarios u ON u.empresa_id = e.id
-  WHERE u.email = 'Hfuniformes12@gmail.com'
-)
+WHERE empresa_id = '8a9c1c7e-81f1-4186-ac89-ed584f549836'
 AND name LIKE '%Ã§%';
 
 -- Verificar quantos produtos foram corrigidos
@@ -152,6 +144,7 @@ WHERE empresa_id = '8a9c1c7e-81f1-4186-ac89-ed584f549836'
 AND name LIKE '%ç%';
 
 -- 4.3: Corrigir outros acentos comuns
+-- EMPRESA_ID: 8a9c1c7e-81f1-4186-ac89-ed584f549836
 UPDATE atelie_products
 SET name = REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
   REPLACE(REPLACE(REPLACE(REPLACE(
@@ -164,12 +157,7 @@ SET name = REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
   'Ã£', 'ã'),  -- ã
   'Ãµ', 'õ'),  -- õ
   'Ã‰', 'É')   -- É
-WHERE empresa_id = (
-  SELECT e.id 
-  FROM empresas e
-  JOIN usuarios u ON u.empresa_id = e.id
-  WHERE u.email = 'Hfuniformes12@gmail.com'
-)
+WHERE empresa_id = '8a9c1c7e-81f1-4186-ac89-ed584f549836'
 AND name LIKE '%Ã%';
 
 -- =====================================================
