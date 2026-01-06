@@ -122,9 +122,22 @@ LIMIT 50;
 -- =====================================================
 -- Execute estas queries UMA POR VEZ e verifique os resultados antes de continuar
 
--- 4.1: Corrigir "~" que foi salvo como "Ã" (quando não é parte de outro caractere)
--- ATENÇÃO: Esta query corrige "Ã" para "~" apenas quando não faz parte de "á", "é", "í", "ó", "ú", "ã", "õ", "ç"
+-- 4.1: Corrigir padrões específicos encontrados (Ãƒ e Ã‡)
 -- EMPRESA_ID: 8a9c1c7e-81f1-4186-ac89-ed584f549836
+-- Padrão 1: "BLUSÃƒO" -> "BLUSÃO" (Ãƒ = ã)
+UPDATE atelie_products
+SET name = REPLACE(name, 'Ãƒ', 'ã')
+WHERE empresa_id = '8a9c1c7e-81f1-4186-ac89-ed584f549836'
+AND name LIKE '%Ãƒ%';
+
+-- Padrão 2: "CALÃ‡A" -> "CALÇA" (Ã‡ = ç)
+UPDATE atelie_products
+SET name = REPLACE(name, 'Ã‡', 'ç')
+WHERE empresa_id = '8a9c1c7e-81f1-4186-ac89-ed584f549836'
+AND name LIKE '%Ã‡%';
+
+-- 4.1.1: Corrigir "~" que foi salvo como "Ã" (quando não é parte de outro caractere)
+-- ATENÇÃO: Esta query corrige "Ã" para "~" apenas quando não faz parte de "á", "é", "í", "ó", "ú", "ã", "õ", "ç"
 UPDATE atelie_products
 SET name = REPLACE(name, 'Ã', '~')
 WHERE empresa_id = '8a9c1c7e-81f1-4186-ac89-ed584f549836'
