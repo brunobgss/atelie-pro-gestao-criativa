@@ -66,10 +66,17 @@ export async function criarFornecedor(fornecedor: Omit<Fornecedor, 'id' | 'creat
       return trimmed === '' ? null : trimmed;
     };
 
+    // Normalizar CNPJ/CPF: remover formatação (pontos, barras, hífens) para garantir consistência
+    const normalizeCnpjCpf = (value: string | null | undefined): string | null => {
+      if (!value) return null;
+      const cleaned = value.replace(/\D/g, ''); // Remove tudo que não é dígito
+      return cleaned === '' ? null : cleaned;
+    };
+
     const cleanedFornecedor = {
       ...fornecedor,
-      cnpj: cleanValue(fornecedor.cnpj),
-      cpf: cleanValue(fornecedor.cpf),
+      cnpj: normalizeCnpjCpf(fornecedor.cnpj),
+      cpf: normalizeCnpjCpf(fornecedor.cpf),
       email: cleanValue(fornecedor.email),
       telefone: cleanValue(fornecedor.telefone),
       celular: cleanValue(fornecedor.celular),
@@ -137,7 +144,45 @@ export async function criarFornecedor(fornecedor: Omit<Fornecedor, 'id' | 'creat
         // Verificar CNPJ (mais específico primeiro)
         if (fullErrorText.includes('fornecedores_cnpj') || fullErrorText.includes('cnpj_key') || 
             (fullErrorText.includes('cnpj') && (fullErrorText.includes('unique') || fullErrorText.includes('duplicate')))) {
-          return { ok: false, error: 'Este CNPJ já está cadastrado. Por favor, verifique se o fornecedor já existe na lista ou use um CNPJ diferente.' };
+          // Verificar se o CNPJ já existe na empresa atual (normalizado)
+          // Buscar tanto com formatação quanto sem, pois pode haver registros antigos
+          const normalizedCnpj = cleanedFornecedor.cnpj;
+          
+          if (normalizedCnpj) {
+            // Buscar CNPJ normalizado (sem formatação)
+            const { data: existingFornecedor1 } = await supabase
+              .from('fornecedores')
+              .select('id, nome_fantasia, cnpj')
+              .eq('empresa_id', empresaId)
+              .eq('cnpj', normalizedCnpj)
+              .maybeSingle();
+            
+            if (existingFornecedor1) {
+              return { ok: false, error: `Este CNPJ já está cadastrado para o fornecedor "${existingFornecedor1.nome_fantasia}" na sua empresa. Por favor, verifique a lista de fornecedores.` };
+            }
+            
+            // Buscar também com formatação (caso tenha registro antigo com formatação)
+            // Formatar o CNPJ normalizado para buscar: 00.000.000/0000-00
+            const formattedCnpj = normalizedCnpj.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+            const { data: existingFornecedor2 } = await supabase
+              .from('fornecedores')
+              .select('id, nome_fantasia, cnpj')
+              .eq('empresa_id', empresaId)
+              .eq('cnpj', formattedCnpj)
+              .maybeSingle();
+            
+            if (existingFornecedor2) {
+              return { ok: false, error: `Este CNPJ já está cadastrado para o fornecedor "${existingFornecedor2.nome_fantasia}" na sua empresa. Por favor, verifique a lista de fornecedores.` };
+            }
+          }
+          
+          if (existingFornecedor) {
+            return { ok: false, error: `Este CNPJ já está cadastrado para o fornecedor "${existingFornecedor.nome_fantasia}" na sua empresa. Por favor, verifique a lista de fornecedores.` };
+          } else {
+            // Pode ser que outra empresa tenha esse CNPJ (se a constraint global ainda existir)
+            // Ou pode ser um problema de formatação
+            return { ok: false, error: 'Este CNPJ já está cadastrado. Por favor, verifique se o fornecedor já existe na sua lista de fornecedores. Se não encontrar, entre em contato com o suporte.' };
+          }
         }
         
         // Verificar CPF (mais específico primeiro)
@@ -208,10 +253,33 @@ export async function atualizarFornecedor(id: string, fornecedor: Partial<Fornec
       return { ok: false, error: 'Usuário não tem empresa associada' };
     }
 
+    // Normalizar CNPJ/CPF: remover formatação (pontos, barras, hífens) para garantir consistência
+    const normalizeCnpjCpf = (value: string | null | undefined): string | null => {
+      if (!value) return null;
+      const cleaned = value.replace(/\D/g, ''); // Remove tudo que não é dígito
+      return cleaned === '' ? null : cleaned;
+    };
+
+    // Limpar valores vazios e normalizar CNPJ/CPF
+    const cleanValue = (value: string | undefined | null): string | null => {
+      if (!value) return null;
+      const trimmed = value.trim();
+      return trimmed === '' ? null : trimmed;
+    };
+
+    const cleanedFornecedor = {
+      ...fornecedor,
+      cnpj: fornecedor.cnpj !== undefined ? normalizeCnpjCpf(fornecedor.cnpj) : undefined,
+      cpf: fornecedor.cpf !== undefined ? normalizeCnpjCpf(fornecedor.cpf) : undefined,
+      email: fornecedor.email !== undefined ? cleanValue(fornecedor.email) : undefined,
+      telefone: fornecedor.telefone !== undefined ? cleanValue(fornecedor.telefone) : undefined,
+      celular: fornecedor.celular !== undefined ? cleanValue(fornecedor.celular) : undefined,
+    };
+
     const { data, error } = await supabase
       .from('fornecedores')
       .update({
-        ...fornecedor,
+        ...cleanedFornecedor,
         updated_at: new Date().toISOString()
       })
       .eq('id', id)
