@@ -1,10 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Check, ChevronsUpDown, Plus, User } from "lucide-react";
+import { Check, ChevronsUpDown, Plus, User, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getCustomers, createCustomer } from "@/integrations/supabase/customers";
 import { toast } from "sonner";
@@ -28,11 +26,29 @@ export function ClientSearch({
   const [clients, setClients] = useState<Array<{ id: string; name: string; phone?: string; email?: string }>>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Buscar clientes quando o componente montar
   useEffect(() => {
     loadClients();
   }, []);
+
+  // Fechar dropdown ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+
+    if (open) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [open]);
 
   const loadClients = async () => {
     try {
@@ -53,26 +69,15 @@ export function ClientSearch({
   );
 
   const handleSelectClient = (client: { id: string; name: string; phone?: string; email?: string }) => {
-    // Atualizar valores de forma síncrona primeiro
+    // Atualizar valores primeiro
     onChange(client.name);
     if (onPhoneChange && client.phone) {
       onPhoneChange(client.phone);
     }
     
-    // Fechar popover e limpar busca de forma assíncrona
-    // Usar múltiplos requestAnimationFrame para garantir que tudo seja processado
-    // antes de desmontar o componente
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        try {
-          setOpen(false);
-          setSearchTerm("");
-        } catch (error) {
-          // Ignorar erros de setState durante desmontagem
-          console.warn('Erro ao fechar popover (ignorado):', error);
-        }
-      });
-    });
+    // Fechar dropdown e limpar busca
+    setOpen(false);
+    setSearchTerm("");
   };
 
   const handleCreateNewClient = async () => {
@@ -88,13 +93,8 @@ export function ClientSearch({
       if (result.ok && result.data) {
         toast.success("Cliente criado com sucesso!");
         onChange(result.data.name);
-        
-        // Fechar popover e limpar busca de forma assíncrona para evitar conflitos
-        setTimeout(() => {
-          setOpen(false);
-          setSearchTerm("");
-        }, 0);
-        
+        setOpen(false);
+        setSearchTerm("");
         // Recarregar lista de clientes
         loadClients();
       } else {
@@ -109,58 +109,65 @@ export function ClientSearch({
   };
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" ref={containerRef}>
       <Label htmlFor="client">
         Cliente {required && <span className="text-red-500">*</span>}
       </Label>
-      <Popover 
-        open={open} 
-        onOpenChange={(newOpen) => {
-          // Proteção: só fechar se não estiver processando seleção
-          if (!newOpen) {
-            // Usar requestAnimationFrame para fechar de forma segura
-            requestAnimationFrame(() => {
-              setOpen(false);
-            });
-          } else {
-            setOpen(newOpen);
-          }
-        }}
-      >
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            role="combobox"
-            aria-expanded={open}
-            className="w-full justify-between border-input"
-          >
-            <div className="flex items-center gap-2">
-              <User className="h-4 w-4 text-muted-foreground" />
-              <span className={cn(
+      <div className="relative">
+        <Button
+          type="button"
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          onClick={() => {
+            setOpen(!open);
+            if (!open && inputRef.current) {
+              setTimeout(() => inputRef.current?.focus(), 0);
+            }
+          }}
+          className="w-full justify-between border-input"
+        >
+          <div className="flex items-center gap-2">
+            <User className="h-4 w-4 text-muted-foreground" />
+            <span className={cn(
               "truncate",
               !value && "text-muted-foreground"
             )}>
-                {value || placeholder}
-              </span>
+              {value || placeholder}
+            </span>
+          </div>
+          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+        </Button>
+        
+        {open && (
+          <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-md max-h-[300px] overflow-auto">
+            <div className="p-2 border-b">
+              <Input
+                ref={inputRef}
+                placeholder="Pesquisar cliente..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full"
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    setOpen(false);
+                  }
+                }}
+              />
             </div>
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-full p-0" align="start">
-          <Command>
-            <CommandInput
-              placeholder="Pesquisar cliente..."
-              value={searchTerm}
-              onValueChange={setSearchTerm}
-            />
-            <CommandList>
-              <CommandEmpty>
+            <div className="p-1">
+              {loading ? (
+                <div className="p-4 text-center text-sm text-muted-foreground">
+                  Carregando...
+                </div>
+              ) : filteredClients.length === 0 ? (
                 <div className="flex flex-col gap-2 p-2">
                   <p className="text-sm text-muted-foreground">
                     Nenhum cliente encontrado
                   </p>
                   {searchTerm.trim() && (
                     <Button
+                      type="button"
                       variant="outline"
                       size="sm"
                       onClick={handleCreateNewClient}
@@ -172,48 +179,43 @@ export function ClientSearch({
                     </Button>
                   )}
                 </div>
-              </CommandEmpty>
-              <CommandGroup>
-                {filteredClients.map((client) => (
-                  <CommandItem
-                    key={client.id}
-                    value={client.name}
-                    onSelect={(currentValue) => {
-                      // Prevenir comportamento padrão do Command que pode causar conflito
-                      // Usar setTimeout para garantir que a seleção aconteça após o render atual
-                      setTimeout(() => {
-                        const selectedClient = filteredClients.find(c => c.name === currentValue);
-                        if (selectedClient) {
-                          handleSelectClient(selectedClient);
-                        }
-                      }, 0);
-                    }}
-                    className="flex items-center justify-between"
-                  >
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4" />
-                      <div>
-                        <div className="font-medium">{client.name}</div>
-                        {client.phone && (
-                          <div className="text-xs text-muted-foreground">
-                            {client.phone}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <Check
+              ) : (
+                <div className="space-y-1">
+                  {filteredClients.map((client) => (
+                    <button
+                      key={client.id}
+                      type="button"
+                      onClick={() => handleSelectClient(client)}
                       className={cn(
-                        "ml-auto h-4 w-4",
-                        value === client.name ? "opacity-100" : "opacity-0"
+                        "w-full flex items-center justify-between px-2 py-1.5 rounded-sm text-sm hover:bg-accent hover:text-accent-foreground transition-colors",
+                        value === client.name && "bg-accent"
                       )}
-                    />
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
+                    >
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <User className="h-4 w-4 shrink-0" />
+                        <div className="flex-1 min-w-0 text-left">
+                          <div className="font-medium truncate">{client.name}</div>
+                          {client.phone && (
+                            <div className="text-xs text-muted-foreground truncate">
+                              {client.phone}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <Check
+                        className={cn(
+                          "ml-2 h-4 w-4 shrink-0",
+                          value === client.name ? "opacity-100" : "opacity-0"
+                        )}
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
