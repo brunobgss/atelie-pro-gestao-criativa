@@ -360,26 +360,30 @@ export default function NovoOrcamento() {
       personalizationCount: personalizations.length,
     });
 
-    toast.success("Orçamento criado com sucesso!");
-    // Sincronização automática
-    if (result.id) {
-      syncAfterCreate('quotes', result.id);
-    }
-    invalidateRelated('quotes');
+    // Navegar imediatamente sem atualizações de estado para evitar erros de removeChild
+    // As invalidações serão feitas na página de destino
+    const targetUrl = `/orcamento/${code}`;
     
-    // Fechar qualquer modal/popover aberto antes de navegar
-    setProductPopoverOpen(false);
-    setQuantityModalOpen(false);
-    setWhatsappModalOpen(false);
-    
-    // Usar window.location.href em vez de navigate() para evitar erros de removeChild
-    // Isso força uma navegação completa e limpa todos os componentes React de uma vez
-    // Usar requestAnimationFrame para garantir que o toast seja exibido antes da navegação
-    requestAnimationFrame(() => {
-      setTimeout(() => {
-        window.location.href = `/orcamento/${code}`;
-      }, 300);
+    // Exibir toast e navegar imediatamente sem esperar atualizações de estado
+    toast.success("Orçamento criado com sucesso!", {
+      duration: 2000,
     });
+    
+    // Usar window.location.href imediatamente para evitar qualquer atualização de estado
+    // que possa causar conflitos durante a desmontagem de componentes
+    try {
+      // Fechar modais de forma síncrona antes de navegar
+      setProductPopoverOpen(false);
+      setQuantityModalOpen(false);
+      setWhatsappModalOpen(false);
+      
+      // Navegar imediatamente sem aguardar nada
+      window.location.href = targetUrl;
+    } catch (error) {
+      // Se houver erro, tentar navegação alternativa
+      console.error('Erro ao navegar:', error);
+      window.location.replace(targetUrl);
+    }
   };
 
   const addItem = () => {

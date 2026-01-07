@@ -527,28 +527,31 @@ export default function NovoPedido() {
       personalizationCount: personalizations.length,
     });
     
-    console.log("Pedido criado com sucesso! Redirecionando para:", `/pedidos/${code}`);
-    toast.success("Pedido criado com sucesso!");
-    // Sincronização automática - invalidar cache de pedidos E receitas
-    if (result.id) {
-      syncAfterCreate('orders', result.id);
-    }
-    invalidateRelated('orders');
-    invalidateRelated('receitas'); // Garantir que receitas sejam atualizadas
-    queryClient.invalidateQueries({ queryKey: ["receitas"] }); // Invalidar explicitamente
+    // Navegar imediatamente sem atualizações de estado para evitar erros de removeChild
+    // As invalidações serão feitas na página de destino
+    const targetUrl = `/pedidos/${code}`;
     
-    // Fechar qualquer modal/popover aberto antes de navegar
-    setProductPopoverOpen(false);
-    setQuantityModalOpen(false);
+    console.log("Pedido criado com sucesso! Redirecionando para:", targetUrl);
     
-    // Usar window.location.href em vez de navigate() para evitar erros de removeChild
-    // Isso força uma navegação completa e limpa todos os componentes React de uma vez
-    // Usar requestAnimationFrame para garantir que o toast seja exibido antes da navegação
-    requestAnimationFrame(() => {
-      setTimeout(() => {
-        window.location.href = `/pedidos/${code}`;
-      }, 300);
+    // Exibir toast e navegar imediatamente sem esperar atualizações de estado
+    toast.success("Pedido criado com sucesso!", {
+      duration: 2000,
     });
+    
+    // Usar window.location.href imediatamente para evitar qualquer atualização de estado
+    // que possa causar conflitos durante a desmontagem de componentes
+    try {
+      // Fechar modais de forma síncrona antes de navegar
+      setProductPopoverOpen(false);
+      setQuantityModalOpen(false);
+      
+      // Navegar imediatamente sem aguardar nada
+      window.location.href = targetUrl;
+    } catch (error) {
+      // Se houver erro, tentar navegação alternativa
+      console.error('Erro ao navegar:', error);
+      window.location.replace(targetUrl);
+    }
   };
 
   return (
