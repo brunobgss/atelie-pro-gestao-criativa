@@ -34,6 +34,15 @@ class ErrorBoundaryClass extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    // Ignorar erros de removeChild que são não-críticos e geralmente causados
+    // por problemas de timing durante navegação/desmontagem de componentes
+    if (error.message?.includes('removeChild') || 
+        error.message?.includes('Failed to execute \'removeChild\'')) {
+      console.warn('Erro de removeChild ignorado (não-crítico):', error.message);
+      // Não capturar nem exibir erro para o usuário neste caso
+      return;
+    }
+    
     console.error('ErrorBoundary capturou um erro:', error, errorInfo);
     
     // Capturar erro no sistema de rastreamento

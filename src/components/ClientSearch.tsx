@@ -53,12 +53,25 @@ export function ClientSearch({
   );
 
   const handleSelectClient = (client: { id: string; name: string; phone?: string; email?: string }) => {
-    onChange(client.name);
-    if (onPhoneChange && client.phone) {
-      onPhoneChange(client.phone);
+    // Usar setTimeout para garantir que as atualizações de estado aconteçam antes de fechar o popover
+    // Isso evita erros de removeChild durante a desmontagem do componente
+    try {
+      onChange(client.name);
+      if (onPhoneChange && client.phone) {
+        onPhoneChange(client.phone);
+      }
+      
+      // Fechar popover e limpar busca de forma assíncrona para evitar conflitos
+      setTimeout(() => {
+        setOpen(false);
+        setSearchTerm("");
+      }, 0);
+    } catch (error) {
+      // Se houver erro, tentar fechar o popover de qualquer forma
+      console.warn('Erro ao selecionar cliente:', error);
+      setOpen(false);
+      setSearchTerm("");
     }
-    setOpen(false);
-    setSearchTerm("");
   };
 
   const handleCreateNewClient = async () => {
@@ -74,8 +87,13 @@ export function ClientSearch({
       if (result.ok && result.data) {
         toast.success("Cliente criado com sucesso!");
         onChange(result.data.name);
-        setOpen(false);
-        setSearchTerm("");
+        
+        // Fechar popover e limpar busca de forma assíncrona para evitar conflitos
+        setTimeout(() => {
+          setOpen(false);
+          setSearchTerm("");
+        }, 0);
+        
         // Recarregar lista de clientes
         loadClients();
       } else {

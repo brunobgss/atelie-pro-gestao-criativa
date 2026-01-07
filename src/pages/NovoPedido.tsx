@@ -538,20 +538,29 @@ export default function NovoPedido() {
       duration: 2000,
     });
     
-    // Usar window.location.href imediatamente para evitar qualquer atualização de estado
-    // que possa causar conflitos durante a desmontagem de componentes
+    // Proteção contra erros de removeChild: usar window.location.replace
+    // que não adiciona entrada no histórico e força limpeza completa
+    // Além disso, envolver em try-catch silencioso para ignorar erros de DOM
     try {
       // Fechar modais de forma síncrona antes de navegar
       setProductPopoverOpen(false);
       setQuantityModalOpen(false);
-      
-      // Navegar imediatamente sem aguardar nada
-      window.location.href = targetUrl;
-    } catch (error) {
-      // Se houver erro, tentar navegação alternativa
-      console.error('Erro ao navegar:', error);
-      window.location.replace(targetUrl);
+    } catch (e) {
+      // Ignorar erros ao fechar modais
     }
+    
+    // Usar window.location.replace em vez de href para evitar problemas com histórico
+    // e garantir limpeza completa do estado React
+    // Adicionar pequeno delay para garantir que toast seja processado
+    setTimeout(() => {
+      try {
+        window.location.replace(targetUrl);
+      } catch (error) {
+        // Se ainda houver erro, tentar href como fallback
+        console.warn('Erro ao usar replace, tentando href:', error);
+        window.location.href = targetUrl;
+      }
+    }, 100);
   };
 
   return (
