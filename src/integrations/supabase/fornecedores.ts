@@ -149,12 +149,13 @@ export async function criarFornecedor(fornecedor: Omit<Fornecedor, 'id' | 'creat
           const normalizedCnpj = cleanedFornecedor.cnpj;
           
           if (normalizedCnpj) {
-            // Buscar CNPJ normalizado (sem formatação)
+            // Buscar CNPJ normalizado (sem formatação) - apenas fornecedores ATIVOS
             const { data: existingFornecedor1 } = await supabase
               .from('fornecedores')
               .select('id, nome_fantasia, cnpj')
               .eq('empresa_id', empresaId)
               .eq('cnpj', normalizedCnpj)
+              .eq('ativo', true)  // Apenas fornecedores ativos
               .maybeSingle();
             
             if (existingFornecedor1) {
@@ -169,6 +170,7 @@ export async function criarFornecedor(fornecedor: Omit<Fornecedor, 'id' | 'creat
               .select('id, nome_fantasia, cnpj')
               .eq('empresa_id', empresaId)
               .eq('cnpj', formattedCnpj)
+              .eq('ativo', true)  // Apenas fornecedores ativos
               .maybeSingle();
             
             if (existingFornecedor2) {
