@@ -541,11 +541,14 @@ export default function NovoPedido() {
     setProductPopoverOpen(false);
     setQuantityModalOpen(false);
     
-    // Usar setTimeout para garantir que o DOM esteja pronto antes de navegar
-    // Isso evita erros de removeChild durante a navegação
-    setTimeout(() => {
-      navigate(`/pedidos/${code}`);
-    }, 100);
+    // Usar window.location.href em vez de navigate() para evitar erros de removeChild
+    // Isso força uma navegação completa e limpa todos os componentes React de uma vez
+    // Usar requestAnimationFrame para garantir que o toast seja exibido antes da navegação
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        window.location.href = `/pedidos/${code}`;
+      }, 300);
+    });
   };
 
   return (

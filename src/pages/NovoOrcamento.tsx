@@ -362,7 +362,9 @@ export default function NovoOrcamento() {
 
     toast.success("Orçamento criado com sucesso!");
     // Sincronização automática
-    syncAfterCreate('quotes', result.data);
+    if (result.id) {
+      syncAfterCreate('quotes', result.id);
+    }
     invalidateRelated('quotes');
     
     // Fechar qualquer modal/popover aberto antes de navegar
@@ -370,11 +372,14 @@ export default function NovoOrcamento() {
     setQuantityModalOpen(false);
     setWhatsappModalOpen(false);
     
-    // Usar setTimeout para garantir que o DOM esteja pronto antes de navegar
-    // Isso evita erros de removeChild durante a navegação
-    setTimeout(() => {
-      navigate(`/orcamento/${code}`);
-    }, 100);
+    // Usar window.location.href em vez de navigate() para evitar erros de removeChild
+    // Isso força uma navegação completa e limpa todos os componentes React de uma vez
+    // Usar requestAnimationFrame para garantir que o toast seja exibido antes da navegação
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        window.location.href = `/orcamento/${code}`;
+      }, 300);
+    });
   };
 
   const addItem = () => {
