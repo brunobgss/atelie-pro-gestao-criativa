@@ -77,17 +77,40 @@ export default function NovoOrcamento() {
     queryFn: getProducts,
   });
 
+  // Normalizar texto para busca (remove acentos, espaços extras, caixa)
+  const normalizeSearch = (value: string) =>
+    value
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
   // Filtrar produtos baseado no termo de busca
   const filteredProducts = useMemo(() => {
     if (!productSearchTerm.trim()) {
       return products;
     }
-    const searchLower = productSearchTerm.toLowerCase().trim();
-    return products.filter((product) =>
-      product.name.toLowerCase().includes(searchLower) ||
-      product.type?.toLowerCase().includes(searchLower) ||
-      product.materials?.some((material: string) => material.toLowerCase().includes(searchLower))
-    );
+
+    const search = normalizeSearch(productSearchTerm);
+    if (!search) return products;
+
+    const searchWords = search.split(" ");
+
+    return products.filter((product) => {
+      const base = [
+        product.name,
+        product.type || "",
+        ...(Array.isArray(product.materials) ? product.materials : []),
+      ]
+        .join(" ")
+        .toString();
+
+      const normalizedProduct = normalizeSearch(base);
+
+      // Cada palavra digitada deve existir em alguma parte do texto do produto
+      return searchWords.every((word) => normalizedProduct.includes(word));
+    });
   }, [products, productSearchTerm]);
 
   // Buscar serviços
@@ -341,7 +364,17 @@ export default function NovoOrcamento() {
     // Sincronização automática
     syncAfterCreate('quotes', result.data);
     invalidateRelated('quotes');
-    navigate(`/orcamento/${code}`);
+    
+    // Fechar qualquer modal/popover aberto antes de navegar
+    setProductPopoverOpen(false);
+    setQuantityModalOpen(false);
+    setWhatsappModalOpen(false);
+    
+    // Usar setTimeout para garantir que o DOM esteja pronto antes de navegar
+    // Isso evita erros de removeChild durante a navegação
+    setTimeout(() => {
+      navigate(`/orcamento/${code}`);
+    }, 100);
   };
 
   const addItem = () => {

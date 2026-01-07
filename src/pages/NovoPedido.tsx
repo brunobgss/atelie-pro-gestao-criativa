@@ -9,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, Upload, Save, Plus, Trash2, Copy, CheckCircle, XCircle, Wrench, Search, Check, ChevronsUpDown, Package } from "lucide-react";
+import { ArrowLeft, Upload, Save, Plus, Trash2, Copy, CheckCircle, XCircle, Wrench, Search, Check, ChevronsUpDown, Package, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { createOrder, generateOrderCode } from "@/integrations/supabase/orders";
@@ -48,6 +48,18 @@ export default function NovoPedido() {
   const [selectedProduct, setSelectedProduct] = useState<string>("");
   const [productSearchTerm, setProductSearchTerm] = useState<string>("");
   const [productPopoverOpen, setProductPopoverOpen] = useState(false);
+  const [addedCatalogProducts, setAddedCatalogProducts] = useState<Array<{ 
+    id: string; 
+    name: string; 
+    price: number; 
+    quantity: number;
+    size?: string;
+    color?: string;
+  }>>([]);
+  
+  // Estados para serviços rápidos
+  const [selectedServico, setSelectedServico] = useState<string>("");
+  const [addedServices, setAddedServices] = useState<Array<{ id: string; name: string; price: number; quantity: number }>>([]);
 
   // Buscar produtos do catálogo
   const { data: products = [] } = useQuery({
@@ -55,17 +67,40 @@ export default function NovoPedido() {
     queryFn: getProducts,
   });
 
+  // Normalizar texto para busca (remove acentos, espaços extras, caixa)
+  const normalizeSearch = (value: string) =>
+    value
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
   // Filtrar produtos baseado no termo de busca
   const filteredProducts = useMemo(() => {
     if (!productSearchTerm.trim()) {
       return products;
     }
-    const searchLower = productSearchTerm.toLowerCase().trim();
-    return products.filter((product) =>
-      product.name.toLowerCase().includes(searchLower) ||
-      product.type?.toLowerCase().includes(searchLower) ||
-      product.materials?.some((material: string) => material.toLowerCase().includes(searchLower))
-    );
+
+    const search = normalizeSearch(productSearchTerm);
+    if (!search) return products;
+
+    const searchWords = search.split(" ");
+
+    return products.filter((product) => {
+      const base = [
+        product.name,
+        product.type || "",
+        ...(Array.isArray(product.materials) ? product.materials : []),
+      ]
+        .join(" ")
+        .toString();
+
+      const normalizedProduct = normalizeSearch(base);
+
+      // Cada palavra digitada deve existir em alguma parte do texto do produto
+      return searchWords.every((word) => normalizedProduct.includes(word));
+    });
   }, [products, productSearchTerm]);
 
   // Buscar serviços
@@ -87,7 +122,25 @@ export default function NovoPedido() {
   const [color, setColor] = useState<string>("");
   const [size, setSize] = useState<string>("");
   const [type, setType] = useState<string>("");
-  const [selectedServico, setSelectedServico] = useState<string>("");
+
+  // Atualizar valor total quando produtos adicionados mudarem (cada produto tem sua própria quantidade)
+  useEffect(() => {
+    if (addedCatalogProducts.length > 0) {
+      // Calcular valor total: soma dos preços × quantidade individual de cada produto
+      const totalValue = addedCatalogProducts.reduce((sum, product) => 
+        sum + (product.price * product.quantity), 0
+      );
+      
+      const valueInput = document.getElementById("value") as HTMLInputElement;
+      if (valueInput) {
+        valueInput.value = totalValue.toFixed(2);
+        valueInput.dispatchEvent(new Event('input', { bubbles: true }));
+        valueInput.dispatchEvent(new Event('change', { bubbles: true }));
+        console.log(`💰 Valor total atualizado: R$ ${totalValue.toFixed(2)} (${addedCatalogProducts.length} produto(s))`);
+      }
+    }
+  }, [addedCatalogProducts]);
+
   const [isKitMode, setIsKitMode] = useState<boolean>(false);
   const [kitItems, setKitItems] = useState<Array<{id: string, size: string, quantity: number}>>([
     { id: generateId(), size: "P", quantity: 0 },
@@ -288,7 +341,16 @@ export default function NovoPedido() {
     const description = (document.getElementById("description") as HTMLTextAreaElement)?.value || "";
     const value = Number((document.getElementById("value") as HTMLInputElement)?.value || 0);
     const paid = Number((document.getElementById("paid") as HTMLInputElement)?.value || 0);
-    const delivery = (document.getElementById("delivery") as HTMLInputElement)?.value || undefined;
+    // Capturar data de entrega e garantir que seja salva sem conversão de timezone
+    const deliveryInput = document.getElementById("delivery") as HTMLInputElement;
+    let delivery: string | undefined = undefined;
+    if (deliveryInput?.value) {
+      // Input type="date" retorna formato YYYY-MM-DD, usar diretamente sem conversão
+      // Garantir que seja apenas a data (remover qualquer parte de hora/timezone se houver)
+      const dateValue = deliveryInput.value;
+      delivery = dateValue.split('T')[0]; // Pega apenas a parte da data (YYYY-MM-DD)
+      console.log("📅 Data de entrega capturada (sem timezone):", delivery, "valor original:", dateValue);
+    }
     const code = generateOrderCode();
 
     // Validação de campos obrigatórios
@@ -316,24 +378,36 @@ export default function NovoPedido() {
     // Montar descrição com informações do kit ou quantidade simples
     let finalDescription = description;
     
-    // Adicionar informações do produto selecionado se for "Item do Catálogo"
-    if (type === "catalogo" && selectedProduct) {
+    // Se houver produtos adicionados do catálogo, usar suas informações
+    if (addedCatalogProducts.length > 0) {
+      // A descrição já foi montada ao adicionar os produtos
+      // Apenas adicionar informações de tamanho/cor se houver
+      const sizeInfo = size ? ` | Tamanho: ${size}` : "";
+      const colorInfo = color ? ` | Cor: ${color}` : "";
+      if (sizeInfo || colorInfo) {
+        finalDescription = `${finalDescription}${sizeInfo}${colorInfo}`;
+      }
+    } else if (type === "catalogo" && selectedProduct) {
+      // Fallback: adicionar informações do produto selecionado se não foi adicionado à lista
       const product = products.find(p => p.id === selectedProduct);
       if (product) {
         finalDescription = `${description}\nProduto: ${product.name} (R$ ${product.unit_price.toFixed(2)})`;
       }
     }
     
-    if (isKitMode) {
-      const kitInfo = kitItems
-        .filter(item => item.quantity > 0)
-        .map(item => `${item.quantity} ${item.size}`)
-        .join(" | ");
-      finalDescription = `${finalDescription}\nKit: ${kitInfo}\nTotal: ${getTotalKitQuantity()} peças${color ? ` | Cor: ${color}` : ""}`;
-    } else {
-      const sizeInfo = size ? ` | Tamanho: ${size}` : "";
-      const colorInfo = color ? ` | Cor: ${color}` : "";
-      finalDescription = `${finalDescription}\nQtd: ${quantity}${sizeInfo}${colorInfo}`;
+    // Adicionar informações de kit ou quantidade apenas se não houver produtos do catálogo
+    if (addedCatalogProducts.length === 0) {
+      if (isKitMode) {
+        const kitInfo = kitItems
+          .filter(item => item.quantity > 0)
+          .map(item => `${item.quantity} ${item.size}`)
+          .join(" | ");
+        finalDescription = `${finalDescription}\nKit: ${kitInfo}\nTotal: ${getTotalKitQuantity()} peças${color ? ` | Cor: ${color}` : ""}`;
+      } else {
+        const sizeInfo = size ? ` | Tamanho: ${size}` : "";
+        const colorInfo = color ? ` | Cor: ${color}` : "";
+        finalDescription = `${finalDescription}\nQtd: ${quantity}${sizeInfo}${colorInfo}`;
+      }
     }
 
     if (personalizations.length) {
@@ -358,6 +432,48 @@ export default function NovoPedido() {
       file_url
     });
 
+    // Determinar produtos e serviços para baixa automática de estoque
+    let productsForInventory: Array<{ id: string; quantity: number }> | undefined = undefined;
+    let servicesForInventory: Array<{ id: string; quantity: number }> | undefined = undefined;
+    let finalType = type;
+    
+    // Se houver produtos adicionados do catálogo, forçar tipo como "catalogo" e processar todos
+    if (addedCatalogProducts.length > 0) {
+      finalType = "catalogo";
+      // Processar todos os produtos adicionados com suas quantidades individuais
+      productsForInventory = addedCatalogProducts.map(product => ({
+        id: product.id,
+        quantity: product.quantity
+      }));
+      console.log("📦 Usando produtos da lista adicionada para baixa de estoque:", {
+        products: productsForInventory,
+        totalProducts: addedCatalogProducts.length,
+        originalType: type,
+        finalType: finalType
+      });
+    } else if (type === "catalogo" && selectedProduct) {
+      // Fallback: usar produto selecionado (caso não tenha clicado em "Adicionar")
+      productsForInventory = [{
+        id: selectedProduct,
+        quantity: isKitMode ? getTotalKitQuantity() : quantity
+      }];
+      console.log("📦 Usando produto selecionado para baixa de estoque:", {
+        products: productsForInventory
+      });
+    }
+    
+    // Processar serviços adicionados para baixa de estoque
+    if (addedServices.length > 0) {
+      servicesForInventory = addedServices.map(service => ({
+        id: service.id,
+        quantity: service.quantity
+      }));
+      console.log("🔧 Usando serviços da lista adicionada para baixa de estoque:", {
+        services: servicesForInventory,
+        totalServices: addedServices.length
+      });
+    }
+
     // Medir performance e criar pedido
     const result = await performanceMonitor.measure(
       'createOrder',
@@ -365,12 +481,17 @@ export default function NovoPedido() {
         return await createOrder({
           code,
           customer_name: client,
-          type,
+          type: finalType,
           description: finalDescription,
           value,
           paid,
           delivery_date: delivery,
           file_url,
+          products: productsForInventory, // Lista de produtos com quantidades
+          services: servicesForInventory, // Lista de serviços com quantidades
+          // Manter product_id e quantity para compatibilidade (deprecated)
+          product_id: productsForInventory && productsForInventory.length > 0 ? productsForInventory[0].id : undefined,
+          quantity: productsForInventory && productsForInventory.length > 0 ? productsForInventory[0].quantity : undefined,
           personalizations: personalizations
             .filter((p) => p.personName.trim())
             .map((p) => ({
@@ -415,7 +536,16 @@ export default function NovoPedido() {
     invalidateRelated('orders');
     invalidateRelated('receitas'); // Garantir que receitas sejam atualizadas
     queryClient.invalidateQueries({ queryKey: ["receitas"] }); // Invalidar explicitamente
-    navigate(`/pedidos/${code}`);
+    
+    // Fechar qualquer modal/popover aberto antes de navegar
+    setProductPopoverOpen(false);
+    setQuantityModalOpen(false);
+    
+    // Usar setTimeout para garantir que o DOM esteja pronto antes de navegar
+    // Isso evita erros de removeChild durante a navegação
+    setTimeout(() => {
+      navigate(`/pedidos/${code}`);
+    }, 100);
   };
 
   return (
@@ -479,85 +609,7 @@ export default function NovoPedido() {
                   </Select>
                 </div>
 
-                {/* Seletor de Catálogo - aparece quando escolher "Item do Catálogo" */}
-                {type === "catalogo" && (
-                  <div className="space-y-2">
-                    <Label htmlFor="product">Produto do Catálogo</Label>
-                    <Popover open={productPopoverOpen} onOpenChange={setProductPopoverOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          role="combobox"
-                          aria-expanded={productPopoverOpen}
-                          className="w-full justify-between"
-                          disabled={isUploading}
-                        >
-                          {selectedProduct
-                            ? products.find((product) => product.id === selectedProduct)?.name || "Selecione um produto"
-                            : "Selecione um produto do catálogo"}
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[400px] p-0" align="start">
-                        <Command>
-                          <CommandInput 
-                            placeholder="Pesquisar produto por nome, tipo ou material..." 
-                            value={productSearchTerm}
-                            onValueChange={setProductSearchTerm}
-                          />
-                          <CommandList>
-                            <CommandEmpty>Nenhum produto encontrado.</CommandEmpty>
-                            <CommandGroup>
-                              {filteredProducts.map((product) => (
-                                <CommandItem
-                                  key={product.id}
-                                  value={`${product.name} ${product.type || ""} ${product.materials?.join(" ") || ""}`}
-                                  onSelect={() => {
-                                    setSelectedProduct(product.id);
-                                    setProductPopoverOpen(false);
-                                    setProductSearchTerm("");
-                                  }}
-                                >
-                                  <Check
-                                    className={cn(
-                                      "mr-2 h-4 w-4",
-                                      selectedProduct === product.id ? "opacity-100" : "opacity-0"
-                                    )}
-                                  />
-                                  <div className="flex flex-col">
-                                    <span className="font-medium">{product.name}</span>
-                                    <span className="text-xs text-muted-foreground">
-                                      R$ {product.unit_price.toFixed(2)}
-                                      {product.type && ` • ${product.type}`}
-                                    </span>
-                                  </div>
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-                    {selectedProduct && (
-                      <div className="text-sm text-gray-600 bg-gray-50 p-2 rounded">
-                        {(() => {
-                          const product = products.find(p => p.id === selectedProduct);
-                          return product ? (
-                            <div>
-                              <p><strong>Nome:</strong> {product.name}</p>
-                              <p><strong>Preço:</strong> R$ {product.unit_price.toFixed(2)}</p>
-                              <p><strong>Tempo estimado:</strong> {product.work_hours}h</p>
-                              <p><strong>Tipo:</strong> {product.type}</p>
-                              {product.materials && product.materials.length > 0 && (
-                                <p><strong>Materiais:</strong> {product.materials.join(", ")}</p>
-                              )}
-                            </div>
-                          ) : null;
-                        })()}
-                      </div>
-                    )}
-                  </div>
-                )}
+                {/* Seletor de Catálogo removido - agora usamos a seção "Adicionar do Catálogo" sempre visível */}
               </div>
 
               {/* Seletor de Medidas */}
@@ -619,61 +671,151 @@ export default function NovoPedido() {
                   <Wrench className="w-4 h-4 text-green-600" />
                   <Label className="text-green-800 font-medium">Adicionar Serviço Rápido</Label>
                 </div>
-                <div className="flex gap-3">
-                  <Select value={selectedServico} onValueChange={setSelectedServico}>
-                    <SelectTrigger className="flex-1">
-                      <SelectValue placeholder="Selecione um serviço pré-cadastrado" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {servicos.map((servico) => (
-                        <SelectItem key={servico.id} value={servico.id}>
-                          {servico.nome}
-                          {servico.preco_padrao > 0 && ` - R$ ${servico.preco_padrao.toFixed(2)}`}
-                          {servico.categoria && ` (${servico.categoria})`}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    type="button"
-                    onClick={() => {
-                      if (!selectedServico) {
-                        toast.error("Selecione um serviço");
-                        return;
-                      }
-                      const servico = servicos.find(s => s.id === selectedServico);
-                      if (servico) {
-                        const descriptionInput = document.getElementById("description") as HTMLTextAreaElement;
-                        const valueInput = document.getElementById("value") as HTMLInputElement;
-                        
-                        if (descriptionInput) {
-                          const currentDesc = descriptionInput.value;
-                          descriptionInput.value = currentDesc 
-                            ? `${currentDesc}\n${servico.nome}${servico.descricao ? ` - ${servico.descricao}` : ""}`
-                            : `${servico.nome}${servico.descricao ? ` - ${servico.descricao}` : ""}`;
+                <div className="space-y-3">
+                  <div className="flex gap-3">
+                    <Select value={selectedServico} onValueChange={setSelectedServico}>
+                      <SelectTrigger className="flex-1">
+                        <SelectValue placeholder="Selecione um serviço pré-cadastrado" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {servicos.map((servico) => (
+                          <SelectItem key={servico.id} value={servico.id}>
+                            {servico.nome}
+                            {servico.preco_padrao > 0 && ` - R$ ${servico.preco_padrao.toFixed(2)}`}
+                            {servico.categoria && ` (${servico.categoria})`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        if (!selectedServico) {
+                          toast.error("Selecione um serviço");
+                          return;
                         }
-                        
-                        if (valueInput && servico.preco_padrao > 0) {
-                          const currentValue = parseFloat(valueInput.value) || 0;
-                          valueInput.value = (currentValue + servico.preco_padrao).toFixed(2);
+                        const servico = servicos.find(s => s.id === selectedServico);
+                        if (servico) {
+                          const descriptionInput = document.getElementById("description") as HTMLTextAreaElement;
+                          
+                          if (descriptionInput) {
+                            const currentDesc = descriptionInput.value;
+                            const servicoLine = `${servico.nome}${servico.descricao ? ` - ${servico.descricao}` : ""} | Qtd: 1`;
+                            descriptionInput.value = currentDesc 
+                              ? `${currentDesc}\n${servicoLine}`
+                              : servicoLine;
+                          }
+                          
+                          // Adicionar à lista de serviços com quantidade padrão 1
+                          setAddedServices(prev => [...prev, {
+                            id: servico.id,
+                            name: servico.nome,
+                            price: servico.preco_padrao || 0,
+                            quantity: 1
+                          }]);
+                          
+                          // O useEffect vai atualizar o valor total automaticamente
+                          
+                          // Só definir tipo como "outro" se o usuário ainda não tiver selecionado um tipo
+                          if (!type || type.trim() === "") {
+                            setType("outro");
+                          }
+                          toast.success(`Serviço "${servico.nome}" adicionado!`);
+                          setSelectedServico("");
                         }
-                        
-                        // Só definir tipo como "outro" se o usuário ainda não tiver selecionado um tipo
-                        // Isso preserva a escolha do usuário (ex: "Outros")
-                        // Usamos "outro" porque "servico" não é uma opção válida no Select
-                        if (!type || type.trim() === "") {
-                          setType("outro");
-                        }
-                        toast.success(`Serviço "${servico.nome}" adicionado!`);
-                        setSelectedServico("");
-                      }
-                    }}
-                    disabled={!selectedServico}
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Adicionar
-                  </Button>
+                      }}
+                      disabled={!selectedServico}
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Adicionar
+                    </Button>
+                  </div>
+                  
+                  {/* Lista de serviços adicionados */}
+                  {addedServices.length > 0 && (
+                    <div className="space-y-2 mt-3">
+                      <Label className="text-sm text-green-700 font-medium">Serviços adicionados:</Label>
+                      <div className="space-y-2">
+                        {addedServices.map((addedService, index) => {
+                          const servico = servicos.find(s => s.id === addedService.id);
+                          return (
+                            <div
+                              key={`${addedService.id}-${index}`}
+                              className="flex items-center justify-between gap-3 p-2 bg-white border border-green-200 rounded-md"
+                            >
+                              <div className="flex-1">
+                                <p className="text-sm font-medium text-gray-900">{addedService.name}</p>
+                                <p className="text-xs text-gray-500">
+                                  R$ {addedService.price.toFixed(2).replace(".", ",")}
+                                  {servico?.categoria && ` • ${servico.categoria}`}
+                                </p>
+                              </div>
+                              
+                              {/* Campo de quantidade individual */}
+                              <div className="flex items-center gap-2">
+                                <Label htmlFor={`serv-qty-${index}`} className="text-xs text-gray-600 whitespace-nowrap">
+                                  Qtd:
+                                </Label>
+                                <Input
+                                  id={`serv-qty-${index}`}
+                                  type="number"
+                                  min="1"
+                                  value={addedService.quantity}
+                                  onChange={(e) => {
+                                    const newQuantity = Math.max(1, parseInt(e.target.value) || 1);
+                                    setAddedServices(prev => prev.map((s, i) => 
+                                      i === index ? { ...s, quantity: newQuantity } : s
+                                    ));
+                                    
+                                    // Atualizar quantidade na descrição
+                                    const descriptionInput = document.getElementById("description") as HTMLTextAreaElement;
+                                    if (descriptionInput) {
+                                      const lines = descriptionInput.value.split('\n');
+                                      const updatedLines = lines.map(line => {
+                                        if (line.includes(addedService.name)) {
+                                          return line.replace(/Qtd: \d+/, `Qtd: ${newQuantity}`);
+                                        }
+                                        return line;
+                                      });
+                                      descriptionInput.value = updatedLines.join('\n');
+                                    }
+                                  }}
+                                  className="w-16 h-8 text-sm"
+                                />
+                              </div>
+                              
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  setAddedServices(prev => prev.filter((s, i) => i !== index));
+                                  
+                                  // Remover da descrição
+                                  const descriptionInput = document.getElementById("description") as HTMLTextAreaElement;
+                                  if (descriptionInput) {
+                                    descriptionInput.value = descriptionInput.value
+                                      .split('\n')
+                                      .filter(line => !line.includes(addedService.name))
+                                      .join('\n')
+                                      .trim();
+                                  }
+                                  
+                                  // O useEffect vai recalcular o valor total automaticamente
+                                  toast.info("Serviço removido");
+                                }}
+                                className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                title="Remover serviço"
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 {servicos.length === 0 && (
                   <p className="text-xs text-green-700 mt-2">
@@ -705,6 +847,24 @@ export default function NovoPedido() {
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                       </PopoverTrigger>
+                      {selectedProduct && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedProduct("");
+                            setProductSearchTerm("");
+                            toast.info("Seleção removida");
+                          }}
+                          disabled={isUploading}
+                          className="shrink-0"
+                          title="Remover seleção"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
                       <PopoverContent className="w-[400px] p-0" align="start">
                         <Command>
                           <CommandInput 
@@ -723,6 +883,7 @@ export default function NovoPedido() {
                                     setSelectedProduct(product.id);
                                     setProductPopoverOpen(false);
                                     setProductSearchTerm("");
+                                    // Valor só será somado quando o usuário clicar em "Adicionar"
                                   }}
                                 >
                                   <Check
@@ -759,23 +920,30 @@ export default function NovoPedido() {
                           
                           if (descriptionInput) {
                             const currentDesc = descriptionInput.value;
+                            const sizeInfo = "Não aplicável"; // Será atualizado quando o usuário mudar
+                            const productLine = `${product.name}${product.type ? ` - ${product.type}` : ""}${product.materials && product.materials.length > 0 ? ` (${product.materials.join(", ")})` : ""} | Qtd: 1${sizeInfo !== "Não aplicável" ? ` | Tamanho: ${sizeInfo}` : ""}`;
                             descriptionInput.value = currentDesc 
-                              ? `${currentDesc}\n${product.name}${product.type ? ` - ${product.type}` : ""}${product.materials && product.materials.length > 0 ? ` (${product.materials.join(", ")})` : ""}`
-                              : `${product.name}${product.type ? ` - ${product.type}` : ""}${product.materials && product.materials.length > 0 ? ` (${product.materials.join(", ")})` : ""}`;
+                              ? `${currentDesc}\n${productLine}`
+                              : productLine;
                           }
                           
-                          if (valueInput && product.unit_price > 0) {
-                            const currentValue = parseFloat(valueInput.value.replace(",", ".")) || 0;
-                            valueInput.value = (currentValue + product.unit_price).toFixed(2).replace(".", ",");
-                          }
+                          // Adicionar à lista de produtos do catálogo com quantidade padrão 1
+                          setAddedCatalogProducts(prev => [...prev, {
+                            id: product.id,
+                            name: product.name,
+                            price: product.unit_price,
+                            quantity: 1, // Quantidade padrão ao adicionar
+                            size: "Não aplicável", // Tamanho padrão
+                            color: "" // Cor vazia por padrão
+                          }]);
                           
-                          // Definir tipo como "catalogo" se ainda não tiver selecionado
-                          if (!type || type.trim() === "") {
-                            setType("catalogo");
-                          }
+                          // O useEffect vai atualizar o valor total automaticamente
+                          
+                          // Definir tipo como "catalogo" quando adicionar produto do catálogo
+                          setType("catalogo");
                           
                           setSelectedProduct("");
-                          toast.success("Produto adicionado à descrição!");
+                          toast.success("Produto adicionado!");
                         }
                       }}
                       disabled={!selectedProduct || isUploading}
@@ -785,6 +953,175 @@ export default function NovoPedido() {
                       Adicionar
                     </Button>
                   </div>
+                  {/* Lista de produtos adicionados do catálogo */}
+                  {addedCatalogProducts.length > 0 && (
+                    <div className="space-y-2 mt-3">
+                      <Label className="text-sm text-blue-700 font-medium">Produtos adicionados:</Label>
+                      <div className="space-y-2">
+                        {addedCatalogProducts.map((addedProduct, index) => {
+                          const product = products.find(p => p.id === addedProduct.id);
+                          const updateDescription = (updates: Partial<typeof addedProduct>) => {
+                            const descriptionInput = document.getElementById("description") as HTMLTextAreaElement;
+                            if (descriptionInput) {
+                              const lines = descriptionInput.value.split('\n');
+                              const updatedLines = lines.map(line => {
+                                if (line.includes(addedProduct.name)) {
+                                  let newLine = line;
+                                  // Atualizar quantidade
+                                  if (updates.quantity !== undefined) {
+                                    newLine = newLine.replace(/Qtd: \d+/, `Qtd: ${updates.quantity}`);
+                                  }
+                                  // Atualizar tamanho
+                                  if (updates.size !== undefined) {
+                                    if (updates.size === "Não aplicável") {
+                                      newLine = newLine.replace(/\s*\|\s*Tamanho: [^|]+/g, '');
+                                    } else {
+                                      if (newLine.includes('| Tamanho:')) {
+                                        newLine = newLine.replace(/\|\s*Tamanho: [^|]+/, `| Tamanho: ${updates.size}`);
+                                      } else {
+                                        newLine = newLine.replace(/(\| Qtd: \d+)/, `$1 | Tamanho: ${updates.size}`);
+                                      }
+                                    }
+                                  }
+                                  // Atualizar cor
+                                  if (updates.color !== undefined) {
+                                    if (!updates.color || updates.color.trim() === "") {
+                                      newLine = newLine.replace(/\s*\|\s*Cor: [^|]+/g, '');
+                                    } else {
+                                      if (newLine.includes('| Cor:')) {
+                                        newLine = newLine.replace(/\|\s*Cor: [^|]+/, `| Cor: ${updates.color}`);
+                                      } else {
+                                        newLine = newLine + ` | Cor: ${updates.color}`;
+                                      }
+                                    }
+                                  }
+                                  return newLine;
+                                }
+                                return line;
+                              });
+                              descriptionInput.value = updatedLines.join('\n');
+                            }
+                          };
+                          
+                          return (
+                            <div
+                              key={`${addedProduct.id}-${index}`}
+                              className="p-3 bg-white border border-blue-200 rounded-md space-y-2"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium text-gray-900">{addedProduct.name}</p>
+                                  <p className="text-xs text-gray-500">
+                                    R$ {addedProduct.price.toFixed(2).replace(".", ",")}
+                                    {product?.type && ` • ${product.type}`}
+                                  </p>
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => {
+                                    // Remover da lista
+                                    setAddedCatalogProducts(prev => prev.filter((p, i) => i !== index));
+                                    
+                                    // Remover da descrição
+                                    const descriptionInput = document.getElementById("description") as HTMLTextAreaElement;
+                                    if (descriptionInput) {
+                                      descriptionInput.value = descriptionInput.value
+                                        .split('\n')
+                                        .filter(line => !line.includes(addedProduct.name))
+                                        .join('\n')
+                                        .trim();
+                                    }
+                                    
+                                    // O useEffect vai recalcular o valor total automaticamente
+                                    toast.info("Produto removido");
+                                  }}
+                                  className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  title="Remover produto"
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                              
+                              {/* Campos de quantidade, tamanho e cor */}
+                              <div className="grid grid-cols-3 gap-2">
+                                {/* Quantidade */}
+                                <div className="space-y-1">
+                                  <Label htmlFor={`qty-${index}`} className="text-xs text-gray-600">
+                                    Qtd:
+                                  </Label>
+                                  <Input
+                                    id={`qty-${index}`}
+                                    type="number"
+                                    min="1"
+                                    value={addedProduct.quantity}
+                                    onChange={(e) => {
+                                      const newQuantity = Math.max(1, parseInt(e.target.value) || 1);
+                                      setAddedCatalogProducts(prev => prev.map((p, i) => 
+                                        i === index ? { ...p, quantity: newQuantity } : p
+                                      ));
+                                      updateDescription({ quantity: newQuantity });
+                                    }}
+                                    className="h-8 text-sm"
+                                  />
+                                </div>
+                                
+                                {/* Tamanho */}
+                                <div className="space-y-1">
+                                  <Label htmlFor={`size-${index}`} className="text-xs text-gray-600">
+                                    Tamanho:
+                                  </Label>
+                                  <Select
+                                    value={addedProduct.size || "Não aplicável"}
+                                    onValueChange={(newSize) => {
+                                      setAddedCatalogProducts(prev => prev.map((p, i) => 
+                                        i === index ? { ...p, size: newSize } : p
+                                      ));
+                                      updateDescription({ size: newSize });
+                                    }}
+                                  >
+                                    <SelectTrigger className="h-8 text-sm">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {CLOTHING_SIZES.map((size) => (
+                                        <SelectItem key={size.value} value={size.value}>
+                                          {size.label}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                
+                                {/* Cor */}
+                                <div className="space-y-1">
+                                  <Label htmlFor={`color-${index}`} className="text-xs text-gray-600">
+                                    Cor:
+                                  </Label>
+                                  <Input
+                                    id={`color-${index}`}
+                                    type="text"
+                                    placeholder="Ex: Preto, Azul..."
+                                    value={addedProduct.color || ""}
+                                    onChange={(e) => {
+                                      const newColor = e.target.value;
+                                      setAddedCatalogProducts(prev => prev.map((p, i) => 
+                                        i === index ? { ...p, color: newColor } : p
+                                      ));
+                                      updateDescription({ color: newColor });
+                                    }}
+                                    className="h-8 text-sm"
+                                    disabled={addedProduct.size === "Não aplicável"}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 {selectedProduct && (
                   <div className="mt-3 text-sm text-blue-700 bg-blue-100 p-2 rounded">
@@ -971,7 +1308,15 @@ export default function NovoPedido() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="qty">Quantidade</Label>
-                  <Input id="qty" type="number" min="1" value={quantity} onChange={(e) => setQuantity(Number(e.target.value))} />
+                  <Input 
+                    id="qty" 
+                    type="number" 
+                    min="1" 
+                    value={quantity} 
+                    onChange={(e) => setQuantity(Number(e.target.value))}
+                    disabled={addedCatalogProducts.length > 0 || addedServices.length > 0}
+                    title={addedCatalogProducts.length > 0 ? "Quantidade controlada pelos produtos do catálogo" : addedServices.length > 0 ? "Quantidade controlada pelos serviços rápidos" : ""}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="size">Tamanho</Label>
