@@ -53,25 +53,26 @@ export function ClientSearch({
   );
 
   const handleSelectClient = (client: { id: string; name: string; phone?: string; email?: string }) => {
-    // Usar setTimeout para garantir que as atualizações de estado aconteçam antes de fechar o popover
-    // Isso evita erros de removeChild durante a desmontagem do componente
-    try {
-      onChange(client.name);
-      if (onPhoneChange && client.phone) {
-        onPhoneChange(client.phone);
-      }
-      
-      // Fechar popover e limpar busca de forma assíncrona para evitar conflitos
-      setTimeout(() => {
-        setOpen(false);
-        setSearchTerm("");
-      }, 0);
-    } catch (error) {
-      // Se houver erro, tentar fechar o popover de qualquer forma
-      console.warn('Erro ao selecionar cliente:', error);
-      setOpen(false);
-      setSearchTerm("");
+    // Atualizar valores de forma síncrona primeiro
+    onChange(client.name);
+    if (onPhoneChange && client.phone) {
+      onPhoneChange(client.phone);
     }
+    
+    // Fechar popover e limpar busca de forma assíncrona
+    // Usar múltiplos requestAnimationFrame para garantir que tudo seja processado
+    // antes de desmontar o componente
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        try {
+          setOpen(false);
+          setSearchTerm("");
+        } catch (error) {
+          // Ignorar erros de setState durante desmontagem
+          console.warn('Erro ao fechar popover (ignorado):', error);
+        }
+      });
+    });
   };
 
   const handleCreateNewClient = async () => {
@@ -112,7 +113,20 @@ export function ClientSearch({
       <Label htmlFor="client">
         Cliente {required && <span className="text-red-500">*</span>}
       </Label>
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover 
+        open={open} 
+        onOpenChange={(newOpen) => {
+          // Proteção: só fechar se não estiver processando seleção
+          if (!newOpen) {
+            // Usar requestAnimationFrame para fechar de forma segura
+            requestAnimationFrame(() => {
+              setOpen(false);
+            });
+          } else {
+            setOpen(newOpen);
+          }
+        }}
+      >
         <PopoverTrigger asChild>
           <Button
             variant="outline"
@@ -164,7 +178,16 @@ export function ClientSearch({
                   <CommandItem
                     key={client.id}
                     value={client.name}
-                    onSelect={() => handleSelectClient(client)}
+                    onSelect={(currentValue) => {
+                      // Prevenir comportamento padrão do Command que pode causar conflito
+                      // Usar setTimeout para garantir que a seleção aconteça após o render atual
+                      setTimeout(() => {
+                        const selectedClient = filteredClients.find(c => c.name === currentValue);
+                        if (selectedClient) {
+                          handleSelectClient(selectedClient);
+                        }
+                      }, 0);
+                    }}
                     className="flex items-center justify-between"
                   >
                     <div className="flex items-center gap-2">
