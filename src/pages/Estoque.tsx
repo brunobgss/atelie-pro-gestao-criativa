@@ -8,6 +8,7 @@ import { performanceMonitor } from "@/utils/performanceMonitor";
 import { logger } from "@/utils/logger";
 import { validateForm, validateMoney, validateName, validateQuantity } from "@/utils/validators";
 import { formatCurrency } from "@/utils/formatCurrency";
+import { criarMovimentacao } from "@/integrations/supabase/movimentacoes-estoque";
 import {
   getInventoryAlertPreferences,
   listInventoryAlertLogs,
@@ -510,27 +511,50 @@ export default function Estoque() {
     }
     if (editForm.notes) metadata.notes = editForm.notes;
 
+    // 1) Atualizar metadados/campos (sem mexer direto no saldo)
     const result = await updateInventoryItem(editForm.id, {
-        name: editForm.name,
-      quantity: numericQuantity,
-        unit: editForm.unit,
+      name: editForm.name,
+      unit: editForm.unit,
       min_quantity: numericMin,
       item_type: editForm.itemType,
       category: editForm.category || null,
       supplier: editForm.supplier || null,
       cost_per_unit: numericCost,
       metadata,
-      });
+    });
       
-      if (result.ok) {
-      toast.success("Item atualizado com sucesso");
-        setIsEditDialogOpen(false);
-        setEditingItem(null);
-      invalidateRelated("inventory_items");
-      queryClient.invalidateQueries({ queryKey: ["inventory"] });
-      } else {
-        toast.error(result.error || "Erro ao atualizar item");
+    if (!result.ok) {
+      toast.error(result.error || "Erro ao atualizar item");
+      return;
+    }
+
+    // 2) Ajustar saldo via movimentação (auditoria) se necessário
+    const previousQuantity = Number(editingItem.quantity ?? 0);
+    const delta = numericQuantity - previousQuantity;
+    if (delta !== 0) {
+      const ajusteSign = delta >= 0 ? "incremento" : "decremento";
+      const ajusteQuantidade = Math.abs(delta);
+
+      const mov = await criarMovimentacao({
+        inventory_item_id: editForm.id,
+        tipo_movimentacao: "ajuste",
+        ajuste_sign: ajusteSign,
+        quantidade: ajusteQuantidade,
+        motivo: `Ajuste manual via edição do item: ${editForm.name}`,
+        origem: "ajuste_manual",
+        origem_id: null,
+      } as any);
+
+      if (!mov.ok) {
+        toast.warning("Item atualizado, mas não foi possível registrar a movimentação de ajuste");
       }
+    }
+
+    toast.success("Item atualizado com sucesso");
+    setIsEditDialogOpen(false);
+    setEditingItem(null);
+    invalidateRelated("inventory_items");
+    queryClient.invalidateQueries({ queryKey: ["inventory"] });
   };
 
   const handleDeleteItem = async (item: InventoryRow) => {

@@ -29,6 +29,7 @@ import OrcamentoImpressaoNovo from "./pages/OrcamentoImpressaoNovo";
 import VisualizarOrcamento from "./pages/VisualizarOrcamento";
 import Clientes from "./pages/Clientes";
 import Estoque from "./pages/Estoque";
+import DuplicadosEstoque from "./pages/DuplicadosEstoque";
 import CatalogoProdutos from "./pages/CatalogoProdutos";
 import CalculadoraPrecos from "./pages/CalculadoraPrecos";
 import Relatorios from "./pages/Relatorios";
@@ -109,6 +110,7 @@ function App() {
                     <Route path="orcamentos/:id/visualizar" element={<VisualizarOrcamento />} />
                     <Route path="clientes" element={<Clientes />} />
                     <Route path="estoque" element={<Estoque />} />
+                    <Route path="estoque/duplicados" element={<DuplicadosEstoque />} />
                     <Route path="catalogo" element={<CatalogoProdutos />} />
                     <Route path="calculadora" element={<CalculadoraPrecos />} />
                     <Route path="relatorios" element={<Relatorios />} />

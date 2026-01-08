@@ -75,6 +75,7 @@ const menuItems: MenuItem[] = [
     icon: Archive,
     subItems: [
       { title: "Movimentações Estoque", url: "/movimentacoes-estoque", icon: Package },
+      { title: "Duplicados do Estoque", url: "/estoque/duplicados", icon: AlertTriangle },
     ],
   },
   {

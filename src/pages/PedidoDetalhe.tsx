@@ -85,6 +85,37 @@ export default function PedidoDetalhe() {
     [statusDetails]
   );
 
+  // Exibir avisos de estoque (se existirem) após redirecionamento do "Novo Pedido".
+  useEffect(() => {
+    if (!id) return;
+    const key = `inventoryWarnings:${id}`;
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return;
+      localStorage.removeItem(key);
+
+      const warnings = JSON.parse(raw) as Array<{ level?: string; item_name?: string; message?: string }>;
+      if (!Array.isArray(warnings) || warnings.length === 0) return;
+
+      const negative = warnings.filter((w) => w.level === "negative").length;
+      const low = warnings.filter((w) => w.level === "low").length;
+      const preview = warnings
+        .slice(0, 3)
+        .map((w) => `- ${w.item_name ?? "Item"}: ${w.message ?? "Atenção no estoque"}`)
+        .join("\n");
+
+      toast.warning(
+        `Atenção no estoque: ${negative} item(ns) ficaram negativos e ${low} item(ns) ficaram abaixo do mínimo.`,
+        {
+          duration: 8000,
+          description: preview,
+        }
+      );
+    } catch {
+      // Ignorar parsing/storage errors
+    }
+  }, [id]);
+
   const handleOpenCustomizeStatuses = useCallback(() => {
     setStatusDraft(statusDetails.map((detail) => ({ ...detail })));
     setIsCustomizeDialogOpen(true);

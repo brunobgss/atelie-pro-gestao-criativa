@@ -9,6 +9,7 @@ import { createProduct, getProducts, updateProduct } from "@/integrations/supaba
 import { createInventoryItem, listInventory, updateInventoryItem } from "@/integrations/supabase/inventory";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { criarMovimentacao } from "@/integrations/supabase/movimentacoes-estoque";
 
 interface ImportedProduct {
   name: string;
@@ -591,12 +592,12 @@ Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50,Camiseta Básica,,1.
 
     // Buscar itens de estoque para vinculação automática (mapa por id e por nome normalizado)
     let inventoryItems: Array<{ id: string; name: string; unit?: string | null; item_type?: string | null; quantity?: number | null }> = [];
-    const inventoryById = new Map<string, { id: string; name: string; unit?: string | null; item_type?: string | null; quantity?: number | null }>();
-    const inventoryByKey = new Map<string, Array<{ id: string; name: string; unit?: string | null; item_type?: string | null; quantity?: number | null }>>();
+    const inventoryById = new Map<string, { id: string; name: string; unit?: string | null; item_type?: string | null; quantity?: number | null; min_quantity?: number | null }>();
+    const inventoryByKey = new Map<string, Array<{ id: string; name: string; unit?: string | null; item_type?: string | null; quantity?: number | null; min_quantity?: number | null }>>();
     try {
       inventoryItems = await listInventory();
       for (const item of inventoryItems) {
-        const entry = { id: item.id, name: item.name, unit: item.unit, item_type: item.item_type, quantity: (item as any).quantity ?? null };
+        const entry = { id: item.id, name: item.name, unit: item.unit, item_type: item.item_type, quantity: (item as any).quantity ?? null, min_quantity: (item as any).min_quantity ?? null };
         inventoryById.set(item.id, entry);
         const key = normalizeKey(item.name);
         const list = inventoryByKey.get(key) ?? [];
@@ -654,7 +655,7 @@ Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50,Camiseta Básica,,1.
 
                   // Resolver item alvo (id escolhido, id do CSV, nome -> candidato único, criar)
                   let resolvedId: string | null = null;
-                  let resolvedItem = null as null | { id: string; name: string; unit?: string | null; item_type?: string | null };
+                  let resolvedItem = null as null | { id: string; name: string; unit?: string | null; item_type?: string | null; quantity?: number | null; min_quantity?: number | null };
 
                   if (product.resolvedInventoryItemId && product.resolvedInventoryItemId !== "__create__" && product.resolvedInventoryItemId !== "__skip__") {
                     resolvedId = product.resolvedInventoryItemId;
@@ -726,7 +727,7 @@ Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50,Camiseta Básica,,1.
                     }
                   }
 
-                  // Sobrescrever estoque existente (opcional) usando a coluna Estoque
+                  // Sobrescrever saldo existente (opcional) usando a coluna Estoque
                   if (
                     resolvedItem &&
                     !createdStockByKey.has(normalizeKey(resolvedItem.name)) &&
@@ -735,11 +736,29 @@ Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50,Camiseta Básica,,1.
                     typeof product.stockQuantity === "number"
                   ) {
                     const updatedUnit = product.stockUnit?.trim() || resolvedItem.unit || undefined;
-                    await updateInventoryItem(resolvedItem.id, {
-                      quantity: product.stockQuantity,
-                      unit: updatedUnit,
-                    });
-                    updatedStockById.set(resolvedItem.id, { id: resolvedItem.id, name: resolvedItem.name, quantity: product.stockQuantity, unit: updatedUnit });
+
+                    // Ajuste via movimentação (auditoria) para chegar no valor absoluto do CSV
+                    const currentQty = typeof resolvedItem.quantity === "number" ? Number(resolvedItem.quantity) : 0;
+                    const targetQty = Number(product.stockQuantity);
+                    const delta = targetQty - currentQty;
+                    if (delta !== 0) {
+                      await criarMovimentacao({
+                        inventory_item_id: resolvedItem.id,
+                        tipo_movimentacao: "ajuste",
+                        ajuste_sign: delta >= 0 ? "incremento" : "decremento",
+                        quantidade: Math.abs(delta),
+                        motivo: `Ajuste via importação de produtos (CSV)`,
+                        origem: "importacao_produtos",
+                        origem_id: null,
+                      } as any);
+                    }
+
+                    // Atualizar unidade (se enviada no CSV)
+                    if (updatedUnit) {
+                      await updateInventoryItem(resolvedItem.id, { unit: updatedUnit });
+                    }
+
+                    updatedStockById.set(resolvedItem.id, { id: resolvedItem.id, name: resolvedItem.name, quantity: targetQty, unit: updatedUnit });
                   }
 
                   if (resolvedItem) {

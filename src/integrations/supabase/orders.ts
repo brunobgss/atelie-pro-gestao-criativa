@@ -38,6 +38,22 @@ export type OrderPersonalizationRow = {
   updated_at?: string | null;
 };
 
+export type InventoryWarningLevel = "negative" | "low";
+
+export type InventoryWarning = {
+  inventory_item_id: string;
+  item_name: string;
+  unit: string;
+  level: InventoryWarningLevel;
+  delta: number;
+  quantity_before: number;
+  quantity_after: number;
+  message: string;
+  origem: "pedido";
+  origem_id: string; // order UUID
+  origem_code: string; // order code
+};
+
 export type OrderPersonalizationInput = {
   person_name: string;
   size?: string;
@@ -176,7 +192,8 @@ export async function baixarEstoqueAutomatico(
   orderCode: string,
   orderId: string, // ID do pedido (UUID) para origem_id
   empresaId: string
-): Promise<void> {
+): Promise<InventoryWarning[]> {
+  const warnings: InventoryWarning[] = [];
   try {
     console.error(`📦 Iniciando baixa automática de estoque para produto ${productId}, quantidade: ${quantity}`);
     
@@ -184,14 +201,14 @@ export async function baixarEstoqueAutomatico(
     const product = await getProductById(productId);
     if (!product) {
       console.warn(`⚠️ Produto ${productId} não encontrado, pulando baixa de estoque`);
-      return;
+      return warnings;
     }
 
     // Buscar todos os itens de estoque da empresa
     const allInventoryItems = await listInventory();
     if (allInventoryItems.length === 0) {
       console.log("ℹ️ Nenhum item de estoque encontrado, pulando baixa");
-      return;
+      return warnings;
     }
 
     const itemsParaBaixar: Array<{ item: typeof allInventoryItems[0]; quantidade: number }> = [];
@@ -417,7 +434,7 @@ export async function baixarEstoqueAutomatico(
         inventoryItemsAvailable: allInventoryItems.length,
         inventoryItemsNames: allInventoryItems.map(i => i.name)
       });
-      return;
+      return warnings;
     }
 
     console.log(`📝 Criando ${itemsParaBaixar.length} movimentação(ões) de saída...`);
@@ -458,6 +475,50 @@ export async function baixarEstoqueAutomatico(
             });
           }
           successCount++;
+
+          // Avisos de falta/baixo estoque:
+          // - Quando o trigger do banco permitir negativo, quantidade_atual virá negativa.
+          // - Enquanto isso, calculamos um "after esperado" para avisar mesmo se o banco travar em 0.
+          const before =
+            typeof result.data?.quantidade_anterior === "number"
+              ? Number(result.data.quantidade_anterior)
+              : Number((item as any).quantity ?? 0);
+          const afterDb =
+            typeof result.data?.quantidade_atual === "number"
+              ? Number(result.data.quantidade_atual)
+              : before - Number(quantidade ?? 0);
+          const afterExpected = before - Number(quantidade ?? 0);
+          const after = Math.min(afterDb, afterExpected); // pega o mais "realista" (pode ser negativo)
+
+          if (after < 0) {
+            warnings.push({
+              inventory_item_id: item.id,
+              item_name: item.name,
+              unit: item.unit,
+              level: "negative",
+              delta: -Number(quantidade ?? 0),
+              quantity_before: before,
+              quantity_after: after,
+              message: `Faltou estoque de "${item.name}": saldo ficou ${after.toFixed(2)} ${item.unit}.`,
+              origem: "pedido",
+              origem_id: orderId,
+              origem_code: orderCode,
+            });
+          } else if (typeof (item as any).min_quantity === "number" && after < Number((item as any).min_quantity)) {
+            warnings.push({
+              inventory_item_id: item.id,
+              item_name: item.name,
+              unit: item.unit,
+              level: "low",
+              delta: -Number(quantidade ?? 0),
+              quantity_before: before,
+              quantity_after: after,
+              message: `Estoque baixo de "${item.name}": saldo ficou ${after.toFixed(2)} ${item.unit} (mínimo ${Number((item as any).min_quantity).toFixed(2)}).`,
+              origem: "pedido",
+              origem_id: orderId,
+              origem_code: orderCode,
+            });
+          }
         } else {
           console.error(`❌ Erro ao criar baixa para ${item.name}:`, result.error);
           errorCount++;
@@ -478,9 +539,11 @@ export async function baixarEstoqueAutomatico(
       sucesso: successCount,
       erros: errorCount
     });
+    return warnings;
   } catch (error: any) {
     console.error("❌ Erro na baixa automática de estoque:", error);
     // Não falhar o pedido por causa de erro na baixa de estoque
+    return warnings;
   }
 }
 
@@ -491,7 +554,8 @@ async function baixarEstoqueServico(
   orderCode: string,
   orderId: string, // ID do pedido (UUID) para origem_id
   empresaId: string
-): Promise<void> {
+): Promise<InventoryWarning[]> {
+  const warnings: InventoryWarning[] = [];
   try {
     console.log(`🔧 Iniciando baixa automática de estoque para serviço ${servicoId}, quantidade: ${quantity}`);
     
@@ -499,14 +563,14 @@ async function baixarEstoqueServico(
     const servico = await getServico(servicoId);
     if (!servico) {
       console.warn(`⚠️ Serviço ${servicoId} não encontrado, pulando baixa de estoque`);
-      return;
+      return warnings;
     }
 
     // Buscar todos os itens de estoque da empresa
     const allInventoryItems = await listInventory();
     if (allInventoryItems.length === 0) {
       console.log("ℹ️ Nenhum item de estoque encontrado, pulando baixa");
-      return;
+      return warnings;
     }
 
     const itemsParaBaixar: Array<{ item: typeof allInventoryItems[0]; quantidade: number }> = [];
@@ -666,7 +730,7 @@ async function baixarEstoqueServico(
     // Criar movimentações de saída para cada item encontrado
     if (itemsParaBaixar.length === 0) {
       console.log("ℹ️ Nenhum item de estoque correspondente encontrado para baixa automática");
-      return;
+      return warnings;
     }
 
     console.log(`📝 Criando ${itemsParaBaixar.length} movimentação(ões) de saída...`);
@@ -706,6 +770,47 @@ async function baixarEstoqueServico(
             });
           }
           successCount++;
+
+          const before =
+            typeof result.data?.quantidade_anterior === "number"
+              ? Number(result.data.quantidade_anterior)
+              : Number((item as any).quantity ?? 0);
+          const afterDb =
+            typeof result.data?.quantidade_atual === "number"
+              ? Number(result.data.quantidade_atual)
+              : before - Number(quantidade ?? 0);
+          const afterExpected = before - Number(quantidade ?? 0);
+          const after = Math.min(afterDb, afterExpected);
+
+          if (after < 0) {
+            warnings.push({
+              inventory_item_id: item.id,
+              item_name: item.name,
+              unit: item.unit,
+              level: "negative",
+              delta: -Number(quantidade ?? 0),
+              quantity_before: before,
+              quantity_after: after,
+              message: `Faltou estoque de "${item.name}": saldo ficou ${after.toFixed(2)} ${item.unit}.`,
+              origem: "pedido",
+              origem_id: orderId,
+              origem_code: orderCode,
+            });
+          } else if (typeof (item as any).min_quantity === "number" && after < Number((item as any).min_quantity)) {
+            warnings.push({
+              inventory_item_id: item.id,
+              item_name: item.name,
+              unit: item.unit,
+              level: "low",
+              delta: -Number(quantidade ?? 0),
+              quantity_before: before,
+              quantity_after: after,
+              message: `Estoque baixo de "${item.name}": saldo ficou ${after.toFixed(2)} ${item.unit} (mínimo ${Number((item as any).min_quantity).toFixed(2)}).`,
+              origem: "pedido",
+              origem_id: orderId,
+              origem_code: orderCode,
+            });
+          }
         } else {
           console.error(`❌ Erro ao criar baixa para ${item.name}:`, result.error);
           errorCount++;
@@ -726,9 +831,11 @@ async function baixarEstoqueServico(
       sucesso: successCount,
       erros: errorCount
     });
+    return warnings;
   } catch (error: any) {
     console.error("❌ Erro na baixa automática de estoque do serviço:", error);
     // Não falhar o pedido por causa de erro na baixa de estoque
+    return warnings;
   }
 }
 
@@ -750,7 +857,7 @@ export async function createOrder(input: {
   quantity?: number; // Quantidade vendida - DEPRECATED: usar products
   products?: Array<{ id: string; quantity: number }>; // Lista de produtos do catálogo com suas quantidades
   services?: Array<{ id: string; quantity: number }>; // Lista de serviços rápidos com suas quantidades
-}): Promise<{ ok: boolean; id?: string; error?: string }> {
+}): Promise<{ ok: boolean; id?: string; error?: string; inventoryWarnings?: InventoryWarning[] }> {
   try {
     const code = input.code ?? generateOrderCode();
     console.error("📝 Criando pedido - Dados recebidos:", {
@@ -878,6 +985,8 @@ export async function createOrder(input: {
       shouldProcessInventory
     });
     
+    const inventoryWarnings: InventoryWarning[] = [];
+
     if (shouldProcessInventory) {
       // Priorizar lista de produtos (nova forma)
       const productsToProcess = input.products && input.products.length > 0
@@ -905,13 +1014,14 @@ export async function createOrder(input: {
 
           for (const product of productsToProcess) {
             try {
-              await baixarEstoqueAutomatico(
+              const warnings = await baixarEstoqueAutomatico(
                 product.id,
                 product.quantity,
                 orderData.code,
                 orderData.id, // Passar ID do pedido (UUID) para origem_id
                 empresa_id
               );
+              if (warnings?.length) inventoryWarnings.push(...warnings);
               successCount++;
               console.error(`✅ Baixa de estoque concluída para produto ${product.id} (quantidade: ${product.quantity})`);
             } catch (error) {
@@ -952,13 +1062,14 @@ export async function createOrder(input: {
 
         for (const service of input.services) {
           try {
-            await baixarEstoqueServico(
+            const warnings = await baixarEstoqueServico(
               service.id,
               service.quantity,
               orderData.code,
               orderData.id,
               empresa_id
             );
+            if (warnings?.length) inventoryWarnings.push(...warnings);
             successCount++;
             console.log(`✅ Baixa de estoque concluída para serviço ${service.id} (quantidade: ${service.quantity})`);
           } catch (error) {
@@ -974,7 +1085,7 @@ export async function createOrder(input: {
       }
     }
 
-    return { ok: true, id: orderData.id };
+    return { ok: true, id: orderData.id, inventoryWarnings: inventoryWarnings.length ? inventoryWarnings : undefined };
   } catch (e: unknown) {
     console.error("Erro ao criar pedido:", e);
     return { ok: false, error: (e as any)?.message || "Erro ao criar pedido" };
