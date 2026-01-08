@@ -5,7 +5,8 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Upload, FileText, CheckCircle2, XCircle, Loader2, AlertCircle, Download, HelpCircle, Info, X } from "lucide-react";
 import { toast } from "sonner";
-import { createProduct, getProducts } from "@/integrations/supabase/products";
+import { createProduct, getProducts, updateProduct } from "@/integrations/supabase/products";
+import { listInventory } from "@/integrations/supabase/inventory";
 
 interface ImportedProduct {
   name: string;
@@ -19,6 +20,8 @@ interface ImportedProduct {
   isDuplicate?: boolean;
   importError?: string;
   status?: 'pending' | 'success' | 'error' | 'duplicate';
+  inventoryItemName?: string;
+  quantityPerUnit?: number;
 }
 
 interface ImportProductsProps {
@@ -42,11 +45,11 @@ export function ImportProducts({ onImportComplete }: ImportProductsProps) {
   const cancelImportRef = useRef(false);
 
   const downloadExampleCSV = () => {
-    const csvContent = `Nome,Tipo,Materiais,Horas Trabalho,Preço Unitário,Margem Lucro (%)
-Camiseta Polo Bordada,Bordado,"linha, tecido",1.5,25.00,35
-Vestido Personalizado,Personalizado,"tecido, linha, zíper",3.0,120.00,40
-Uniforme Escolar,Uniforme,"tecido, botões, etiqueta",2.0,85.00,30
-Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50`;
+    const csvContent = `Nome,Tipo,Materiais,Horas Trabalho,Preço Unitário,Margem Lucro (%),Item Estoque,Quantidade por Unidade
+Camiseta Polo Bordada,Bordado,"linha, tecido",1.5,25.00,35,Tecido Algodão,2.5
+Vestido Personalizado,Personalizado,"tecido, linha, zíper",3.0,120.00,40,Tecido Seda,3.0
+Uniforme Escolar,Uniforme,"tecido, botões, etiqueta",2.0,85.00,30,Tecido Algodão,2.0
+Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50,Camiseta Básica,1.0`;
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -182,6 +185,8 @@ Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50`;
       const workHoursIndex = headers.findIndex(h => h.includes('horas') || h.includes('hours') || h.includes('tempo') || h.includes('work'));
       const unitPriceIndex = headers.findIndex(h => h.includes('preço') || h.includes('price') || h.includes('preco') || h.includes('valor') || h.includes('unit'));
       const profitMarginIndex = headers.findIndex(h => h.includes('margem') || h.includes('margin') || h.includes('lucro') || h.includes('profit'));
+      const inventoryItemIndex = headers.findIndex(h => h.includes('estoque') || h.includes('inventory') || h.includes('item estoque') || h.includes('item_estoque'));
+      const quantityPerUnitIndex = headers.findIndex(h => h.includes('quantidade por unidade') || h.includes('quantity per unit') || h.includes('qtd por unidade') || h.includes('qtd_por_unidade'));
 
       if (nameIndex === -1) {
         toast.error("Não foi encontrada uma coluna 'Nome' no arquivo. Verifique o cabeçalho.");
@@ -208,6 +213,8 @@ Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50`;
         const workHoursStr = workHoursIndex >= 0 ? row[workHoursIndex]?.trim() : '0';
         const unitPriceStr = unitPriceIndex >= 0 ? row[unitPriceIndex]?.trim() : '0';
         const profitMarginStr = profitMarginIndex >= 0 ? row[profitMarginIndex]?.trim() : '0';
+        const inventoryItemName = inventoryItemIndex >= 0 ? row[inventoryItemIndex]?.trim() : '';
+        const quantityPerUnitStr = quantityPerUnitIndex >= 0 ? row[quantityPerUnitIndex]?.trim() : '1';
 
         const errors: string[] = [];
 
@@ -249,6 +256,12 @@ Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50`;
           errors.push("Margem de lucro deve estar entre 0 e 100");
         }
 
+        // Processar quantidade por unidade (opcional)
+        const quantityPerUnit = quantityPerUnitStr ? parseFloat(quantityPerUnitStr.replace(',', '.')) : undefined;
+        if (quantityPerUnit !== undefined && quantityPerUnit <= 0) {
+          errors.push("Quantidade por unidade deve ser maior que zero");
+        }
+
         products.push({
           name,
           type,
@@ -257,7 +270,9 @@ Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50`;
           unit_price,
           profit_margin,
           row: i + 1,
-          errors
+          errors,
+          inventoryItemName: inventoryItemName || undefined,
+          quantityPerUnit: quantityPerUnit || undefined
         });
       }
 
@@ -328,6 +343,14 @@ Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50`;
       return;
     }
 
+    // Buscar itens de estoque para vinculação automática
+    let inventoryItems: Array<{ id: string; name: string }> = [];
+    try {
+      inventoryItems = await listInventory();
+    } catch (error) {
+      console.warn("Não foi possível buscar itens de estoque para vinculação automática:", error);
+    }
+
     // Importar produtos em lotes para não sobrecarregar
     const batchSize = 10;
     const totalProducts = productsToImport.length;
@@ -354,8 +377,33 @@ Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50`;
               profit_margin: product.profit_margin
             });
 
-            if (result.ok) {
+            if (result.ok && result.id) {
               successCount++;
+              
+              // Vincular estoque automaticamente se especificado
+              if (product.inventoryItemName && product.quantityPerUnit && product.quantityPerUnit > 0) {
+                try {
+                  // Buscar item de estoque pelo nome (case-insensitive)
+                  const inventoryItem = inventoryItems.find(item => 
+                    item.name.toLowerCase().trim() === product.inventoryItemName!.toLowerCase().trim()
+                  );
+
+                  if (inventoryItem) {
+                    // Vincular estoque ao produto
+                    await updateProduct(result.id, {
+                      inventory_items: [inventoryItem.id],
+                      inventory_quantities: [product.quantityPerUnit]
+                    });
+                    console.log(`✅ Estoque vinculado automaticamente: ${product.name} -> ${inventoryItem.name}`);
+                  } else {
+                    console.warn(`⚠️ Item de estoque "${product.inventoryItemName}" não encontrado para o produto "${product.name}". Produto criado sem vínculo.`);
+                  }
+                } catch (inventoryError) {
+                  console.warn(`⚠️ Erro ao vincular estoque para produto "${product.name}":`, inventoryError);
+                  // Não falhar a importação se a vinculação falhar
+                }
+              }
+
               // Atualizar status do produto
               setImportedProducts(prev => prev.map(p => 
                 p.row === product.row ? { ...p, status: 'success' } : p
@@ -492,7 +540,7 @@ Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50`;
             Importar Produtos
           </DialogTitle>
           <DialogDescription>
-            Importe uma lista de produtos de um arquivo CSV ou Excel. O arquivo deve ter colunas: Nome, Tipo, Materiais (opcional), Horas Trabalho, Preço Unitário, Margem Lucro (%). <strong>Limite: até 1000 produtos por importação.</strong>
+            Importe uma lista de produtos de um arquivo CSV ou Excel. O arquivo deve ter colunas: Nome, Tipo, Materiais (opcional), Horas Trabalho, Preço Unitário, Margem Lucro (%). Colunas opcionais: Item Estoque, Quantidade por Unidade (para vinculação automática de estoque). <strong>Limite: até 1000 produtos por importação.</strong>
           </DialogDescription>
         </DialogHeader>
 
@@ -527,6 +575,8 @@ Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50`;
                     <li>Materiais: separar por vírgula (ex: "linha, tecido, botões")</li>
                     <li>Horas de trabalho, Preço e Margem: use números decimais (ponto ou vírgula)</li>
                     <li>Margem de lucro deve estar entre 0 e 100</li>
+                    <li><strong>Item Estoque</strong> (opcional): Nome do item de estoque para vincular automaticamente</li>
+                    <li><strong>Quantidade por Unidade</strong> (opcional): Quantidade do item de estoque consumida por unidade do produto</li>
                   </ol>
                 </div>
 
@@ -535,13 +585,13 @@ Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50`;
                   <h4 className="font-medium text-sm text-blue-900">📄 Exemplo de formato CSV:</h4>
                   <div className="bg-white border border-blue-200 rounded p-3 font-mono text-xs overflow-x-auto">
                     <div className="text-blue-900 font-semibold mb-1">Cabeçalho (primeira linha):</div>
-                    <div className="text-gray-700 mb-3">Nome,Tipo,Materiais,Horas Trabalho,Preço Unitário,Margem Lucro (%)</div>
+                    <div className="text-gray-700 mb-3">Nome,Tipo,Materiais,Horas Trabalho,Preço Unitário,Margem Lucro (%),Item Estoque,Quantidade por Unidade</div>
                     
                     <div className="text-blue-900 font-semibold mb-1">Dados (linhas seguintes):</div>
                     <div className="text-gray-700 space-y-1">
-                      <div>Camiseta Polo Bordada,Bordado,"linha, tecido",1.5,25.00,35</div>
-                      <div>Vestido Personalizado,Personalizado,"tecido, linha, zíper",3.0,120.00,40</div>
-                      <div>Uniforme Escolar,Uniforme,"tecido, botões",2.0,85.00,30</div>
+                      <div>Camiseta Polo Bordada,Bordado,"linha, tecido",1.5,25.00,35,Tecido Algodão,2.5</div>
+                      <div>Vestido Personalizado,Personalizado,"tecido, linha, zíper",3.0,120.00,40,Tecido Seda,3.0</div>
+                      <div>Uniforme Escolar,Uniforme,"tecido, botões",2.0,85.00,30,Tecido Algodão,2.0</div>
                     </div>
                   </div>
                 </div>
@@ -558,7 +608,9 @@ Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50`;
                           <th className="p-2 text-left border-r border-blue-200">Materiais</th>
                           <th className="p-2 text-left border-r border-blue-200">Horas</th>
                           <th className="p-2 text-left border-r border-blue-200">Preço</th>
-                          <th className="p-2 text-left">Margem %</th>
+                          <th className="p-2 text-left border-r border-blue-200">Margem %</th>
+                          <th className="p-2 text-left border-r border-blue-200">Estoque</th>
+                          <th className="p-2 text-left">Qtd/Un</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -568,7 +620,9 @@ Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50`;
                           <td className="p-2 border-r border-blue-200">linha, tecido</td>
                           <td className="p-2 border-r border-blue-200">1.5</td>
                           <td className="p-2 border-r border-blue-200">25.00</td>
-                          <td className="p-2">35</td>
+                          <td className="p-2 border-r border-blue-200">35</td>
+                          <td className="p-2 border-r border-blue-200">Tecido Algodão</td>
+                          <td className="p-2">2.5</td>
                         </tr>
                       </tbody>
                     </table>
@@ -586,6 +640,8 @@ Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50`;
                       <li>Use vírgulas para separar materiais dentro de aspas: "linha, tecido"</li>
                       <li>Valores decimais podem usar ponto ou vírgula: 25.50 ou 25,50</li>
                       <li>Margem de lucro é em porcentagem (0-100)</li>
+                      <li><strong>Item Estoque</strong>: Deve corresponder exatamente ao nome de um item cadastrado no estoque</li>
+                      <li><strong>Quantidade por Unidade</strong>: Use números decimais (ex: 2.5 significa que cada produto consome 2.5 unidades do item de estoque)</li>
                     </ul>
                   </div>
                 </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -122,24 +122,79 @@ export default function NovoPedido() {
   const [color, setColor] = useState<string>("");
   const [size, setSize] = useState<string>("");
   const [type, setType] = useState<string>("");
+  const [totalValue, setTotalValue] = useState<number>(0);
+  const valueInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Atualizar valor total quando produtos adicionados mudarem (cada produto tem sua própria quantidade)
-  useEffect(() => {
+  // Calcular valor total (useMemo para recalcular quando necessário)
+  const calculatedTotal = useMemo(() => {
+    let total = 0;
+    
+    // Somar produtos do catálogo
     if (addedCatalogProducts.length > 0) {
-      // Calcular valor total: soma dos preços × quantidade individual de cada produto
-      const totalValue = addedCatalogProducts.reduce((sum, product) => 
+      const productsTotal = addedCatalogProducts.reduce((sum, product) => 
         sum + (product.price * product.quantity), 0
       );
-      
-      const valueInput = document.getElementById("value") as HTMLInputElement;
-      if (valueInput) {
-        valueInput.value = totalValue.toFixed(2);
-        valueInput.dispatchEvent(new Event('input', { bubbles: true }));
-        valueInput.dispatchEvent(new Event('change', { bubbles: true }));
-        console.log(`💰 Valor total atualizado: R$ ${totalValue.toFixed(2)} (${addedCatalogProducts.length} produto(s))`);
-      }
+      total += productsTotal;
+      logger.debug(`📦 Produtos: ${addedCatalogProducts.length} item(ns) = R$ ${productsTotal.toFixed(2)}`);
     }
-  }, [addedCatalogProducts]);
+    
+    // Somar serviços rápidos
+    if (addedServices.length > 0) {
+      const servicesTotal = addedServices.reduce((sum, service) => 
+        sum + (service.price * service.quantity), 0
+      );
+      total += servicesTotal;
+      logger.debug(`🔧 Serviços: ${addedServices.length} item(ns) = R$ ${servicesTotal.toFixed(2)}`);
+    }
+    
+    return total;
+  }, [addedCatalogProducts, addedServices]);
+
+  // Atualizar estado do valor total
+  useEffect(() => {
+    setTotalValue(calculatedTotal);
+  }, [calculatedTotal]);
+
+  // Atualizar campo de valor no DOM quando o total mudar
+  useEffect(() => {
+    const updateValue = () => {
+      // Tentar usar ref primeiro, depois getElementById
+      const valueInput = valueInputRef.current || (document.getElementById("value") as HTMLInputElement);
+      
+      if (valueInput) {
+        const previousValue = valueInput.value;
+        const newValue = totalValue.toFixed(2);
+        
+        // Atualizar valor
+        valueInput.value = newValue;
+        
+        // Disparar eventos para garantir que React detecte a mudança
+        valueInput.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
+        valueInput.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
+        
+        // Forçar atualização usando setter nativo (para inputs não controlados)
+        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
+        if (nativeInputValueSetter) {
+          nativeInputValueSetter.call(valueInput, newValue);
+          valueInput.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        
+        if (previousValue !== newValue) {
+          logger.debug(`💰 Valor total atualizado: R$ ${previousValue} → R$ ${newValue} (${addedCatalogProducts.length} produto(s) + ${addedServices.length} serviço(s))`);
+        }
+      } else {
+        logger.warn('⚠️ Campo de valor não encontrado no DOM');
+      }
+    };
+
+    // Atualizar imediatamente
+    updateValue();
+    
+    // Também tentar após um pequeno delay para garantir que o DOM esteja renderizado
+    const timeoutId = setTimeout(updateValue, 100);
+
+    return () => clearTimeout(timeoutId);
+  }, [totalValue, addedCatalogProducts, addedServices]);
 
   const [isKitMode, setIsKitMode] = useState<boolean>(false);
   const [kitItems, setKitItems] = useState<Array<{id: string, size: string, quantity: number}>>([
@@ -1259,13 +1314,26 @@ export default function NovoPedido() {
                 <div className="space-y-2">
                   <Label htmlFor="value">Valor Total (R$) *</Label>
                   <Input
+                    ref={valueInputRef}
                     id="value"
                     type="number"
                     step="0.01"
                     placeholder="0,00"
                     required
                     className="border-input"
+                    readOnly={addedCatalogProducts.length > 0 || addedServices.length > 0}
+                    value={addedCatalogProducts.length > 0 || addedServices.length > 0 ? totalValue.toFixed(2) : undefined}
+                    onChange={(e) => {
+                      if (!(addedCatalogProducts.length > 0 || addedServices.length > 0)) {
+                        setTotalValue(Number(e.target.value) || 0);
+                      }
+                    }}
                   />
+                  {(addedCatalogProducts.length > 0 || addedServices.length > 0) && (
+                    <p className="text-xs text-muted-foreground">
+                      Valor calculado automaticamente
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">

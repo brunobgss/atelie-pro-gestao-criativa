@@ -7,7 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Package, Plus, Edit, Trash2, Copy, Search, Filter, Clock, Layers, Upload, X, Image as ImageIcon, Link2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Package, Plus, Edit, Trash2, Copy, Search, Filter, Clock, Layers, Upload, X, Image as ImageIcon, Link2, Download } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { toast } from "sonner";
 import { getProducts, createProduct, updateProduct, deleteProduct } from "@/integrations/supabase/products";
@@ -15,6 +16,7 @@ import { uploadProductImage } from "@/integrations/supabase/storage";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { DialogVariacoesProduto } from "@/components/DialogVariacoesProduto";
 import { DialogVinculosEstoque } from "@/components/DialogVinculosEstoque";
+import { DialogVinculosEstoqueMassa } from "@/components/DialogVinculosEstoqueMassa";
 import { ImportProducts } from "@/components/ImportProducts";
 import { useSync } from "@/contexts/SyncContext";
 import { useSyncOperations } from "@/hooks/useSyncOperations";
@@ -62,6 +64,9 @@ export default function CatalogoProdutos() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [dialogVinculosMassaOpen, setDialogVinculosMassaOpen] = useState(false);
 
   const categories = ["all", "Uniforme", "Personalizado", "Bordado", "Estampado"];
 
@@ -336,6 +341,66 @@ export default function CatalogoProdutos() {
     }
   };
 
+  // Funções para seleção múltipla
+  const toggleProductSelection = (productId: string) => {
+    setSelectedProducts(prev => 
+      prev.includes(productId)
+        ? prev.filter(id => id !== productId)
+        : [...prev, productId]
+    );
+  };
+
+  const selectAll = () => {
+    setSelectedProducts(filteredProducts.map(p => p.id));
+  };
+
+  const deselectAll = () => {
+    setSelectedProducts([]);
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedProducts.length === 0) {
+      toast.error("Selecione pelo menos um produto para excluir");
+      return;
+    }
+    
+    const confirmMessage = `Tem certeza que deseja excluir ${selectedProducts.length} produto(s)?\n\nEsta ação não pode ser desfeita!`;
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+    
+    let successCount = 0;
+    let errorCount = 0;
+    
+    for (const productId of selectedProducts) {
+      try {
+        const result = await deleteProduct(productId);
+        if (result.ok) {
+          successCount++;
+          syncAfterDelete('products', productId);
+        } else {
+          errorCount++;
+          logger.error(`Erro ao excluir produto ${productId}:`, result.error);
+        }
+      } catch (error) {
+        errorCount++;
+        logger.error(`Erro ao excluir produto ${productId}:`, error);
+      }
+    }
+    
+    if (successCount > 0) {
+      toast.success(`${successCount} produto(s) excluído(s) com sucesso!`);
+    }
+    if (errorCount > 0) {
+      toast.error(`${errorCount} produto(s) não puderam ser excluídos`);
+    }
+    
+    setSelectedProducts([]);
+    setIsSelecting(false);
+    invalidateRelated('products');
+    refetch();
+  };
+
   const handleDuplicate = async (product: Product) => {
     try {
       const result = await createProduct({
@@ -384,6 +449,86 @@ _Orçamento gerado pelo Ateliê Pro_
     toast.success("Orçamento copiado para a área de transferência!");
   };
 
+  const handleExportCSV = async () => {
+    if (!products || products.length === 0) {
+      toast.error("Nenhum produto para exportar");
+      return;
+    }
+
+    try {
+      // Buscar dados originais do Supabase para ter todos os campos
+      const productsData = await getProducts();
+      
+      // Preparar dados para exportação
+      const csvHeaders = [
+        'Nome',
+        'Tipo',
+        'Materiais',
+        'Horas Trabalho',
+        'Preço Unitário',
+        'Margem Lucro (%)',
+        'Imagem URL'
+      ];
+      
+      // Função para escapar valores CSV
+      const escapeCSV = (value: string | null | undefined) => {
+        if (value === null || value === undefined) return '';
+        return `"${String(value).replace(/"/g, '""')}"`;
+      };
+      
+      const csvRows = productsData.map(product => {
+        // Processar materiais
+        let materialsStr = '';
+        if (product.materials) {
+          if (Array.isArray(product.materials)) {
+            materialsStr = product.materials
+              .map((mat: unknown) => {
+                if (typeof mat === 'string') return mat;
+                if (typeof mat === 'object' && mat !== null && 'name' in mat) return String(mat.name);
+                return String(mat);
+              })
+              .join(', ');
+          } else if (typeof product.materials === 'string') {
+            materialsStr = product.materials;
+          }
+        }
+
+        return [
+          escapeCSV(product.name),
+          escapeCSV(product.type || ''),
+          escapeCSV(materialsStr),
+          (product.work_hours || 0).toString(),
+          (product.unit_price || 0).toFixed(2),
+          (product.profit_margin || 0).toString(),
+          escapeCSV(product.image_url || '')
+        ].join(',');
+      });
+      
+      const csvContent = [
+        csvHeaders.join(','),
+        ...csvRows
+      ].join('\n');
+      
+      // Criar e baixar arquivo
+      const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' }); // BOM para Excel
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `catalogo_produtos_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+      toast.success(`Catálogo exportado com sucesso! (${productsData.length} produto(s))`);
+      logger.info('Catálogo exportado para CSV', { productCount: productsData.length });
+    } catch (error: any) {
+      logger.error('Erro ao exportar catálogo:', error);
+      toast.error("Erro ao exportar catálogo: " + (error.message || "Erro desconhecido"));
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100">
       {/* Header */}
@@ -401,6 +546,65 @@ _Orçamento gerado pelo Ateliê Pro_
           </div>
           
           <div className="flex gap-2">
+            {isSelecting && selectedProducts.length > 0 && (
+              <>
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={() => setDialogVinculosMassaOpen(true)}
+                  className="w-full md:w-auto"
+                >
+                  <Link2 className="w-4 h-4 mr-1 md:mr-2" />
+                  <span className="hidden md:inline">Vincular Estoque ({selectedProducts.length})</span>
+                  <span className="md:hidden">Vincular</span>
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="destructive" 
+                  onClick={handleBulkDelete}
+                  className="w-full md:w-auto"
+                >
+                  <Trash2 className="w-4 h-4 mr-1 md:mr-2" />
+                  <span className="hidden md:inline">Excluir {selectedProducts.length} Selecionado(s)</span>
+                  <span className="md:hidden">Excluir {selectedProducts.length}</span>
+                </Button>
+              </>
+            )}
+            {isSelecting && (
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={() => {
+                  setIsSelecting(false);
+                  setSelectedProducts([]);
+                }}
+                className="w-full md:w-auto"
+              >
+                Cancelar Seleção
+              </Button>
+            )}
+            {!isSelecting && (
+              <>
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={handleExportCSV}
+                  className="w-full md:w-auto"
+                >
+                  <Download className="w-4 h-4 mr-1 md:mr-2" />
+                  <span className="hidden md:inline">Exportar CSV</span>
+                  <span className="md:hidden">Exportar</span>
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={() => setIsSelecting(true)}
+                  className="w-full md:w-auto"
+                >
+                  Selecionar
+                </Button>
+              </>
+            )}
             <ImportProducts 
               onImportComplete={() => {
                 refetch();
@@ -633,8 +837,8 @@ _Orçamento gerado pelo Ateliê Pro_
         {/* Filtros */}
         <Card className="bg-white border border-gray-200/50 shadow-sm mb-6">
           <CardContent className="p-6">
-            <div className="flex gap-4 items-center">
-              <div className="flex-1">
+            <div className="flex gap-4 items-center flex-wrap">
+              <div className="flex-1 min-w-[200px]">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                   <Input
@@ -645,20 +849,36 @@ _Orçamento gerado pelo Ateliê Pro_
                   />
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Filter className="w-4 h-4 text-gray-400" />
-                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas as categorias</SelectItem>
-                    {categories.slice(1).map(category => (
-                      <SelectItem key={category} value={category}>{category}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              {!isSelecting && (
+                <div className="flex items-center gap-2">
+                  <Filter className="w-4 h-4 text-gray-400" />
+                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                    <SelectTrigger className="w-48">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas as categorias</SelectItem>
+                      {categories.slice(1).map(category => (
+                        <SelectItem key={category} value={category}>{category}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {isSelecting && (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600">
+                    {selectedProducts.length} selecionado(s)
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={selectedProducts.length === filteredProducts.length ? deselectAll : selectAll}
+                  >
+                    {selectedProducts.length === filteredProducts.length ? "Desmarcar Todos" : "Selecionar Todos"}
+                  </Button>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -697,11 +917,20 @@ _Orçamento gerado pelo Ateliê Pro_
               )}
               <CardHeader>
                 <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="text-lg">{product.name}</CardTitle>
-                    <Badge variant="secondary" className="mt-2">
-                      {product.category}
-                    </Badge>
+                  <div className="flex items-start gap-2 flex-1">
+                    {isSelecting && (
+                      <Checkbox
+                        checked={selectedProducts.includes(product.id)}
+                        onCheckedChange={() => toggleProductSelection(product.id)}
+                        className="mt-1"
+                      />
+                    )}
+                    <div className="flex-1">
+                      <CardTitle className="text-lg">{product.name}</CardTitle>
+                      <Badge variant="secondary" className="mt-2">
+                        {product.category}
+                      </Badge>
+                    </div>
                   </div>
                   <div className="flex gap-1">
                     <Button
@@ -826,6 +1055,19 @@ _Orçamento gerado pelo Ateliê Pro_
             }}
           />
         )}
+
+        {/* Dialog de Vínculos de Estoque em Massa */}
+        <DialogVinculosEstoqueMassa
+          open={dialogVinculosMassaOpen}
+          onOpenChange={setDialogVinculosMassaOpen}
+          selectedProductIds={selectedProducts}
+          onSuccess={() => {
+            refetch();
+            queryClient.invalidateQueries({ queryKey: ["products"] });
+            setSelectedProducts([]);
+            setIsSelecting(false);
+          }}
+        />
       </div>
     </div>
   );

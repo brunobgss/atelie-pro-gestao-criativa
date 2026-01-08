@@ -41,6 +41,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { ImportInventory } from "@/components/ImportInventory";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const ITEM_TYPE_OPTIONS: Array<{
   value: InventoryItemType;
@@ -183,6 +184,8 @@ export default function Estoque() {
   const [typeFilter, setTypeFilter] = useState<InventoryItemType | "all">("all");
   const [isAlertsDialogOpen, setIsAlertsDialogOpen] = useState(false);
   const [alertForm, setAlertForm] = useState<AlertFormState>(ALERT_DEFAULTS);
+  const [selectedItems, setSelectedItems] = useState<string[]>([]);
+  const [isSelecting, setIsSelecting] = useState(false);
 
   const [newItemState, setNewItemState] = useState<NewItemState>({
     name: "",
@@ -545,6 +548,65 @@ export default function Estoque() {
     queryClient.invalidateQueries({ queryKey: ["inventory"] });
   };
 
+  // Funções para seleção múltipla
+  const toggleItemSelection = (itemId: string) => {
+    setSelectedItems(prev => 
+      prev.includes(itemId)
+        ? prev.filter(id => id !== itemId)
+        : [...prev, itemId]
+    );
+  };
+
+  const selectAll = () => {
+    setSelectedItems(filteredItems.map(item => item.id));
+  };
+
+  const deselectAll = () => {
+    setSelectedItems([]);
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedItems.length === 0) {
+      toast.error("Selecione pelo menos um item para excluir");
+      return;
+    }
+    
+    const confirmMessage = `Tem certeza que deseja excluir ${selectedItems.length} item(ns) de estoque?\n\nEsta ação não pode ser desfeita!`;
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+    
+    let successCount = 0;
+    let errorCount = 0;
+    
+    for (const itemId of selectedItems) {
+      try {
+        const { error } = await supabase.from("inventory_items").delete().eq("id", itemId);
+        if (error) {
+          errorCount++;
+          logger.error(`Erro ao excluir item ${itemId}:`, error);
+        } else {
+          successCount++;
+        }
+      } catch (error) {
+        errorCount++;
+        logger.error(`Erro ao excluir item ${itemId}:`, error);
+      }
+    }
+    
+    if (successCount > 0) {
+      toast.success(`${successCount} item(ns) excluído(s) com sucesso!`);
+    }
+    if (errorCount > 0) {
+      toast.error(`${errorCount} item(ns) não puderam ser excluídos`);
+    }
+    
+    setSelectedItems([]);
+    setIsSelecting(false);
+    invalidateRelated("inventory_items");
+    queryClient.invalidateQueries({ queryKey: ["inventory"] });
+  };
+
   return (
     <div className="min-h-screen bg-muted/20">
       <header className="border-b border-border bg-card/60 backdrop-blur supports-[backdrop-filter]:bg-card/70 sticky top-0 z-20">
@@ -557,6 +619,37 @@ export default function Estoque() {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-nowrap">
+            {isSelecting && selectedItems.length > 0 && (
+              <Button 
+                variant="destructive" 
+                size="sm" 
+                onClick={handleBulkDelete}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Excluir {selectedItems.length}
+              </Button>
+            )}
+            {isSelecting && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => {
+                  setIsSelecting(false);
+                  setSelectedItems([]);
+                }}
+              >
+                Cancelar
+              </Button>
+            )}
+            {!isSelecting && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setIsSelecting(true)}
+              >
+                Selecionar
+              </Button>
+            )}
             <Dialog
               open={isAlertsDialogOpen}
               onOpenChange={(open) => {
@@ -1076,19 +1169,35 @@ export default function Estoque() {
                 onChange={(event) => setSearchTerm(event.target.value)}
               />
             </div>
-            <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as InventoryItemType | "all")}>
-              <SelectTrigger className="w-[220px]">
-                <SelectValue placeholder="Tipo" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os tipos</SelectItem>
-                {ITEM_TYPE_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {!isSelecting && (
+              <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as InventoryItemType | "all")}>
+                <SelectTrigger className="w-[220px]">
+                  <SelectValue placeholder="Tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os tipos</SelectItem>
+                  {ITEM_TYPE_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {isSelecting && (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">
+                  {selectedItems.length} selecionado(s)
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={selectedItems.length === filteredItems.length ? deselectAll : selectAll}
+                >
+                  {selectedItems.length === filteredItems.length ? "Desmarcar Todos" : "Selecionar Todos"}
+                </Button>
+              </div>
+            )}
           </div>
 
           <Separator className="my-4" />
@@ -1120,8 +1229,15 @@ export default function Estoque() {
               >
                     <CardContent className="space-y-4 p-4">
                       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                        <div className="space-y-2">
+                        <div className="space-y-2 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
+                            {isSelecting && (
+                              <Checkbox
+                                checked={selectedItems.includes(item.id)}
+                                onCheckedChange={() => toggleItemSelection(item.id)}
+                                className="mt-1"
+                              />
+                            )}
                             <h3 className="text-lg font-semibold text-foreground">{item.name}</h3>
                             <Badge variant="secondary">{getItemTypeLabel(item.item_type)}</Badge>
                             {statusInfo.badge}
