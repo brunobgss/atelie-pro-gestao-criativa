@@ -11,6 +11,7 @@ import { listInventory } from "@/integrations/supabase/inventory";
 import { updateProduct, getProducts, ProductRow } from "@/integrations/supabase/products";
 import { useQuery } from "@tanstack/react-query";
 import { logger } from "@/utils/logger";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface DialogVinculosEstoqueMassaProps {
   open: boolean;
@@ -25,9 +26,12 @@ export function DialogVinculosEstoqueMassa({
   selectedProductIds,
   onSuccess,
 }: DialogVinculosEstoqueMassaProps) {
+  type BulkActionMode = "upsert" | "remove" | "replace_all";
   const [selectedInventoryItem, setSelectedInventoryItem] = useState<string>("");
   const [quantityPerUnit, setQuantityPerUnit] = useState<number>(1);
   const [isSaving, setIsSaving] = useState(false);
+  const [mode, setMode] = useState<BulkActionMode>("upsert");
+  const [confirmReplaceAll, setConfirmReplaceAll] = useState(false);
 
   // Buscar itens de estoque
   const { data: inventoryItems = [] } = useQuery({
@@ -56,8 +60,13 @@ export function DialogVinculosEstoqueMassa({
       return;
     }
 
-    if (quantityPerUnit <= 0) {
+    if (mode !== "remove" && quantityPerUnit <= 0) {
       toast.error("A quantidade por unidade deve ser maior que zero");
+      return;
+    }
+
+    if (mode === "replace_all" && !confirmReplaceAll) {
+      toast.error("Confirme a substituição de vínculos para continuar");
       return;
     }
 
@@ -102,15 +111,37 @@ export function DialogVinculosEstoqueMassa({
             }
           }
 
-          // Verificar se o item já está vinculado
-          const itemIndex = existingItems.indexOf(selectedInventoryItem);
-          if (itemIndex >= 0) {
-            // Atualizar quantidade existente
-            existingQuantities[itemIndex] = quantityPerUnit;
+          // Normalizar consistência: inventory_items e inventory_quantities devem ter mesmo tamanho
+          if (existingItems.length !== existingQuantities.length) {
+            const min = Math.min(existingItems.length, existingQuantities.length);
+            existingItems = existingItems.slice(0, min);
+            existingQuantities = existingQuantities.slice(0, min);
+            logger.warn("Vínculos inconsistentes (itens vs quantidades). Ajustado automaticamente.", {
+              productId,
+              itemsLength: existingItems.length,
+              quantitiesLength: existingQuantities.length,
+            });
+          }
+
+          if (mode === "replace_all") {
+            // Substituir todos os vínculos do produto por apenas este item
+            existingItems = [selectedInventoryItem];
+            existingQuantities = [quantityPerUnit];
+          } else if (mode === "remove") {
+            const itemIndex = existingItems.indexOf(selectedInventoryItem);
+            if (itemIndex >= 0) {
+              existingItems.splice(itemIndex, 1);
+              existingQuantities.splice(itemIndex, 1);
+            }
           } else {
-            // Adicionar novo vínculo
-            existingItems.push(selectedInventoryItem);
-            existingQuantities.push(quantityPerUnit);
+            // upsert: atualizar se já existe, senão adicionar
+            const itemIndex = existingItems.indexOf(selectedInventoryItem);
+            if (itemIndex >= 0) {
+              existingQuantities[itemIndex] = quantityPerUnit;
+            } else {
+              existingItems.push(selectedInventoryItem);
+              existingQuantities.push(quantityPerUnit);
+            }
           }
 
           // Salvar vínculos
@@ -144,6 +175,8 @@ export function DialogVinculosEstoqueMassa({
         // Limpar campos
         setSelectedInventoryItem("");
         setQuantityPerUnit(1);
+        setMode("upsert");
+        setConfirmReplaceAll(false);
       }
     } catch (error: any) {
       logger.error('Erro ao salvar vínculos em massa:', error);
@@ -185,6 +218,34 @@ export function DialogVinculosEstoqueMassa({
             </div>
           </div>
 
+          {/* Ação em massa */}
+          <div className="space-y-2">
+            <Label>Ação</Label>
+            <Select
+              value={mode}
+              onValueChange={(value) => {
+                setMode(value as BulkActionMode);
+                setConfirmReplaceAll(false);
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione a ação" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="upsert">Adicionar/Atualizar vínculo</SelectItem>
+                <SelectItem value="remove">Remover vínculo</SelectItem>
+                <SelectItem value="replace_all">Substituir todos os vínculos (perigoso)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              {mode === "upsert"
+                ? "Adiciona o item ao produto; se já existir, atualiza a quantidade."
+                : mode === "remove"
+                ? "Remove este item do vínculo dos produtos selecionados (se existir)."
+                : "Remove todos os vínculos atuais do produto e deixa apenas este item."}
+            </p>
+          </div>
+
           {/* Seleção de item de estoque */}
           <div className="space-y-2">
             <Label htmlFor="inventory-item">
@@ -214,29 +275,52 @@ export function DialogVinculosEstoqueMassa({
           </div>
 
           {/* Quantidade por unidade */}
-          <div className="space-y-2">
-            <Label htmlFor="quantity-per-unit">
-              Quantidade por Unidade <span className="text-red-500">*</span>
-            </Label>
-            <Input
-              id="quantity-per-unit"
-              type="number"
-              min="0.01"
-              step="0.01"
-              value={quantityPerUnit}
-              onChange={(e) => setQuantityPerUnit(parseFloat(e.target.value) || 1)}
-              placeholder="Ex: 2.5"
-            />
-            <p className="text-xs text-muted-foreground">
-              Quantidade do item de estoque consumida por unidade do produto
-            </p>
-          </div>
+          {mode !== "remove" && (
+            <div className="space-y-2">
+              <Label htmlFor="quantity-per-unit">
+                Quantidade por Unidade <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="quantity-per-unit"
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={quantityPerUnit}
+                onChange={(e) => setQuantityPerUnit(parseFloat(e.target.value) || 1)}
+                placeholder="Ex: 2.5"
+              />
+              <p className="text-xs text-muted-foreground">
+                Quantidade do item de estoque consumida por unidade do produto
+              </p>
+            </div>
+          )}
+
+          {mode === "replace_all" && (
+            <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4">
+              <Checkbox
+                id="confirmReplaceAll"
+                checked={confirmReplaceAll}
+                onCheckedChange={(v) => setConfirmReplaceAll(Boolean(v))}
+                disabled={isSaving}
+              />
+              <div className="space-y-1">
+                <Label htmlFor="confirmReplaceAll">Eu entendo que isso remove vínculos existentes</Label>
+                <p className="text-xs text-amber-800">
+                  Segurança: essa ação é perigosa e só é aplicada se você confirmar.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Informação */}
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <p className="text-sm text-blue-800">
               <strong>ℹ️ Informação:</strong> Este vínculo será aplicado a todos os {selectedProductIds.length} produto(s) selecionado(s).
-              Se algum produto já tiver este item vinculado, a quantidade será atualizada.
+              {mode === "replace_all"
+                ? " Os vínculos existentes serão substituídos por este item."
+                : mode === "remove"
+                ? " Se algum produto tiver este item vinculado, ele será removido."
+                : " Se algum produto já tiver este item vinculado, a quantidade será atualizada."}
             </p>
           </div>
         </div>
@@ -245,14 +329,18 @@ export function DialogVinculosEstoqueMassa({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isSaving}>
             Cancelar
           </Button>
-          <Button onClick={salvarVinculosMassa} disabled={isSaving || !selectedInventoryItem}>
+          <Button onClick={salvarVinculosMassa} disabled={isSaving || !selectedInventoryItem || (mode === "replace_all" && !confirmReplaceAll)}>
             {isSaving ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Salvando...
               </>
             ) : (
-              `Vincular ${selectedProductIds.length} Produto(s)`
+              mode === "remove"
+                ? `Remover vínculo de ${selectedProductIds.length} Produto(s)`
+                : mode === "replace_all"
+                ? `Substituir vínculos de ${selectedProductIds.length} Produto(s)`
+                : `Vincular ${selectedProductIds.length} Produto(s)`
             )}
           </Button>
         </div>

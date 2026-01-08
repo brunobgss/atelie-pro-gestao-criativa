@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -6,7 +6,9 @@ import { Progress } from "@/components/ui/progress";
 import { Upload, FileText, CheckCircle2, XCircle, Loader2, AlertCircle, Download, HelpCircle, Info, X } from "lucide-react";
 import { toast } from "sonner";
 import { createProduct, getProducts, updateProduct } from "@/integrations/supabase/products";
-import { listInventory } from "@/integrations/supabase/inventory";
+import { createInventoryItem, listInventory, updateInventoryItem } from "@/integrations/supabase/inventory";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface ImportedProduct {
   name: string;
@@ -21,7 +23,15 @@ interface ImportedProduct {
   importError?: string;
   status?: 'pending' | 'success' | 'error' | 'duplicate';
   inventoryItemName?: string;
+  inventoryItemId?: string;
+  resolvedInventoryItemId?: string; // id | "__create__" | "__skip__"
   quantityPerUnit?: number;
+  stockQuantity?: number;
+  stockUnit?: string;
+  stockItemType?: "materia_prima" | "tecido" | "produto_acabado";
+  inventoryMatch?: "matched" | "missing" | "will_create" | "ambiguous" | "not_requested";
+  inventoryCandidates?: Array<{ id: string; name: string; unit?: string | null; item_type?: string | null }>;
+  warnings?: string[];
 }
 
 interface ImportProductsProps {
@@ -29,6 +39,14 @@ interface ImportProductsProps {
 }
 
 const VALID_TYPES = ["Uniforme", "Personalizado", "Bordado", "Estampado"];
+
+type ImportReport = {
+  createdStockItems: Array<{ key: string; id: string; name: string; unit: string; item_type: string }>;
+  updatedStockItems: Array<{ id: string; name: string; quantity: number; unit?: string }>;
+  productsWithoutLink: Array<{ name: string; reason: string }>;
+  warnings: Array<{ product: string; warning: string }>;
+  createdAt: string;
+};
 
 export function ImportProducts({ onImportComplete }: ImportProductsProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -41,15 +59,117 @@ export function ImportProducts({ onImportComplete }: ImportProductsProps) {
   const [showHelp, setShowHelp] = useState(false);
   const [existingProducts, setExistingProducts] = useState<string[]>([]);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [autoCreateStockItems, setAutoCreateStockItems] = useState(true);
+  const [overwriteStockFromCsv, setOverwriteStockFromCsv] = useState(false);
+  const [forceOverwriteConfirm, setForceOverwriteConfirm] = useState(false);
+  const [importReport, setImportReport] = useState<ImportReport | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cancelImportRef = useRef(false);
 
+  const normalizeKey = (value: string) =>
+    value
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const isUuid = (value: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value.trim());
+
+  const looksIntegerUnit = (unit: string | undefined | null) => {
+    const u = (unit ?? "").toLowerCase().trim();
+    if (!u) return false;
+    return (
+      u === "un" ||
+      u === "unidade" ||
+      u === "unidades" ||
+      u === "und" ||
+      u === "unds" ||
+      u === "pc" ||
+      u === "pcs" ||
+      u === "peca" ||
+      u === "peça" ||
+      u === "pecas" ||
+      u === "peças"
+    );
+  };
+
+  const previewPlan = useMemo(() => {
+    const productsToAnalyze = importedProducts.filter((p) => p.errors.length === 0 && !p.isDuplicate);
+
+    let linkRequested = 0;
+    let willLink = 0;
+    let willCreateStock = 0;
+    let willUpdateStock = 0;
+    let missing = 0;
+    let ambiguous = 0;
+    let needsReview = 0;
+    let withStockValue = 0;
+    let warningCount = 0;
+
+    const createKeys = new Set<string>();
+    const updateIds = new Set<string>();
+
+    for (const p of productsToAnalyze) {
+      if (p.warnings?.length) warningCount += p.warnings.length;
+
+      const wantsLink = (!!p.inventoryItemName || !!p.inventoryItemId) && !!p.quantityPerUnit && (p.quantityPerUnit ?? 0) > 0;
+      if (!wantsLink) continue;
+
+      if (typeof p.stockQuantity === "number") withStockValue++;
+      linkRequested++;
+
+      if (p.inventoryMatch === "ambiguous" && !p.resolvedInventoryItemId) {
+        needsReview++;
+      }
+
+      if (p.inventoryMatch === "ambiguous") ambiguous++;
+      if (p.inventoryMatch === "missing") missing++;
+      if (p.inventoryMatch === "matched") willLink++;
+
+      if (p.inventoryMatch === "will_create") {
+        willLink++;
+        const key = normalizeKey(p.inventoryItemName || p.inventoryItemId || "");
+        if (key) createKeys.add(key);
+      }
+
+      // Planejar update de estoque (apenas se usuário marcou sobrescrever + confirmou)
+      if (
+        overwriteStockFromCsv &&
+        forceOverwriteConfirm &&
+        typeof p.stockQuantity === "number" &&
+        p.inventoryMatch === "matched" &&
+        p.resolvedInventoryItemId &&
+        isUuid(p.resolvedInventoryItemId)
+      ) {
+        updateIds.add(p.resolvedInventoryItemId);
+      }
+    }
+
+    willCreateStock = createKeys.size;
+    willUpdateStock = updateIds.size;
+
+    return {
+      linkRequested,
+      willLink,
+      willCreateStock,
+      willUpdateStock,
+      missing,
+      ambiguous,
+      needsReview,
+      withStockValue,
+      warningCount,
+    };
+  }, [importedProducts, overwriteStockFromCsv, forceOverwriteConfirm]);
+
+  const hasBlockingReview = useMemo(() => previewPlan.needsReview > 0, [previewPlan.needsReview]);
+
   const downloadExampleCSV = () => {
-    const csvContent = `Nome,Tipo,Materiais,Horas Trabalho,Preço Unitário,Margem Lucro (%),Item Estoque,Quantidade por Unidade
-Camiseta Polo Bordada,Bordado,"linha, tecido",1.5,25.00,35,Tecido Algodão,2.5
-Vestido Personalizado,Personalizado,"tecido, linha, zíper",3.0,120.00,40,Tecido Seda,3.0
-Uniforme Escolar,Uniforme,"tecido, botões, etiqueta",2.0,85.00,30,Tecido Algodão,2.0
-Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50,Camiseta Básica,1.0`;
+    const csvContent = `Nome,Tipo,Materiais,Horas Trabalho,Preço Unitário,Margem Lucro (%),Item Estoque,ID Estoque,Quantidade por Unidade,Estoque,Unidade Estoque,Tipo Estoque
+Camiseta Polo Bordada,Bordado,"linha, tecido",1.5,25.00,35,Tecido Algodão,,2.5,120,metros,tecido
+Vestido Personalizado,Personalizado,"tecido, linha, zíper",3.0,120.00,40,Tecido Seda,,3.0,80,metros,tecido
+Uniforme Escolar,Uniforme,"tecido, botões, etiqueta",2.0,85.00,30,Tecido Algodão,,2.0,120,metros,tecido
+Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50,Camiseta Básica,,1.0,15,unidades,produto_acabado`;
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
@@ -186,7 +306,22 @@ Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50,Camiseta Básica,1.0
       const unitPriceIndex = headers.findIndex(h => h.includes('preço') || h.includes('price') || h.includes('preco') || h.includes('valor') || h.includes('unit'));
       const profitMarginIndex = headers.findIndex(h => h.includes('margem') || h.includes('margin') || h.includes('lucro') || h.includes('profit'));
       const inventoryItemIndex = headers.findIndex(h => h.includes('estoque') || h.includes('inventory') || h.includes('item estoque') || h.includes('item_estoque'));
+      const inventoryItemIdIndex = headers.findIndex((h) => h.includes("id estoque") || h.includes("estoque id") || h.includes("inventory id") || h.includes("inventory_item_id"));
       const quantityPerUnitIndex = headers.findIndex(h => h.includes('quantidade por unidade') || h.includes('quantity per unit') || h.includes('qtd por unidade') || h.includes('qtd_por_unidade'));
+      const stockQuantityIndex = headers.findIndex((h) => {
+        const hasStock = h.includes("estoque") || h.includes("stock");
+        const hasQuantity = h.includes("quant") || h.includes("qtd") || h.includes("saldo") || h.includes("atual") || h.includes("inicial");
+        const isItemStock = h.includes("item estoque") || h.includes("item_estoque") || h.includes("inventory item");
+        return hasStock && hasQuantity && !isItemStock;
+      });
+      const stockUnitIndex = headers.findIndex((h) => {
+        const hasUnit = h.includes("unidade") || h.includes("unit");
+        const isUnitPrice = h.includes("preço") || h.includes("preco") || h.includes("price");
+        const hasStock = h.includes("estoque") || h.includes("stock");
+        // Preferir colunas do tipo "Unidade Estoque"
+        return hasUnit && hasStock && !isUnitPrice;
+      });
+      const stockTypeIndex = headers.findIndex((h) => h.includes("tipo estoque") || h.includes("tipo_estoque") || h.includes("inventory type") || h.includes("item_type"));
 
       if (nameIndex === -1) {
         toast.error("Não foi encontrada uma coluna 'Nome' no arquivo. Verifique o cabeçalho.");
@@ -214,7 +349,11 @@ Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50,Camiseta Básica,1.0
         const unitPriceStr = unitPriceIndex >= 0 ? row[unitPriceIndex]?.trim() : '0';
         const profitMarginStr = profitMarginIndex >= 0 ? row[profitMarginIndex]?.trim() : '0';
         const inventoryItemName = inventoryItemIndex >= 0 ? row[inventoryItemIndex]?.trim() : '';
+        const inventoryItemIdStr = inventoryItemIdIndex >= 0 ? row[inventoryItemIdIndex]?.trim() : '';
         const quantityPerUnitStr = quantityPerUnitIndex >= 0 ? row[quantityPerUnitIndex]?.trim() : '1';
+        const stockQuantityStr = stockQuantityIndex >= 0 ? row[stockQuantityIndex]?.trim() : '';
+        const stockUnitStr = stockUnitIndex >= 0 ? row[stockUnitIndex]?.trim() : '';
+        const stockTypeStr = stockTypeIndex >= 0 ? row[stockTypeIndex]?.trim() : '';
 
         const errors: string[] = [];
 
@@ -262,6 +401,26 @@ Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50,Camiseta Básica,1.0
           errors.push("Quantidade por unidade deve ser maior que zero");
         }
 
+        const inventoryItemId = inventoryItemIdStr ? inventoryItemIdStr.trim() : "";
+        if (inventoryItemId && !isUuid(inventoryItemId)) {
+          errors.push("ID Estoque inválido (precisa ser UUID)");
+        }
+
+        const parsedStockQuantity = stockQuantityStr ? parseFloat(stockQuantityStr.replace(",", ".")) : undefined;
+        if (parsedStockQuantity !== undefined && Number.isNaN(parsedStockQuantity)) {
+          errors.push("Estoque inválido (use número)");
+        }
+
+        const normalizedStockType = stockTypeStr ? stockTypeStr.toLowerCase().trim() : "";
+        const stockItemType =
+          normalizedStockType === "materia_prima" || normalizedStockType === "matéria-prima" || normalizedStockType === "materiaprima"
+            ? "materia_prima"
+            : normalizedStockType === "tecido"
+            ? "tecido"
+            : normalizedStockType === "produto_acabado" || normalizedStockType === "produto acabado" || normalizedStockType === "produto"
+            ? "produto_acabado"
+            : undefined;
+
         products.push({
           name,
           type,
@@ -272,7 +431,13 @@ Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50,Camiseta Básica,1.0
           row: i + 1,
           errors,
           inventoryItemName: inventoryItemName || undefined,
-          quantityPerUnit: quantityPerUnit || undefined
+          inventoryItemId: inventoryItemId || undefined,
+          resolvedInventoryItemId: inventoryItemId ? inventoryItemId : undefined,
+          quantityPerUnit: quantityPerUnit || undefined,
+          stockQuantity: typeof parsedStockQuantity === "number" && !Number.isNaN(parsedStockQuantity) ? parsedStockQuantity : undefined,
+          stockUnit: stockUnitStr || undefined,
+          stockItemType,
+          warnings: [],
         });
       }
 
@@ -308,7 +473,84 @@ Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50,Camiseta Básica,1.0
         toast.warning(`${duplicatesCount} produto(s) já existem no sistema e serão ignorados`);
       }
 
-      setImportedProducts(productsWithDuplicates);
+      // Prévia de vínculos de estoque (com detecção de ambíguos)
+      try {
+        const inventory = await listInventory();
+        const inventoryById = new Map<string, { id: string; name: string; unit?: string | null; item_type?: string | null }>();
+        const inventoryByKey = new Map<string, Array<{ id: string; name: string; unit?: string | null; item_type?: string | null }>>();
+
+        for (const item of inventory) {
+          const entry = { id: item.id, name: item.name, unit: item.unit, item_type: (item as any).item_type ?? null };
+          inventoryById.set(item.id, entry);
+          const key = normalizeKey(item.name);
+          const list = inventoryByKey.get(key) ?? [];
+          list.push(entry);
+          inventoryByKey.set(key, list);
+        }
+
+        const enriched = productsWithDuplicates.map((p) => {
+          const wantsLink = (!!p.inventoryItemName || !!p.inventoryItemId) && !!p.quantityPerUnit && (p.quantityPerUnit ?? 0) > 0;
+          if (!wantsLink) return { ...p, inventoryMatch: "not_requested" as const };
+
+          const warnings: string[] = [];
+
+          // Prioridade: ID Estoque
+          if (p.inventoryItemId && isUuid(p.inventoryItemId)) {
+            const found = inventoryById.get(p.inventoryItemId);
+            if (found) {
+              if (looksIntegerUnit(found.unit) && typeof p.quantityPerUnit === "number" && p.quantityPerUnit % 1 !== 0) {
+                warnings.push(`Consumo ${p.quantityPerUnit} parece decimal, mas a unidade do estoque é "${found.unit}".`);
+              }
+              return {
+                ...p,
+                inventoryMatch: "matched" as const,
+                resolvedInventoryItemId: found.id,
+                inventoryCandidates: [found],
+                warnings,
+              };
+            }
+            return { ...p, inventoryMatch: autoCreateStockItems ? ("will_create" as const) : ("missing" as const), warnings };
+          }
+
+          // Fallback: nome do item de estoque
+          const requestedName = (p.inventoryItemName ?? "").trim();
+          if (!requestedName) {
+            return { ...p, inventoryMatch: "missing" as const };
+          }
+          const key = normalizeKey(requestedName);
+          const candidates = inventoryByKey.get(key) ?? [];
+
+          if (candidates.length === 1) {
+            const chosen = candidates[0];
+            if (looksIntegerUnit(chosen.unit) && typeof p.quantityPerUnit === "number" && p.quantityPerUnit % 1 !== 0) {
+              warnings.push(`Consumo ${p.quantityPerUnit} parece decimal, mas a unidade do estoque é "${chosen.unit}".`);
+            }
+            return {
+              ...p,
+              inventoryMatch: "matched" as const,
+              resolvedInventoryItemId: chosen.id,
+              inventoryCandidates: candidates,
+              warnings,
+            };
+          }
+
+          if (candidates.length > 1) {
+            return {
+              ...p,
+              inventoryMatch: "ambiguous" as const,
+              inventoryCandidates: candidates,
+              resolvedInventoryItemId: undefined,
+              warnings: ["Nome de estoque ambíguo (existem itens duplicados com nome equivalente)."],
+            };
+          }
+
+          return { ...p, inventoryMatch: autoCreateStockItems ? ("will_create" as const) : ("missing" as const), warnings };
+        });
+        setImportedProducts(enriched);
+      } catch {
+        setImportedProducts(productsWithDuplicates);
+      }
+      setImportReport(null);
       toast.success(`${productsToProcess.length} produto(s) encontrado(s) no arquivo`);
     } catch (error: any) {
       console.error("Erro ao processar arquivo:", error);
@@ -331,6 +573,10 @@ Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50,Camiseta Básica,1.0
     let successCount = 0;
     let errorCount = 0;
     let duplicateCount = 0;
+    const createdStockByKey = new Map<string, { id: string; name: string; unit: string; item_type: string }>();
+    const updatedStockById = new Map<string, { id: string; name: string; quantity: number; unit?: string }>();
+    const productsWithoutLink: Array<{ name: string; reason: string }> = [];
+    const reportWarnings: Array<{ product: string; warning: string }> = [];
 
     // Filtrar apenas produtos válidos e não duplicados
     const productsToImport = importedProducts.filter(p => 
@@ -343,10 +589,20 @@ Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50,Camiseta Básica,1.0
       return;
     }
 
-    // Buscar itens de estoque para vinculação automática
-    let inventoryItems: Array<{ id: string; name: string }> = [];
+    // Buscar itens de estoque para vinculação automática (mapa por id e por nome normalizado)
+    let inventoryItems: Array<{ id: string; name: string; unit?: string | null; item_type?: string | null; quantity?: number | null }> = [];
+    const inventoryById = new Map<string, { id: string; name: string; unit?: string | null; item_type?: string | null; quantity?: number | null }>();
+    const inventoryByKey = new Map<string, Array<{ id: string; name: string; unit?: string | null; item_type?: string | null; quantity?: number | null }>>();
     try {
       inventoryItems = await listInventory();
+      for (const item of inventoryItems) {
+        const entry = { id: item.id, name: item.name, unit: item.unit, item_type: item.item_type, quantity: (item as any).quantity ?? null };
+        inventoryById.set(item.id, entry);
+        const key = normalizeKey(item.name);
+        const list = inventoryByKey.get(key) ?? [];
+        list.push(entry);
+        inventoryByKey.set(key, list);
+      }
     } catch (error) {
       console.warn("Não foi possível buscar itens de estoque para vinculação automática:", error);
     }
@@ -381,26 +637,127 @@ Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50,Camiseta Básica,1.0
               successCount++;
               
               // Vincular estoque automaticamente se especificado
-              if (product.inventoryItemName && product.quantityPerUnit && product.quantityPerUnit > 0) {
+              if ((product.inventoryItemName || product.inventoryItemId) && product.quantityPerUnit && product.quantityPerUnit > 0) {
                 try {
-                  // Buscar item de estoque pelo nome (case-insensitive)
-                  const inventoryItem = inventoryItems.find(item => 
-                    item.name.toLowerCase().trim() === product.inventoryItemName!.toLowerCase().trim()
-                  );
+                  // Se usuário decidiu "não vincular"
+                  if (product.resolvedInventoryItemId === "__skip__") {
+                    productsWithoutLink.push({ name: product.name, reason: "Vínculo ignorado pelo usuário" });
+                    // Atualizar status do produto
+                    setImportedProducts(prev => prev.map(p => 
+                      p.row === product.row ? { ...p, status: 'success' } : p
+                    ));
+                    return;
+                  }
 
-                  if (inventoryItem) {
-                    // Vincular estoque ao produto
-                    await updateProduct(result.id, {
-                      inventory_items: [inventoryItem.id],
-                      inventory_quantities: [product.quantityPerUnit]
+                  const requestedName = (product.inventoryItemName ?? "").trim();
+                  const requestedId = (product.inventoryItemId ?? "").trim();
+
+                  // Resolver item alvo (id escolhido, id do CSV, nome -> candidato único, criar)
+                  let resolvedId: string | null = null;
+                  let resolvedItem = null as null | { id: string; name: string; unit?: string | null; item_type?: string | null };
+
+                  if (product.resolvedInventoryItemId && product.resolvedInventoryItemId !== "__create__" && product.resolvedInventoryItemId !== "__skip__") {
+                    resolvedId = product.resolvedInventoryItemId;
+                  } else if (requestedId && isUuid(requestedId)) {
+                    resolvedId = requestedId;
+                  }
+
+                  if (resolvedId && isUuid(resolvedId)) {
+                    const found = inventoryById.get(resolvedId) ?? null;
+                    if (found) resolvedItem = found;
+                  }
+
+                  // Criar explicitamente (escolha do usuário)
+                  const mustCreate = product.resolvedInventoryItemId === "__create__";
+
+                  if (!resolvedItem && !mustCreate) {
+                    // Resolver por nome (se houver e não for ambíguo)
+                    if (requestedName) {
+                      const key = normalizeKey(requestedName);
+                      const candidates = inventoryByKey.get(key) ?? [];
+                      if (candidates.length === 1) {
+                        resolvedItem = candidates[0];
+                      } else if (candidates.length > 1) {
+                        productsWithoutLink.push({ name: product.name, reason: "Nome de estoque ambíguo (não resolvido)" });
+                        // Não falhar importação do produto; apenas não vincular
+                        setImportedProducts(prev => prev.map(p => 
+                          p.row === product.row ? { ...p, status: 'success' } : p
+                        ));
+                        return;
+                      }
+                    }
+                  }
+
+                  // Criar automaticamente se não existir (opcional) ou se usuário forçou
+                  if ((!resolvedItem && autoCreateStockItems) || mustCreate) {
+                    const createKey = normalizeKey(requestedName || requestedId);
+                    const cachedCreated = createKey ? createdStockByKey.get(createKey) : undefined;
+                    if (cachedCreated) {
+                      resolvedItem = { id: cachedCreated.id, name: cachedCreated.name, unit: cachedCreated.unit, item_type: cachedCreated.item_type };
+                    } else {
+                      const inferredUnit = product.stockUnit?.trim() || "unidades";
+                      const inferredType =
+                        product.stockItemType ??
+                        (inferredUnit.toLowerCase().includes("m") || inferredUnit.toLowerCase().includes("metro") ? "tecido" : "produto_acabado");
+
+                      if (!requestedName) {
+                        productsWithoutLink.push({ name: product.name, reason: "Sem nome de estoque para criar" });
+                      } else {
+                        const createResult = await createInventoryItem({
+                          name: requestedName,
+                          quantity: product.stockQuantity ?? 0,
+                          unit: inferredUnit,
+                          min_quantity: 0,
+                          item_type: inferredType,
+                          category: null,
+                          supplier: null,
+                          cost_per_unit: null,
+                          metadata: {},
+                        });
+
+                        if (createResult.ok && createResult.id) {
+                          const created = { id: createResult.id, name: requestedName, unit: inferredUnit, item_type: inferredType };
+                          if (createKey) createdStockByKey.set(createKey, created);
+                          resolvedItem = created;
+                        } else {
+                          productsWithoutLink.push({ name: product.name, reason: "Falha ao criar item de estoque" });
+                        }
+                      }
+                    }
+                  }
+
+                  // Sobrescrever estoque existente (opcional) usando a coluna Estoque
+                  if (
+                    resolvedItem &&
+                    !createdStockByKey.has(normalizeKey(resolvedItem.name)) &&
+                    overwriteStockFromCsv &&
+                    forceOverwriteConfirm &&
+                    typeof product.stockQuantity === "number"
+                  ) {
+                    const updatedUnit = product.stockUnit?.trim() || resolvedItem.unit || undefined;
+                    await updateInventoryItem(resolvedItem.id, {
+                      quantity: product.stockQuantity,
+                      unit: updatedUnit,
                     });
-                    console.log(`✅ Estoque vinculado automaticamente: ${product.name} -> ${inventoryItem.name}`);
+                    updatedStockById.set(resolvedItem.id, { id: resolvedItem.id, name: resolvedItem.name, quantity: product.stockQuantity, unit: updatedUnit });
+                  }
+
+                  if (resolvedItem) {
+                    if (looksIntegerUnit(resolvedItem.unit) && typeof product.quantityPerUnit === "number" && product.quantityPerUnit % 1 !== 0) {
+                      reportWarnings.push({ product: product.name, warning: `Consumo ${product.quantityPerUnit} parece decimal, mas a unidade do estoque é "${resolvedItem.unit}".` });
+                    }
+                    await updateProduct(result.id, {
+                      inventory_items: [resolvedItem.id],
+                      inventory_quantities: [product.quantityPerUnit],
+                    });
                   } else {
                     console.warn(`⚠️ Item de estoque "${product.inventoryItemName}" não encontrado para o produto "${product.name}". Produto criado sem vínculo.`);
+                    productsWithoutLink.push({ name: product.name, reason: "Item de estoque não encontrado" });
                   }
                 } catch (inventoryError) {
                   console.warn(`⚠️ Erro ao vincular estoque para produto "${product.name}":`, inventoryError);
                   // Não falhar a importação se a vinculação falhar
+                  productsWithoutLink.push({ name: product.name, reason: "Erro ao vincular estoque" });
                 }
               }
 
@@ -458,6 +815,23 @@ Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50,Camiseta Básica,1.0
 
     setIsImporting(false);
 
+    // Montar relatório pós-importação (baixável)
+    const createdStockItems = Array.from(createdStockByKey.entries()).map(([key, value]) => ({ key, ...value }));
+    const updatedStockItems = Array.from(updatedStockById.values());
+    const warningsFromPreview: Array<{ product: string; warning: string }> = [];
+    for (const p of importedProducts) {
+      if (p.warnings?.length) {
+        p.warnings.forEach((w) => warningsFromPreview.push({ product: p.name, warning: w }));
+      }
+    }
+    setImportReport({
+      createdStockItems,
+      updatedStockItems,
+      productsWithoutLink,
+      warnings: [...warningsFromPreview, ...reportWarnings],
+      createdAt: new Date().toISOString(),
+    });
+
     if (onImportComplete && !cancelImportRef.current) {
       onImportComplete();
     }
@@ -502,6 +876,41 @@ Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50,Camiseta Básica,1.0
     toast.success("Arquivo de erros exportado!");
   };
 
+  const downloadImportReport = () => {
+    if (!importReport) {
+      toast.info("Nenhum relatório disponível");
+      return;
+    }
+
+    const rows: string[] = [];
+    rows.push(["Tipo", "Produto", "Item Estoque", "ID Estoque", "Quantidade", "Unidade", "Detalhe"].join(","));
+
+    importReport.createdStockItems.forEach((it) => {
+      rows.push(["estoque_criado", "", it.name, it.id, "", it.unit, it.item_type].map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(","));
+    });
+    importReport.updatedStockItems.forEach((it) => {
+      rows.push(["estoque_atualizado", "", it.name, it.id, String(it.quantity), it.unit ?? "", ""].map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(","));
+    });
+    importReport.productsWithoutLink.forEach((p) => {
+      rows.push(["produto_sem_vinculo", p.name, "", "", "", "", p.reason].map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(","));
+    });
+    importReport.warnings.forEach((w) => {
+      rows.push(["aviso", w.product, "", "", "", "", w.warning].map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(","));
+    });
+
+    const blob = new Blob(["\ufeff" + rows.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.setAttribute("href", url);
+    link.setAttribute("download", `relatorio_importacao_${new Date().toISOString().split("T")[0]}.csv`);
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success("Relatório baixado!");
+  };
+
   const handleClose = () => {
     if (isImporting) {
       if (!confirm("A importação está em andamento. Deseja realmente cancelar?")) {
@@ -514,6 +923,7 @@ Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50,Camiseta Básica,1.0
     setImportResults({ success: 0, errors: 0, duplicates: 0 });
     setImportProgress(0);
     setExistingProducts([]);
+    setImportReport(null);
     setIsOpen(false);
     cancelImportRef.current = false;
     if (fileInputRef.current) {
@@ -540,7 +950,7 @@ Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50,Camiseta Básica,1.0
             Importar Produtos
           </DialogTitle>
           <DialogDescription>
-            Importe uma lista de produtos de um arquivo CSV ou Excel. O arquivo deve ter colunas: Nome, Tipo, Materiais (opcional), Horas Trabalho, Preço Unitário, Margem Lucro (%). Colunas opcionais: Item Estoque, Quantidade por Unidade (para vinculação automática de estoque). <strong>Limite: até 1000 produtos por importação.</strong>
+            Importe uma lista de produtos de um arquivo CSV. Colunas obrigatórias: Nome, Tipo. Colunas opcionais: Item Estoque, ID Estoque, Quantidade por Unidade, Estoque, Unidade Estoque, Tipo Estoque. <strong>Limite: até 1000 produtos por importação.</strong>
           </DialogDescription>
         </DialogHeader>
 
@@ -700,6 +1110,73 @@ Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50,Camiseta Básica,1.0
             </div>
           </div>
 
+          {/* Opções de estoque/vínculo */}
+          <div className="grid gap-3 rounded-lg border p-4 bg-muted/20">
+            <div className="flex items-start gap-3">
+              <Checkbox
+                checked={autoCreateStockItems}
+                onCheckedChange={(v) => setAutoCreateStockItems(Boolean(v))}
+                id="autoCreateStockItems"
+                disabled={isImporting || isProcessing}
+              />
+              <div className="space-y-1">
+                <Label htmlFor="autoCreateStockItems">Criar item no estoque automaticamente quando não existir</Label>
+                <p className="text-xs text-muted-foreground">
+                  Recomendado para quem tem muitos produtos. O item é criado usando o nome em “Item Estoque”. Se a coluna “Estoque” existir, ela define o saldo inicial.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <Checkbox
+                checked={overwriteStockFromCsv}
+                onCheckedChange={(v) => {
+                  const next = Boolean(v);
+                  setOverwriteStockFromCsv(next);
+                  if (!next) setForceOverwriteConfirm(false);
+                }}
+                id="overwriteStockFromCsv"
+                disabled={isImporting || isProcessing}
+              />
+              <div className="space-y-1">
+                <Label htmlFor="overwriteStockFromCsv">Sobrescrever estoque existente usando a coluna “Estoque”</Label>
+                <p className="text-xs text-muted-foreground">
+                  Use apenas se o CSV tiver o saldo real atual. Isso SUBSTITUI o estoque atual do item.
+                </p>
+                {overwriteStockFromCsv && (
+                  <div className="mt-2 flex items-start gap-3 rounded-md border border-amber-300 bg-amber-50 p-3">
+                    <Checkbox
+                      checked={forceOverwriteConfirm}
+                      onCheckedChange={(v) => setForceOverwriteConfirm(Boolean(v))}
+                      id="forceOverwriteConfirm"
+                      disabled={isImporting || isProcessing}
+                    />
+                    <div className="space-y-1">
+                      <Label htmlFor="forceOverwriteConfirm">Eu entendo que isso substitui o estoque atual</Label>
+                      <p className="text-xs text-amber-700">
+                        Segurança: o sistema só sobrescreve se essa confirmação estiver marcada.
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {importedProducts.length > 0 && (
+              <div className="text-xs text-muted-foreground">
+                Prévia (vínculo/estoque): {previewPlan.linkRequested} pedem vínculo • {previewPlan.willLink} serão vinculados •{" "}
+                {previewPlan.willCreateStock} item(ns) de estoque serão criados • {previewPlan.willUpdateStock} item(ns) terão estoque atualizado •{" "}
+                {previewPlan.ambiguous} ambíguo(s) • {previewPlan.missing} ausente(s) • {previewPlan.withStockValue} com saldo no CSV •{" "}
+                {previewPlan.warningCount} aviso(s)
+              </div>
+            )}
+            {hasBlockingReview && (
+              <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800">
+                Existem itens de estoque <strong>ambíguos</strong> (duplicados) e precisam ser escolhidos na tabela antes de importar (ou marque “Não vincular” nesses produtos).
+              </div>
+            )}
+          </div>
+
           {/* Preview dos produtos */}
           {importedProducts.length > 0 && (
             <div className="space-y-4">
@@ -771,6 +1248,7 @@ Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50,Camiseta Básica,1.0
                       <th className="p-2 text-left">Tipo</th>
                       <th className="p-2 text-left">Preço</th>
                       <th className="p-2 text-left">Horas</th>
+                      <th className="p-2 text-left">Vínculo/Estoque</th>
                       <th className="p-2 text-left">Status</th>
                     </tr>
                   </thead>
@@ -788,6 +1266,81 @@ Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50,Camiseta Básica,1.0
                           <td className="p-2">{product.type || "-"}</td>
                           <td className="p-2">R$ {product.unit_price.toFixed(2)}</td>
                           <td className="p-2">{product.work_hours}h</td>
+                          <td className="p-2">
+                            {(product.inventoryItemName || product.inventoryItemId) && product.quantityPerUnit ? (
+                              <div className="text-xs">
+                                <div>
+                                  <span className="font-medium">Item:</span>{" "}
+                                  {product.inventoryItemName ? product.inventoryItemName : <span className="text-muted-foreground">—</span>}{" "}
+                                  {product.inventoryItemId ? (
+                                    <span className="text-muted-foreground">• ID: {product.inventoryItemId}</span>
+                                  ) : null}{" "}
+                                  •{" "}
+                                  <span className="font-medium">Qtd/Un:</span> {product.quantityPerUnit}
+                                </div>
+                                {typeof product.stockQuantity === "number" && (
+                                  <div className="text-muted-foreground">
+                                    <span className="font-medium">Estoque (CSV):</span> {product.stockQuantity}
+                                    {product.stockUnit ? ` ${product.stockUnit}` : ""}
+                                  </div>
+                                )}
+                                <div className="mt-1">
+                                  {product.inventoryMatch === "matched" ? (
+                                    <span className="text-green-700">Vínculo OK (item encontrado)</span>
+                                  ) : product.inventoryMatch === "will_create" ? (
+                                    <span className="text-blue-700">Item não encontrado (será criado)</span>
+                                  ) : product.inventoryMatch === "ambiguous" ? (
+                                    <div className="space-y-2">
+                                      <div className="text-amber-700">Ambíguo: existem itens duplicados no estoque</div>
+                                      <Select
+                                        value={product.resolvedInventoryItemId ?? ""}
+                                        onValueChange={(value) => {
+                                          setImportedProducts((prev) =>
+                                            prev.map((p) => {
+                                              if (p.row !== product.row) return p;
+                                              if (value === "__skip__") {
+                                                return { ...p, resolvedInventoryItemId: "__skip__", inventoryMatch: "not_requested" };
+                                              }
+                                              if (value === "__create__") {
+                                                return { ...p, resolvedInventoryItemId: "__create__", inventoryMatch: "will_create" };
+                                              }
+                                              return { ...p, resolvedInventoryItemId: value, inventoryMatch: "matched" };
+                                            })
+                                          );
+                                        }}
+                                      >
+                                        <SelectTrigger className="h-8 text-xs">
+                                          <SelectValue placeholder="Escolha o item correto" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {(product.inventoryCandidates ?? []).map((c) => (
+                                            <SelectItem key={c.id} value={c.id}>
+                                              {c.name} ({c.unit})
+                                            </SelectItem>
+                                          ))}
+                                          <SelectItem value="__create__">Criar novo item no estoque</SelectItem>
+                                          <SelectItem value="__skip__">Não vincular este produto</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                  ) : product.inventoryMatch === "missing" ? (
+                                    <span className="text-amber-700">
+                                      Item não encontrado {autoCreateStockItems ? "(será criado)" : "(não será vinculado)"}
+                                    </span>
+                                  ) : (
+                                    <span className="text-muted-foreground">Sem vínculo</span>
+                                  )}
+                                </div>
+                                {product.warnings?.length ? (
+                                  <div className="mt-1 text-amber-700">
+                                    {product.warnings[0]}
+                                  </div>
+                                ) : null}
+                              </div>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </td>
                           <td className="p-2">
                             {isError ? (
                               <div className="flex items-center gap-1 text-red-600">
@@ -839,10 +1392,16 @@ Camiseta Estampada,Estampado,"camiseta, tinta",0.5,35.00,50,Camiseta Básica,1.0
           <Button type="button" variant="outline" onClick={handleClose} disabled={isImporting}>
             {importResults.success > 0 ? "Fechar" : "Cancelar"}
           </Button>
+          {importReport && !isImporting && (
+            <Button type="button" variant="outline" onClick={downloadImportReport}>
+              <Download className="h-4 w-4 mr-2" />
+              Baixar Relatório
+            </Button>
+          )}
           <Button
             type="button"
             onClick={handleImport}
-            disabled={validProducts.length === 0 || isImporting || importResults.success > 0}
+            disabled={validProducts.length === 0 || isImporting || importResults.success > 0 || hasBlockingReview}
           >
             {isImporting ? (
               <>

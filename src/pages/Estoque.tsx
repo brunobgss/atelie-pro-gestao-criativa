@@ -22,6 +22,7 @@ import {
   Download,
   Filter,
   History,
+  HelpCircle,
   PackageSearch,
   Plus,
   TrendingDown,
@@ -35,6 +36,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { DialogDescription } from "@/components/ui/dialog";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -183,6 +185,7 @@ export default function Estoque() {
   const [searchTerm, setSearchTerm] = useState("");
   const [typeFilter, setTypeFilter] = useState<InventoryItemType | "all">("all");
   const [isAlertsDialogOpen, setIsAlertsDialogOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [alertForm, setAlertForm] = useState<AlertFormState>(ALERT_DEFAULTS);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [isSelecting, setIsSelecting] = useState(false);
@@ -619,6 +622,57 @@ export default function Estoque() {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-nowrap">
+            <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <HelpCircle className="mr-2 h-4 w-4" />
+                  Ajuda
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Ajuda rápida — Estoque</DialogTitle>
+                  <DialogDescription>
+                    O Estoque é onde você controla matérias-primas, tecidos e produtos acabados. Depois, no Catálogo, você vincula os produtos aos itens do estoque para medir consumo.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-5 text-sm">
+                  <div className="space-y-2">
+                    <p className="font-semibold">1) Cadastre seus itens principais</p>
+                    <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
+                      <li>Crie itens como: “Tecido Algodão”, “Linha preta”, “Zíper 20cm”, “Botão 18mm”.</li>
+                      <li>Escolha bem a <strong>unidade</strong> (metros, unidades, kg). Isso melhora a leitura e evita erro no consumo.</li>
+                      <li>Defina <strong>mínimo</strong> para o sistema te avisar antes de faltar.</li>
+                    </ul>
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="font-semibold">2) Importar estoque (se você já tem planilha)</p>
+                    <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
+                      <li>Use o botão de importação aqui no Estoque para subir seus itens em lote.</li>
+                      <li>Depois, no Catálogo, você pode importar produtos já com “Item Estoque” e “Qtd/Un” para vincular automaticamente.</li>
+                    </ul>
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="font-semibold">3) Alertas automáticos</p>
+                    <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
+                      <li>Ative “Alertas” para receber por e-mail quando um item ficar baixo/crítico.</li>
+                      <li>Se estiver testando, use “Executar agora”.</li>
+                    </ul>
+                  </div>
+
+                  <div className="rounded-lg border bg-muted/10 p-4 text-muted-foreground">
+                    <p className="font-semibold text-foreground mb-1">Dica prática</p>
+                    <p>
+                      Padronize nomes e unidades. Ex: sempre “metros” para tecido e “unidades” para aviamentos. Isso deixa a importação e a vinculação muito mais “perfeitas”.
+                    </p>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+
             {isSelecting && selectedItems.length > 0 && (
               <Button 
                 variant="destructive" 

@@ -6,9 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Package, Plus, Edit, Trash2, Copy, Search, Filter, Clock, Layers, Upload, X, Image as ImageIcon, Link2, Download } from "lucide-react";
+import { Package, Plus, Edit, Trash2, Copy, Search, Filter, Clock, Layers, Upload, X, Image as ImageIcon, Link2, Download, HelpCircle } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { toast } from "sonner";
 import { getProducts, createProduct, updateProduct, deleteProduct } from "@/integrations/supabase/products";
@@ -67,6 +67,13 @@ export default function CatalogoProdutos() {
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [isSelecting, setIsSelecting] = useState(false);
   const [dialogVinculosMassaOpen, setDialogVinculosMassaOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [copiedLinks, setCopiedLinks] = useState<null | {
+    sourceProductId: string;
+    sourceName: string;
+    inventory_items: string[];
+    inventory_quantities: number[];
+  }>(null);
 
   const categories = ["all", "Uniforme", "Personalizado", "Bordado", "Estampado"];
 
@@ -427,6 +434,151 @@ export default function CatalogoProdutos() {
     }
   };
 
+  const parseLinksFromProductRow = (productRow: any) => {
+    let inventory_items: string[] = [];
+    let inventory_quantities: number[] = [];
+
+    if (productRow?.inventory_items) {
+      if (typeof productRow.inventory_items === "string") {
+        try {
+          inventory_items = JSON.parse(productRow.inventory_items);
+        } catch {
+          inventory_items = [];
+        }
+      } else if (Array.isArray(productRow.inventory_items)) {
+        inventory_items = productRow.inventory_items;
+      }
+    }
+
+    if (productRow?.inventory_quantities) {
+      if (typeof productRow.inventory_quantities === "string") {
+        try {
+          inventory_quantities = JSON.parse(productRow.inventory_quantities);
+        } catch {
+          inventory_quantities = [];
+        }
+      } else if (Array.isArray(productRow.inventory_quantities)) {
+        inventory_quantities = productRow.inventory_quantities;
+      }
+    }
+
+    const min = Math.min(inventory_items.length, inventory_quantities.length);
+    return {
+      inventory_items: inventory_items.slice(0, min).filter(Boolean),
+      inventory_quantities: inventory_quantities.slice(0, min).map((n: any) => Number(n) || 0),
+    };
+  };
+
+  const handleCopyLinksFromSelected = async () => {
+    if (selectedProducts.length !== 1) {
+      toast.error("Selecione exatamente 1 produto para copiar os vínculos");
+      return;
+    }
+
+    try {
+      const productsData = await getProducts();
+      const productFull = productsData.find((p) => p.id === selectedProducts[0]);
+      if (!productFull) {
+        toast.error("Não foi possível carregar o produto para copiar vínculos");
+        return;
+      }
+      const parsed = parseLinksFromProductRow(productFull);
+      if (parsed.inventory_items.length === 0) {
+        toast.warning("Este produto não possui vínculos para copiar");
+        return;
+      }
+      setCopiedLinks({
+        sourceProductId: productFull.id,
+        sourceName: productFull.name,
+        inventory_items: parsed.inventory_items,
+        inventory_quantities: parsed.inventory_quantities,
+      });
+      toast.success(`Vínculos copiados de: ${productFull.name}`);
+    } catch (e) {
+      toast.error("Erro ao copiar vínculos");
+    }
+  };
+
+  const applyCopiedLinksToSelected = async (mode: "replace" | "merge") => {
+    if (!copiedLinks) {
+      toast.error("Nenhum vínculo copiado");
+      return;
+    }
+    if (selectedProducts.length === 0) {
+      toast.error("Selecione pelo menos 1 produto");
+      return;
+    }
+
+    if (mode === "replace") {
+      const ok = confirm(
+        `Você está prestes a SUBSTITUIR todos os vínculos de ${selectedProducts.length} produto(s) pelos vínculos copiados de "${copiedLinks.sourceName}".\n\nDeseja continuar?`
+      );
+      if (!ok) return;
+    }
+
+    let success = 0;
+    let fail = 0;
+
+    try {
+      const productsData = await getProducts();
+      const byId = new Map(productsData.map((p) => [p.id, p]));
+
+      for (const productId of selectedProducts) {
+        try {
+          const row = byId.get(productId);
+          if (!row) {
+            fail++;
+            continue;
+          }
+
+          if (mode === "replace") {
+            const res = await updateProduct(productId, {
+              inventory_items: copiedLinks.inventory_items,
+              inventory_quantities: copiedLinks.inventory_quantities,
+            });
+            if (res.ok) success++;
+            else fail++;
+            continue;
+          }
+
+          // merge
+          const existing = parseLinksFromProductRow(row);
+          const mergedItems = [...existing.inventory_items];
+          const mergedQtys = [...existing.inventory_quantities];
+
+          copiedLinks.inventory_items.forEach((itemId, idx) => {
+            const q = copiedLinks.inventory_quantities[idx] ?? 0;
+            const existingIdx = mergedItems.indexOf(itemId);
+            if (existingIdx >= 0) {
+              mergedQtys[existingIdx] = q; // padrão: atualiza com o valor copiado
+            } else {
+              mergedItems.push(itemId);
+              mergedQtys.push(q);
+            }
+          });
+
+          const res = await updateProduct(productId, {
+            inventory_items: mergedItems.length ? mergedItems : undefined,
+            inventory_quantities: mergedQtys.length ? mergedQtys : undefined,
+          });
+          if (res.ok) success++;
+          else fail++;
+        } catch {
+          fail++;
+        }
+      }
+
+      if (success) toast.success(`${success} produto(s) atualizado(s)`);
+      if (fail) toast.error(`${fail} produto(s) falharam`);
+      if (success) {
+        refetch();
+        queryClient.invalidateQueries({ queryKey: ["products"] });
+      }
+    } catch {
+      toast.error("Erro ao aplicar vínculos copiados");
+    }
+  };
+
   const createQuoteFromProduct = (product: Product) => {
     const quoteText = `
 🧵 *ORÇAMENTO ATELIÊ PRO*
@@ -558,6 +710,44 @@ _Orçamento gerado pelo Ateliê Pro_
                   <span className="hidden md:inline">Vincular Estoque ({selectedProducts.length})</span>
                   <span className="md:hidden">Vincular</span>
                 </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleCopyLinksFromSelected}
+                  disabled={selectedProducts.length !== 1}
+                  className="w-full md:w-auto"
+                  title="Copiar vínculos do produto selecionado"
+                >
+                  <Copy className="w-4 h-4 mr-1 md:mr-2" />
+                  <span className="hidden md:inline">Copiar vínculos</span>
+                  <span className="md:hidden">Copiar</span>
+                </Button>
+                {copiedLinks && (
+                  <>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => applyCopiedLinksToSelected("merge")}
+                      className="w-full md:w-auto"
+                      title={`Mesclar vínculos copiados de ${copiedLinks.sourceName}`}
+                    >
+                      <Link2 className="w-4 h-4 mr-1 md:mr-2" />
+                      <span className="hidden md:inline">Mesclar vínculos</span>
+                      <span className="md:hidden">Mesclar</span>
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => applyCopiedLinksToSelected("replace")}
+                      className="w-full md:w-auto"
+                      title={`Substituir vínculos pelos copiados de ${copiedLinks.sourceName}`}
+                    >
+                      <Link2 className="w-4 h-4 mr-1 md:mr-2" />
+                      <span className="hidden md:inline">Substituir vínculos</span>
+                      <span className="md:hidden">Substituir</span>
+                    </Button>
+                  </>
+                )}
                 <Button 
                   size="sm" 
                   variant="destructive" 
@@ -585,6 +775,62 @@ _Orçamento gerado pelo Ateliê Pro_
             )}
             {!isSelecting && (
               <>
+                <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
+                  <DialogTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full md:w-auto"
+                    >
+                      <HelpCircle className="w-4 h-4 mr-1 md:mr-2" />
+                      <span className="hidden md:inline">Ajuda</span>
+                      <span className="md:hidden">Ajuda</span>
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>Ajuda rápida — Catálogo + Estoque</DialogTitle>
+                      <DialogDescription>
+                        O Catálogo guarda seus modelos de produtos. O Estoque guarda seus materiais/itens. A “mágica” é vincular um produto do catálogo aos itens do estoque para consumo por unidade.
+                      </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-5 text-sm">
+                      <div className="space-y-2">
+                        <p className="font-semibold">1) Importar produtos com vínculo automático</p>
+                        <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
+                          <li>Clique em <strong>Importar Produtos</strong> e use as colunas opcionais: <strong>Item Estoque</strong> e <strong>Quantidade por Unidade</strong>.</li>
+                          <li>Se você incluir <strong>Estoque</strong> e marcar “Sobrescrever estoque”, o sistema vai ajustar o saldo do item do estoque pelo CSV.</li>
+                          <li>Se marcar “Criar item no estoque automaticamente”, itens ausentes são criados pelo nome do CSV.</li>
+                        </ul>
+                      </div>
+
+                      <div className="space-y-2">
+                        <p className="font-semibold">2) Vincular estoque em massa (mais rápido)</p>
+                        <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
+                          <li>Clique em <strong>Selecionar</strong>, marque vários produtos e use <strong>Vincular</strong>.</li>
+                          <li>Use “Substituir vínculos existentes” quando você quer que cada produto fique ligado apenas a 1 item.</li>
+                        </ul>
+                      </div>
+
+                      <div className="space-y-2">
+                        <p className="font-semibold">3) Vincular estoque por produto (mais detalhado)</p>
+                        <ul className="list-disc pl-5 space-y-1 text-muted-foreground">
+                          <li>No card do produto, clique no ícone de <strong>Vínculos de Estoque</strong> (corrente).</li>
+                          <li>Use isso quando um produto consome múltiplos itens (ex: tecido + linha + zíper).</li>
+                        </ul>
+                      </div>
+
+                      <div className="rounded-lg border bg-muted/10 p-4 text-muted-foreground">
+                        <p className="font-semibold text-foreground mb-1">Dica prática</p>
+                        <p>
+                          Padronize nomes (ex: “Tecido Algodão 30.1”) para facilitar o casamento automático. Se tiver dúvidas, exporte o estoque e use exatamente os mesmos nomes no CSV do catálogo.
+                        </p>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+
                 <Button 
                   size="sm" 
                   variant="outline" 
