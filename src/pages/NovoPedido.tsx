@@ -556,6 +556,18 @@ export default function NovoPedido() {
       toast.error(appError.message);
       return;
     }
+
+    // Se houve avisos de estoque (saldo negativo/baixo), armazenar para exibir na tela do pedido.
+    if ((result as any).inventoryWarnings && Array.isArray((result as any).inventoryWarnings) && (result as any).inventoryWarnings.length > 0) {
+      try {
+        localStorage.setItem(
+          `inventoryWarnings:${code}`,
+          JSON.stringify((result as any).inventoryWarnings)
+        );
+      } catch {
+        // Ignorar falha de storage
+      }
+    }
     
     // Log de sucesso
     logger.userAction('order_created', 'NOVO_PEDIDO', { 

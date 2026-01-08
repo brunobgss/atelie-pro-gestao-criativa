@@ -191,12 +191,15 @@ begin
     end if;
   end if;
 
-  new_quantity := greatest(0, coalesce(current_quantity, 0) + delta);
+  -- Permitir saldo negativo para representar falta real (backorder).
+  -- Avisos/alertas devem ser exibidos no app quando quantidade_atual < 0.
+  new_quantity := coalesce(current_quantity, 0) + delta;
 
   update public.inventory_items
     set quantity = new_quantity,
         total_cost = case
-          when cost_per_unit is not null then new_quantity * cost_per_unit
+          -- total_cost não deve ficar negativo (valor de estoque físico).
+          when cost_per_unit is not null then greatest(new_quantity, 0) * cost_per_unit
           else total_cost
         end,
         status = case
