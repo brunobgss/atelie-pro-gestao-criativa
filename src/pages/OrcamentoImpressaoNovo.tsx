@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Printer } from "lucide-react";
 import PrintLayout from "@/components/PrintLayout";
 import { useAuth } from "@/components/AuthProvider";
+import { parseISODateAsLocal } from "@/utils/dateOnly";
 
 // Função para formatar moeda
 const formatCurrency = (value: number) => {
@@ -273,9 +274,25 @@ export default function OrcamentoImpressaoNovo() {
               console.log("Empresa:", empresa);
 
               // Calcular data de validade (7 dias a partir da data do orçamento)
-              const quoteDate = new Date(safeQuote.date);
+              const quoteDate = parseISODateAsLocal(safeQuote.date);
               const validityDate = new Date(quoteDate);
               validityDate.setDate(validityDate.getDate() + 7);
+
+              // Extrair dados "extras" das observações (sem mexer no layout do PDF)
+              const extractPaymentMethod = (observations?: string | null): string | null => {
+                if (!observations) return null;
+                const match = observations.match(/Forma de pagamento:\s*([^\n\r]+)/i);
+                return match?.[1]?.trim() || null;
+              };
+
+              const extractDeliveryDateBR = (observations?: string | null): string | null => {
+                if (!observations) return null;
+                const match = observations.match(/Data de entrega estimada:\s*(\d{1,2}\/\d{1,2}\/\d{4})/i);
+                return match?.[1]?.trim() || null;
+              };
+
+              const paymentMethodText = extractPaymentMethod(safeQuote.observations) ?? "A combinar";
+              const deliveryDateText = extractDeliveryDateBR(safeQuote.observations) ?? "A combinar";
 
               // Dados da empresa
               const empresaNome = empresa?.nome || "Empresa";
@@ -598,9 +615,9 @@ export default function OrcamentoImpressaoNovo() {
                           <th>Responsável</th>
                         </tr>
                         <tr>
-                          <td>A combinar</td>
+                          <td>${paymentMethodText}</td>
                           <td>-</td>
-                          <td>A combinar</td>
+                          <td>${deliveryDateText}</td>
                           <td>-</td>
                           <td>Não</td>
                           <td>${empresaResponsavel}</td>

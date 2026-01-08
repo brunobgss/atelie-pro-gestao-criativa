@@ -13,6 +13,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listQuotes, deleteQuote, approveQuote, getQuoteByCode } from "@/integrations/supabase/quotes";
 import { toast } from "sonner";
+import { isoDateToBR } from "@/utils/dateOnly";
 import { useAuth } from "@/components/AuthProvider";
 import { useInternationalization } from "@/contexts/InternationalizationContext";
 import { useSync } from "@/contexts/SyncContext";
@@ -537,7 +538,7 @@ ${empresa?.nome || 'Ateliê'}`;
                       <div>
                         <p className="text-xs text-muted-foreground">Data</p>
                         <p className="text-sm font-medium text-foreground">
-                          {new Date(quote.date).toLocaleDateString('pt-BR')}
+                          {isoDateToBR(quote.date) || "—"}
                         </p>
                       </div>
                     </div>

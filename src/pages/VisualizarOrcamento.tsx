@@ -9,6 +9,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { useInternationalization } from "@/contexts/InternationalizationContext";
 import { useState } from "react";
 import { fixEncoding } from "@/utils/fixEncoding";
+import { isoDateToBR } from "@/utils/dateOnly";
 
 export default function VisualizarOrcamento() {
   const { id } = useParams<{ id: string }>();
@@ -184,7 +185,7 @@ export default function VisualizarOrcamento() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Data</p>
-                  <p>{new Date(quote.date).toLocaleDateString('pt-BR')}</p>
+                  <p>{isoDateToBR(quote.date) || "—"}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Cliente</p>

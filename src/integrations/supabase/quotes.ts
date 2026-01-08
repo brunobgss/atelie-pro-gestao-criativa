@@ -444,12 +444,8 @@ export async function approveQuote(quoteCode: string): Promise<{ ok: boolean; er
 
         const [day, month, year] = match[1].split("/").map((part) => parseInt(part, 10));
         if (!day || !month || !year) return null;
-
-        const date = new Date(year, month - 1, day);
-        if (isNaN(date.getTime())) return null;
-
-        // Salvar apenas a parte de data em formato ISO (YYYY-MM-DD)
-        return date.toISOString().split("T")[0];
+        // Salvar apenas a parte de data em formato ISO (YYYY-MM-DD) sem bug de timezone
+        return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
       } catch (e) {
         console.warn("Não foi possível extrair data de entrega das observações:", e);
         return null;

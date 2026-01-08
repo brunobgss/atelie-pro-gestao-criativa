@@ -8,11 +8,13 @@ import { useQuery } from "@tanstack/react-query";
 import { listOrders } from "@/integrations/supabase/orders";
 import { useAuth } from "@/components/AuthProvider";
 import { toast } from "sonner";
+import { formatDateBR, parseISODateAsLocal } from "@/utils/dateOnly";
 
 interface DeliveryEvent {
   id: string;
   date: string;
   client: string;
+  phone?: string | null;
   type: string;
   status: string;
   orderCode: string;
@@ -35,7 +37,7 @@ export default function Agenda() {
   const deliveryEvents: DeliveryEvent[] = orders
     .filter(order => order.delivery_date && order.status !== 'Cancelado' && order.status !== 'Entregue') // Filtrar pedidos com data de entrega, não cancelados e não entregues
     .map(order => {
-      const deliveryDate = new Date(order.delivery_date!);
+      const deliveryDate = parseISODateAsLocal(order.delivery_date!);
       const today = new Date();
       const diffTime = deliveryDate.getTime() - today.getTime();
       const daysUntilDelivery = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -44,6 +46,7 @@ export default function Agenda() {
         id: order.id,
         date: order.delivery_date!,
         client: order.customer_name,
+        phone: (order as any).customer_phone ?? null,
         type: order.type,
         status: order.status,
         orderCode: order.code,
@@ -122,13 +125,22 @@ export default function Agenda() {
       const customTemplate = empresa?.id ? await getWhatsAppTemplate(empresa.id, 'delivery') : null;
       
       let message = '';
+
+      const normalizeWhatsAppPhone = (phone?: string | null): string | undefined => {
+        if (!phone) return undefined;
+        const digits = String(phone).replace(/\D/g, "");
+        if (!digits) return undefined;
+        if (digits.startsWith("55")) return digits;
+        if (digits.length === 10 || digits.length === 11) return `55${digits}`;
+        return digits;
+      };
       
       // Se tem template personalizado, usar ele
       if (customTemplate) {
         message = processTemplate(customTemplate, {
           cliente: event.client,
           codigo_pedido: event.orderCode,
-          data_entrega: new Date(event.date).toLocaleDateString('pt-BR'),
+          data_entrega: formatDateBR(event.date),
           tipo: event.type,
           status: event.status,
           dias_restantes: event.daysUntilDelivery > 0 ? event.daysUntilDelivery.toString() : 'Atrasado'
@@ -137,7 +149,7 @@ export default function Agenda() {
         // Template padrão
         message = `Olá ${event.client}!
 
-Lembramos que seu pedido ${event.orderCode} tem entrega prevista para ${new Date(event.date).toLocaleDateString('pt-BR')}.
+Lembramos que seu pedido ${event.orderCode} tem entrega prevista para ${formatDateBR(event.date)}.
 
 *DETALHES:*
 • Tipo: ${event.type}
@@ -154,7 +166,8 @@ _${empresa?.nome || 'Ateliê'}_`;
       message = addSignature(message, settings);
 
       // Gerar URL do WhatsApp
-      const whatsappUrl = generateWhatsAppUrl(message, settings?.whatsapp_number);
+      const phone = normalizeWhatsAppPhone(event.phone) ?? normalizeWhatsAppPhone(settings?.whatsapp_number);
+      const whatsappUrl = generateWhatsAppUrl(message, phone);
       window.open(whatsappUrl, '_blank');
       toast.success("Mensagem do WhatsApp preparada!");
     } catch (error) {
