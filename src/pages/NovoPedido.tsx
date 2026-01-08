@@ -152,49 +152,21 @@ export default function NovoPedido() {
 
   // Atualizar estado do valor total
   useEffect(() => {
-    setTotalValue(calculatedTotal);
+    // Só forçar o valor quando ele está sendo calculado automaticamente
+    // (quando existem produtos/serviços adicionados). Assim evitamos sobrescrever
+    // o valor digitado manualmente quando a lista está vazia.
+    if (addedCatalogProducts.length > 0 || addedServices.length > 0) {
+      setTotalValue(calculatedTotal);
+    }
   }, [calculatedTotal]);
 
-  // Atualizar campo de valor no DOM quando o total mudar
+  // Mudar tipo automaticamente para "catalogo" quando um produto é selecionado
   useEffect(() => {
-    const updateValue = () => {
-      // Tentar usar ref primeiro, depois getElementById
-      const valueInput = valueInputRef.current || (document.getElementById("value") as HTMLInputElement);
-      
-      if (valueInput) {
-        const previousValue = valueInput.value;
-        const newValue = totalValue.toFixed(2);
-        
-        // Atualizar valor
-        valueInput.value = newValue;
-        
-        // Disparar eventos para garantir que React detecte a mudança
-        valueInput.dispatchEvent(new Event('input', { bubbles: true, cancelable: true }));
-        valueInput.dispatchEvent(new Event('change', { bubbles: true, cancelable: true }));
-        
-        // Forçar atualização usando setter nativo (para inputs não controlados)
-        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
-        if (nativeInputValueSetter) {
-          nativeInputValueSetter.call(valueInput, newValue);
-          valueInput.dispatchEvent(new Event('input', { bubbles: true }));
-        }
-        
-        if (previousValue !== newValue) {
-          logger.debug(`💰 Valor total atualizado: R$ ${previousValue} → R$ ${newValue} (${addedCatalogProducts.length} produto(s) + ${addedServices.length} serviço(s))`);
-        }
-      } else {
-        logger.warn('⚠️ Campo de valor não encontrado no DOM');
-      }
-    };
-
-    // Atualizar imediatamente
-    updateValue();
-    
-    // Também tentar após um pequeno delay para garantir que o DOM esteja renderizado
-    const timeoutId = setTimeout(updateValue, 100);
-
-    return () => clearTimeout(timeoutId);
-  }, [totalValue, addedCatalogProducts, addedServices]);
+    if (selectedProduct && type !== "catalogo") {
+      setType("catalogo");
+      logger.debug(`🔄 Tipo alterado automaticamente para "catalogo" ao selecionar produto`);
+    }
+  }, [selectedProduct, type]);
 
   const [isKitMode, setIsKitMode] = useState<boolean>(false);
   const [kitItems, setKitItems] = useState<Array<{id: string, size: string, quantity: number}>>([
@@ -222,11 +194,11 @@ export default function NovoPedido() {
         setClientName(orderData.client || "");
         buscarMedidasCliente(orderData.client || "");
         const descriptionInput = document.getElementById("description") as HTMLTextAreaElement;
-        const valueInput = document.getElementById("value") as HTMLInputElement;
         const paidInput = document.getElementById("paid") as HTMLInputElement;
         
         if (descriptionInput) descriptionInput.value = orderData.description;
-        if (valueInput) valueInput.value = orderData.value.toString();
+        if (typeof orderData.value === "number") setTotalValue(orderData.value);
+        else if (orderData.value) setTotalValue(Number(orderData.value) || 0);
         if (paidInput) paidInput.value = orderData.paid.toString();
         
         // Limpar dados duplicados após uso
@@ -385,7 +357,7 @@ export default function NovoPedido() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Não permitir envio se estiver fazendo upload
     if (isUploading) {
       toast.warning("Aguarde o upload do arquivo terminar");
@@ -404,21 +376,32 @@ export default function NovoPedido() {
       // Garantir que seja apenas a data (remover qualquer parte de hora/timezone se houver)
       const dateValue = deliveryInput.value;
       delivery = dateValue.split('T')[0]; // Pega apenas a parte da data (YYYY-MM-DD)
-      console.log("📅 Data de entrega capturada (sem timezone):", delivery, "valor original:", dateValue);
     }
     const code = generateOrderCode();
 
     // Validação de campos obrigatórios
     // Validação robusta
+    // Se houver produtos do catálogo ou serviços adicionados, não validar quantidade (ela é controlada pelos produtos/serviços)
+    const shouldValidateQuantity = addedCatalogProducts.length === 0 && addedServices.length === 0;
+    
+    // Garantir que quantity está disponível - capturar do estado
+    const currentQuantity = typeof quantity !== 'undefined' ? quantity : 1;
+    
     const validation = validateForm(
-      { client, type, description, value, delivery, quantity },
+      { client, type, description, value, delivery, quantity: currentQuantity },
       {
         client: validateName,
         type: (value) => value && typeof value === 'string' && value.trim() !== "" ? { isValid: true, errors: [] } : { isValid: false, errors: ['Tipo do pedido é obrigatório'] },
         description: validateDescription,
         value: validateMoney,
         delivery: validateDate,
-        quantity: (value) => typeof value === 'number' && value > 0 ? { isValid: true, errors: [] } : { isValid: false, errors: ['Quantidade deve ser maior que zero'] }
+        quantity: (value) => {
+          if (!shouldValidateQuantity) {
+            // Se há produtos/serviços adicionados, quantidade não é obrigatória
+            return { isValid: true, errors: [] };
+          }
+          return typeof value === 'number' && value > 0 ? { isValid: true, errors: [] } : { isValid: false, errors: ['Quantidade deve ser maior que zero'] };
+        }
       }
     );
     
@@ -461,7 +444,8 @@ export default function NovoPedido() {
       } else {
         const sizeInfo = size ? ` | Tamanho: ${size}` : "";
         const colorInfo = color ? ` | Cor: ${color}` : "";
-        finalDescription = `${finalDescription}\nQtd: ${quantity}${sizeInfo}${colorInfo}`;
+        const currentQuantity = typeof quantity !== 'undefined' ? quantity : 1;
+        finalDescription = `${finalDescription}\nQtd: ${currentQuantity}${sizeInfo}${colorInfo}`;
       }
     }
 
@@ -500,21 +484,18 @@ export default function NovoPedido() {
         id: product.id,
         quantity: product.quantity
       }));
-      console.log("📦 Usando produtos da lista adicionada para baixa de estoque:", {
-        products: productsForInventory,
-        totalProducts: addedCatalogProducts.length,
-        originalType: type,
-        finalType: finalType
-      });
     } else if (type === "catalogo" && selectedProduct) {
       // Fallback: usar produto selecionado (caso não tenha clicado em "Adicionar")
       productsForInventory = [{
         id: selectedProduct,
-        quantity: isKitMode ? getTotalKitQuantity() : quantity
+        quantity: isKitMode ? getTotalKitQuantity() : (typeof quantity !== 'undefined' ? quantity : 1)
       }];
-      console.log("📦 Usando produto selecionado para baixa de estoque:", {
-        products: productsForInventory
-      });
+    }
+    
+    // Garantir que se há produtos para estoque, o tipo seja "catalogo"
+    if (productsForInventory && productsForInventory.length > 0 && finalType !== "catalogo") {
+      console.warn("⚠️ Produtos encontrados mas tipo não é 'catalogo'. Corrigindo...");
+      finalType = "catalogo";
     }
     
     // Processar serviços adicionados para baixa de estoque
@@ -523,14 +504,12 @@ export default function NovoPedido() {
         id: service.id,
         quantity: service.quantity
       }));
-      console.log("🔧 Usando serviços da lista adicionada para baixa de estoque:", {
-        services: servicesForInventory,
-        totalServices: addedServices.length
-      });
     }
 
     // Medir performance e criar pedido
-    const result = await performanceMonitor.measure(
+    let result;
+    try {
+      result = await performanceMonitor.measure(
       'createOrder',
       async () => {
         return await createOrder({
@@ -559,10 +538,16 @@ export default function NovoPedido() {
       },
       'NovoPedido'
     );
-    
+    } catch (error) {
+      console.error("❌ ERRO AO CHAMAR createOrder:", error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      toast.error(`Erro ao criar pedido: ${errorMessage}`);
+      return;
+    }
     console.log("Resultado da criação do pedido:", result);
     
     if (!result.ok) {
+      console.error("❌ ERRO AO CRIAR PEDIDO:", result.error);
       const appError = errorHandler.handleSupabaseError(
         { message: result.error, code: 'CREATE_ORDER_ERROR' },
         'createOrder'
@@ -578,7 +563,7 @@ export default function NovoPedido() {
       client, 
       type, 
       value, 
-      quantity: isKitMode ? getTotalKitQuantity() : quantity,
+      quantity: isKitMode ? getTotalKitQuantity() : (typeof quantity !== 'undefined' ? quantity : 1),
       personalizationCount: personalizations.length,
     });
     
@@ -1322,7 +1307,7 @@ export default function NovoPedido() {
                     required
                     className="border-input"
                     readOnly={addedCatalogProducts.length > 0 || addedServices.length > 0}
-                    value={addedCatalogProducts.length > 0 || addedServices.length > 0 ? totalValue.toFixed(2) : undefined}
+                    value={totalValue.toFixed(2)}
                     onChange={(e) => {
                       if (!(addedCatalogProducts.length > 0 || addedServices.length > 0)) {
                         setTotalValue(Number(e.target.value) || 0);

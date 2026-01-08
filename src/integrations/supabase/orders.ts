@@ -170,7 +170,7 @@ export async function getOrderByCode(code: string): Promise<OrderRow | null> {
 }
 
 // Função auxiliar para fazer baixa automática de estoque quando um produto do catálogo é vendido
-async function baixarEstoqueAutomatico(
+export async function baixarEstoqueAutomatico(
   productId: string,
   quantity: number,
   orderCode: string,
@@ -178,7 +178,7 @@ async function baixarEstoqueAutomatico(
   empresaId: string
 ): Promise<void> {
   try {
-    console.log(`📦 Iniciando baixa automática de estoque para produto ${productId}, quantidade: ${quantity}`);
+    console.error(`📦 Iniciando baixa automática de estoque para produto ${productId}, quantidade: ${quantity}`);
     
     // Buscar produto do catálogo
     const product = await getProductById(productId);
@@ -753,7 +753,15 @@ export async function createOrder(input: {
 }): Promise<{ ok: boolean; id?: string; error?: string }> {
   try {
     const code = input.code ?? generateOrderCode();
-    console.log("Código do pedido gerado:", code);
+    console.error("📝 Criando pedido - Dados recebidos:", {
+      code,
+      type: input.type,
+      products: input.products,
+      product_id: input.product_id,
+      quantity: input.quantity,
+      services: input.services,
+      productsCount: input.products?.length || 0
+    });
     
     // Obter empresa_id do usuário logado
     const empresa_id = await getCurrentEmpresaId();
@@ -783,9 +791,24 @@ export async function createOrder(input: {
       return { ok: false, error: (error as any)?.message || "Erro ao criar pedido" };
     }
 
-    console.log("Pedido criado com sucesso:", data);
+    console.log("✅ Pedido criado com sucesso:", {
+      id: data?.id,
+      code: data?.code,
+      type: data?.type
+    });
 
     const orderData = data as any;
+    
+    console.error("🔍 DEBUG - Dados do pedido criado:", {
+      orderId: orderData?.id,
+      orderCode: orderData?.code,
+      orderType: orderData?.type,
+      inputType: input.type,
+      inputProducts: input.products,
+      inputProductId: input.product_id,
+      inputQuantity: input.quantity,
+      hasProducts: (input.products && input.products.length > 0) || (input.product_id && input.quantity)
+    });
     if (input.personalizations?.length && orderData?.id) {
       const personalizations = input.personalizations
         .filter((p) => p.person_name?.trim())
@@ -842,61 +865,75 @@ export async function createOrder(input: {
     }
 
     // BAIXA AUTOMÁTICA DE ESTOQUE: Se for pedido do catálogo com produtos selecionados
-    if (input.type === "catalogo") {
+    // Verificar se há produtos mesmo que o tipo não seja explicitamente "catalogo"
+    const hasProducts = (input.products && input.products.length > 0) || (input.product_id && input.quantity);
+    const shouldProcessInventory = input.type === "catalogo" || hasProducts;
+    
+    console.error("🔍 Verificando baixa de estoque:", {
+      type: input.type,
+      hasProducts,
+      products: input.products,
+      product_id: input.product_id,
+      quantity: input.quantity,
+      shouldProcessInventory
+    });
+    
+    if (shouldProcessInventory) {
       // Priorizar lista de produtos (nova forma)
       const productsToProcess = input.products && input.products.length > 0
         ? input.products
         : (input.product_id && input.quantity ? [{ id: input.product_id, quantity: input.quantity }] : []);
       
       if (productsToProcess.length > 0) {
-        console.log("🚀 Iniciando baixa automática de estoque para pedido do catálogo", {
+        console.error("🚀 Iniciando baixa automática de estoque para pedido do catálogo", {
           type: input.type,
           products_count: productsToProcess.length,
           order_code: orderData.code,
-          empresa_id
+          empresa_id,
+          products: productsToProcess
         });
-        
-        // Executar de forma assíncrona mas aguardar um pouco para garantir que o pedido foi salvo
-        // Não bloquear a resposta, mas garantir que execute
-        // IMPORTANTE: Usar Promise para garantir que execute mesmo se houver erro
-        Promise.resolve().then(async () => {
-          // Aguardar um pouco para garantir que o pedido foi salvo
-          await new Promise(resolve => setTimeout(resolve, 500));
-          try {
-            console.log("🔄 Executando baixa automática de estoque para todos os produtos...");
-            
-            // Processar cada produto individualmente
-            let successCount = 0;
-            let errorCount = 0;
-            
-            for (const product of productsToProcess) {
-              try {
-                await baixarEstoqueAutomatico(
-                  product.id,
-                  product.quantity,
-                  orderData.code,
-                  orderData.id, // Passar ID do pedido (UUID) para origem_id
-                  empresa_id
-                );
-                successCount++;
-                console.log(`✅ Baixa de estoque concluída para produto ${product.id} (quantidade: ${product.quantity})`);
-              } catch (error) {
-                errorCount++;
-                console.error(`❌ Erro na baixa de estoque para produto ${product.id}:`, error);
-              }
+
+        // IMPORTANTE:
+        // Não podemos "agendar" a baixa e retornar, porque telas como `NovoPedido`
+        // redirecionam com `window.location.replace(...)` e isso mata Promises pendentes.
+        // Então fazemos a baixa AQUI (com try/catch) antes de retornar.
+        try {
+          console.error("🔄 Executando baixa automática de estoque para todos os produtos...");
+
+          let successCount = 0;
+          let errorCount = 0;
+
+          for (const product of productsToProcess) {
+            try {
+              await baixarEstoqueAutomatico(
+                product.id,
+                product.quantity,
+                orderData.code,
+                orderData.id, // Passar ID do pedido (UUID) para origem_id
+                empresa_id
+              );
+              successCount++;
+              console.error(`✅ Baixa de estoque concluída para produto ${product.id} (quantidade: ${product.quantity})`);
+            } catch (error) {
+              errorCount++;
+              console.error(`❌ Erro na baixa de estoque para produto ${product.id}:`, error);
             }
-            
-            console.log(`✅ Baixa automática de estoque concluída: ${successCount} sucesso(s), ${errorCount} erro(s)`);
-          } catch (error) {
-            console.error("❌ Erro na baixa automática de estoque (não crítico):", error);
-            console.error("Stack trace:", (error as Error).stack);
           }
-        }).catch(err => {
-          console.error("❌ Erro ao agendar baixa automática de estoque:", err);
-        });
+
+          console.error(`✅ Baixa automática de estoque concluída: ${successCount} sucesso(s), ${errorCount} erro(s)`);
+        } catch (error) {
+          console.error("❌ Erro na baixa automática de estoque (não crítico):", error);
+          console.error("Stack trace:", (error as Error).stack);
+        }
       } else {
-        console.log("⚠️ Baixa automática não executada: nenhum produto especificado");
+        console.error("⚠️ Baixa automática não executada: nenhum produto especificado");
       }
+    } else {
+      console.error("⚠️ Baixa automática não executada:", {
+        type: input.type,
+        hasProducts,
+        shouldProcessInventory
+      });
     }
 
     // BAIXA AUTOMÁTICA DE ESTOQUE PARA SERVIÇOS RÁPIDOS
@@ -906,40 +943,35 @@ export async function createOrder(input: {
         order_code: orderData.code,
         empresa_id
       });
-      
-      Promise.resolve().then(async () => {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        try {
-          console.log("🔄 Executando baixa automática de estoque para todos os serviços...");
-          
-          let successCount = 0;
-          let errorCount = 0;
-          
-          for (const service of input.services!) {
-            try {
-              await baixarEstoqueServico(
-                service.id,
-                service.quantity,
-                orderData.code,
-                orderData.id,
-                empresa_id
-              );
-              successCount++;
-              console.log(`✅ Baixa de estoque concluída para serviço ${service.id} (quantidade: ${service.quantity})`);
-            } catch (error) {
-              errorCount++;
-              console.error(`❌ Erro na baixa de estoque para serviço ${service.id}:`, error);
-            }
+
+      try {
+        console.log("🔄 Executando baixa automática de estoque para todos os serviços...");
+
+        let successCount = 0;
+        let errorCount = 0;
+
+        for (const service of input.services) {
+          try {
+            await baixarEstoqueServico(
+              service.id,
+              service.quantity,
+              orderData.code,
+              orderData.id,
+              empresa_id
+            );
+            successCount++;
+            console.log(`✅ Baixa de estoque concluída para serviço ${service.id} (quantidade: ${service.quantity})`);
+          } catch (error) {
+            errorCount++;
+            console.error(`❌ Erro na baixa de estoque para serviço ${service.id}:`, error);
           }
-          
-          console.log(`✅ Baixa automática de estoque para serviços concluída: ${successCount} sucesso(s), ${errorCount} erro(s)`);
-        } catch (error) {
-          console.error("❌ Erro na baixa automática de estoque de serviços (não crítico):", error);
-          console.error("Stack trace:", (error as Error).stack);
         }
-      }).catch(err => {
-        console.error("❌ Erro ao agendar baixa automática de estoque de serviços:", err);
-      });
+
+        console.log(`✅ Baixa automática de estoque para serviços concluída: ${successCount} sucesso(s), ${errorCount} erro(s)`);
+      } catch (error) {
+        console.error("❌ Erro na baixa automática de estoque de serviços (não crítico):", error);
+        console.error("Stack trace:", (error as Error).stack);
+      }
     }
 
     return { ok: true, id: orderData.id };
@@ -1264,40 +1296,37 @@ export async function updateOrder(
         order_code: effectiveOrderCode,
         empresa_id
       });
-      
-      Promise.resolve().then(async () => {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        try {
-          console.log("🔄 Executando baixa automática de estoque para produtos adicionados...");
-          
-          let successCount = 0;
-          let errorCount = 0;
-          
-          for (const product of products) {
-            try {
-              await baixarEstoqueAutomatico(
-                product.id,
-                product.quantity,
-                effectiveOrderCode,
-                updatedOrder.id,
-                empresa_id
-              );
-              successCount++;
-              console.log(`✅ Baixa de estoque concluída para produto ${product.id} (quantidade: ${product.quantity})`);
-            } catch (error) {
-              errorCount++;
-              console.error(`❌ Erro na baixa de estoque para produto ${product.id}:`, error);
-            }
+
+      // Mesmo motivo do createOrder: não agendar para "depois", pois navegação/reload
+      // pode matar a execução e a movimentação não aparece no estoque.
+      try {
+        console.log("🔄 Executando baixa automática de estoque para produtos adicionados...");
+
+        let successCount = 0;
+        let errorCount = 0;
+
+        for (const product of products) {
+          try {
+            await baixarEstoqueAutomatico(
+              product.id,
+              product.quantity,
+              effectiveOrderCode,
+              updatedOrder.id,
+              empresa_id
+            );
+            successCount++;
+            console.log(`✅ Baixa de estoque concluída para produto ${product.id} (quantidade: ${product.quantity})`);
+          } catch (error) {
+            errorCount++;
+            console.error(`❌ Erro na baixa de estoque para produto ${product.id}:`, error);
           }
-          
-          console.log(`✅ Baixa automática de estoque concluída: ${successCount} sucesso(s), ${errorCount} erro(s)`);
-        } catch (error) {
-          console.error("❌ Erro na baixa automática de estoque (não crítico):", error);
-          console.error("Stack trace:", (error as Error).stack);
         }
-      }).catch(err => {
-        console.error("❌ Erro ao agendar baixa automática de estoque:", err);
-      });
+
+        console.log(`✅ Baixa automática de estoque concluída: ${successCount} sucesso(s), ${errorCount} erro(s)`);
+      } catch (error) {
+        console.error("❌ Erro na baixa automática de estoque (não crítico):", error);
+        console.error("Stack trace:", (error as Error).stack);
+      }
     }
 
     if (services && services.length > 0) {
@@ -1306,40 +1335,35 @@ export async function updateOrder(
         order_code: effectiveOrderCode,
         empresa_id
       });
-      
-      Promise.resolve().then(async () => {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        try {
-          console.log("🔄 Executando baixa automática de estoque para serviços adicionados...");
-          
-          let successCount = 0;
-          let errorCount = 0;
-          
-          for (const service of services) {
-            try {
-              await baixarEstoqueServico(
-                service.id,
-                service.quantity,
-                effectiveOrderCode,
-                updatedOrder.id,
-                empresa_id
-              );
-              successCount++;
-              console.log(`✅ Baixa de estoque concluída para serviço ${service.id} (quantidade: ${service.quantity})`);
-            } catch (error) {
-              errorCount++;
-              console.error(`❌ Erro na baixa de estoque para serviço ${service.id}:`, error);
-            }
+
+      try {
+        console.log("🔄 Executando baixa automática de estoque para serviços adicionados...");
+
+        let successCount = 0;
+        let errorCount = 0;
+
+        for (const service of services) {
+          try {
+            await baixarEstoqueServico(
+              service.id,
+              service.quantity,
+              effectiveOrderCode,
+              updatedOrder.id,
+              empresa_id
+            );
+            successCount++;
+            console.log(`✅ Baixa de estoque concluída para serviço ${service.id} (quantidade: ${service.quantity})`);
+          } catch (error) {
+            errorCount++;
+            console.error(`❌ Erro na baixa de estoque para serviço ${service.id}:`, error);
           }
-          
-          console.log(`✅ Baixa automática de estoque para serviços concluída: ${successCount} sucesso(s), ${errorCount} erro(s)`);
-        } catch (error) {
-          console.error("❌ Erro na baixa automática de estoque de serviços (não crítico):", error);
-          console.error("Stack trace:", (error as Error).stack);
         }
-      }).catch(err => {
-        console.error("❌ Erro ao agendar baixa automática de estoque de serviços:", err);
-      });
+
+        console.log(`✅ Baixa automática de estoque para serviços concluída: ${successCount} sucesso(s), ${errorCount} erro(s)`);
+      } catch (error) {
+        console.error("❌ Erro na baixa automática de estoque de serviços (não crítico):", error);
+        console.error("Stack trace:", (error as Error).stack);
+      }
     }
 
     console.log("Pedido atualizado com sucesso:", updatedOrder);

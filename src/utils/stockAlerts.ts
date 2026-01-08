@@ -25,9 +25,40 @@ class StockAlertSystem {
   private config: StockAlertConfig;
   private checkInterval: NodeJS.Timeout | null = null;
   private lastCheck: Date | null = null;
+  private readonly lastAlertStorageKey = "stock_alerts_last_sent_v1";
 
   constructor(config: StockAlertConfig) {
     this.config = config;
+  }
+
+  private readLastAlertMap(): Record<string, string> {
+    try {
+      if (typeof window === "undefined") return {};
+      const raw = window.localStorage.getItem(this.lastAlertStorageKey);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw) as unknown;
+      if (!parsed || typeof parsed !== "object") return {};
+      return parsed as Record<string, string>;
+    } catch {
+      return {};
+    }
+  }
+
+  private writeLastAlertMap(map: Record<string, string>): void {
+    try {
+      if (typeof window === "undefined") return;
+      window.localStorage.setItem(this.lastAlertStorageKey, JSON.stringify(map));
+    } catch {
+      // Ignorar falhas de storage (modo privado, quota, etc.)
+    }
+  }
+
+  private getLastAlertTime(itemId: string): Date | undefined {
+    const map = this.readLastAlertMap();
+    const iso = map[itemId];
+    if (!iso) return undefined;
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? undefined : d;
   }
 
   // Iniciar monitoramento automático
@@ -101,7 +132,9 @@ class StockAlertSystem {
             minQuantity,
             unit: item.unit || 'un',
             status,
-            lastAlert: item.last_alert ? new Date(item.last_alert) : undefined
+            // NÃO grava no banco (evita erro 400 se coluna não existir).
+            // Usamos localStorage só para referência e possível throttling futuro.
+            lastAlert: this.getLastAlertTime(item.id)
           });
         }
       }
@@ -126,8 +159,8 @@ class StockAlertSystem {
     const criticalAlerts = alerts.filter(a => a.status === 'critical');
     const lowAlerts = alerts.filter(a => a.status === 'low');
 
-    // Atualizar last_alert no banco
-    await this.updateLastAlertTimes(alerts);
+    // Registrar último alerta localmente (não no banco).
+    this.updateLastAlertTimes(alerts);
 
     // Enviar notificações
     if (this.config.enableNotifications) {
@@ -151,15 +184,13 @@ class StockAlertSystem {
   }
 
   // Atualizar timestamps de último alerta
-  private async updateLastAlertTimes(alerts: StockAlert[]): Promise<void> {
-    const now = new Date().toISOString();
-    
+  private updateLastAlertTimes(alerts: StockAlert[]): void {
+    const nowIso = new Date().toISOString();
+    const map = this.readLastAlertMap();
     for (const alert of alerts) {
-      await supabase
-        .from("inventory_items")
-        .update({ last_alert: now })
-        .eq("id", alert.id);
+      map[alert.id] = nowIso;
     }
+    this.writeLastAlertMap(map);
   }
 
   // Enviar notificações

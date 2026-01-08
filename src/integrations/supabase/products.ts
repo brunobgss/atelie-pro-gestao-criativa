@@ -14,6 +14,8 @@ export interface ProductRow {
   created_at: string;
   updated_at: string;
   empresa_id?: string;
+  inventory_items?: string[] | string; // IDs dos itens de estoque vinculados (array ou JSON string)
+  inventory_quantities?: number[] | string; // Quantidades por unidade (array ou JSON string)
 }
 
 export async function createProduct(input: {
@@ -89,6 +91,8 @@ export async function updateProduct(id: string, input: {
   unit_price?: number;
   profit_margin?: number;
   image_url?: string;
+  inventory_items?: string[]; // IDs dos itens de estoque vinculados
+  inventory_quantities?: number[]; // Quantidades por unidade
 }): Promise<{ ok: boolean; data?: ProductRow; error?: string }> {
   try {
     console.log("🔍 Atualizando produto:", { id, input });

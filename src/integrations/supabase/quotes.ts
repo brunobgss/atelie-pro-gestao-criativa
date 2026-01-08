@@ -566,6 +566,54 @@ export async function approveQuote(quoteCode: string): Promise<{ ok: boolean; er
       throw new Error(`Erro ao atualizar orçamento: ${updateError.message}`);
     }
 
+    // BAIXA AUTOMÁTICA DE ESTOQUE: Tentar identificar produtos do catálogo pelos itens do orçamento
+    // Como os orçamentos não têm vínculo direto com produtos do catálogo, vamos tentar
+    // identificar produtos pelo nome/descrição e subtrair do estoque se encontrados
+    console.log("🔍 Tentando identificar produtos do catálogo nos itens do orçamento para baixa de estoque...");
+
+    // IMPORTANTE:
+    // Não agendar essa baixa, pois a UI pode navegar/recarregar após aprovar o orçamento.
+    // Se isso acontecer, Promises pendentes são interrompidas e a movimentação pode não ser criada.
+    try {
+      const { baixarEstoqueAutomatico } = await import("./orders");
+      const { getProducts } = await import("./products");
+
+      const allProducts = await getProducts();
+
+      let processedCount = 0;
+
+      for (const item of items) {
+        const matchingProduct = allProducts.find((product) => {
+          const productName = product.name.toLowerCase().trim();
+          const itemDescription = item.description.toLowerCase().trim();
+          return productName.includes(itemDescription) || itemDescription.includes(productName);
+        });
+
+        if (matchingProduct && (matchingProduct as any).inventory_items) {
+          try {
+            await baixarEstoqueAutomatico(
+              matchingProduct.id,
+              item.quantity,
+              orderCode,
+              order.id,
+              empresa_id
+            );
+            processedCount++;
+          } catch (error) {
+            console.warn(`⚠️ Erro ao fazer baixa de estoque para produto ${matchingProduct.name}:`, error);
+          }
+        }
+      }
+
+      if (processedCount > 0) {
+        console.log(`✅ Baixa automática de estoque concluída para ${processedCount} produto(s) do orçamento aprovado`);
+      } else {
+        console.log(`ℹ️ Nenhum produto do catálogo identificado nos itens do orçamento - estoque não foi subtraído`);
+      }
+    } catch (error) {
+      console.error("❌ Erro na baixa automática de estoque ao aprovar orçamento (não crítico):", error);
+    }
+
     console.log("Orçamento aprovado com sucesso!");
     return { ok: true };
   } catch (e: unknown) {
