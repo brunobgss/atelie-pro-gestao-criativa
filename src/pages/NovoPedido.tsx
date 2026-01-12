@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -176,6 +177,7 @@ export default function NovoPedido() {
     { id: generateId(), size: "GG", quantity: 0 }
   ]);
   const [personalizations, setPersonalizations] = useState<PersonalizationEntry[]>([]);
+  const [separateLines, setSeparateLines] = useState<boolean>(false);
   
   // Estados para controle de upload
   const [isUploading, setIsUploading] = useState<boolean>(false);
@@ -521,6 +523,7 @@ export default function NovoPedido() {
           paid,
           delivery_date: delivery,
           file_url,
+          observations: separateLines ? "__SEPARATE_LINES__" : undefined,
           products: productsForInventory, // Lista de produtos com quantidades
           services: servicesForInventory, // Lista de serviços com quantidades
           // Manter product_id e quantity para compatibilidade (deprecated)
@@ -1219,6 +1222,19 @@ export default function NovoPedido() {
                   required
                   className="border-input resize-none"
                 />
+                <div className="flex items-center space-x-2 mt-2">
+                  <Checkbox
+                    id="separateLines"
+                    checked={separateLines}
+                    onCheckedChange={(checked) => setSeparateLines(checked === true)}
+                  />
+                  <Label
+                    htmlFor="separateLines"
+                    className="text-sm font-normal cursor-pointer"
+                  >
+                    Separar descrição em linhas (cada linha vira um item separado)
+                  </Label>
+                </div>
               </div>
 
               <div className="space-y-2">
