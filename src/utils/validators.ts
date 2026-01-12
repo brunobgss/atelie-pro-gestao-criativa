@@ -128,7 +128,8 @@ export function validateDate(date: string): ValidationResult {
     return { isValid: false, errors };
   }
   
-  const dateObj = new Date(date);
+  // Evitar bug de timezone com "YYYY-MM-DD" (date-only)
+  const dateObj = /^\d{4}-\d{2}-\d{2}$/.test(date) ? new Date(`${date}T00:00:00`) : new Date(date);
   
   if (isNaN(dateObj.getTime())) {
     errors.push("Data deve ter um formato válido");

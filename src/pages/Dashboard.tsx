@@ -22,6 +22,7 @@ import { MobileCard, MobileGrid } from "@/components/ui/mobile-form";
 import { DashboardControls, useDashboardControls } from "@/components/DashboardControls";
 import { supabase } from "@/integrations/supabase/client";
 import React, { useMemo, lazy, Suspense } from "react";
+import { parseISODateAsLocal, formatDateBR } from "@/utils/dateOnly";
 
 // Lazy loading de componentes pesados para melhorar performance
 const ChatWidget = lazy(() => import("@/components/ChatWidget").then(m => ({ default: m.ChatWidget })));
@@ -127,14 +128,14 @@ export default function Dashboard() {
     
     const overdueOrders = activeOrders.filter(order => {
       if (!order.delivery_date) return false;
-      const deliveryDate = new Date(order.delivery_date);
+      const deliveryDate = parseISODateAsLocal(order.delivery_date);
       deliveryDate.setHours(0, 0, 0, 0);
       return deliveryDate < today && order.status !== "Entregue";
     });
 
     const urgentOrders = activeOrders.filter(order => {
       if (!order.delivery_date) return false;
-      const deliveryDate = new Date(order.delivery_date);
+      const deliveryDate = parseISODateAsLocal(order.delivery_date);
       deliveryDate.setHours(0, 0, 0, 0);
       const diffTime = deliveryDate.getTime() - today.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -193,7 +194,7 @@ export default function Dashboard() {
         action: () => {
           const message = `Olá ${order.customer_name}!
 
-Lembramos que seu pedido ${order.code} estava previsto para entrega em ${new Date(order.delivery_date).toLocaleDateString('pt-BR')}.
+Lembramos que seu pedido ${order.code} estava previsto para entrega em ${formatDateBR(order.delivery_date)}.
 
 *DETALHES:*
 • Tipo: ${order.type}
@@ -290,7 +291,7 @@ _${empresa?.nome || 'Atelie'}_`;
 
     // 5. Pedidos próximos do prazo
     ordersStats.urgent.forEach(order => {
-      const deliveryDate = new Date(order.delivery_date);
+      const deliveryDate = parseISODateAsLocal(order.delivery_date);
       const today = new Date();
       const diffTime = deliveryDate.getTime() - today.getTime();
       const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));

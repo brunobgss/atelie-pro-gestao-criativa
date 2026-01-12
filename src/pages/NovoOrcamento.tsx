@@ -30,6 +30,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { uploadOrderFile } from "@/integrations/supabase/storage";
 import { CLOTHING_SIZES } from "@/constants/sizes";
 import { cn } from "@/lib/utils";
+import { isoInputToBR } from "@/utils/dateOnly";
 
 export default function NovoOrcamento() {
   const navigate = useNavigate();
@@ -44,6 +45,7 @@ export default function NovoOrcamento() {
   const [productPopoverOpen, setProductPopoverOpen] = useState(false);
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<string>("A combinar");
   const [quantityModalOpen, setQuantityModalOpen] = useState(false);
   const [selectedQuantity, setSelectedQuantity] = useState(1);
   const [whatsappModalOpen, setWhatsappModalOpen] = useState(false);
@@ -277,7 +279,10 @@ export default function NovoOrcamento() {
       }
     }
     if (deliveryDateInput) {
-      observationsText += (observationsText ? '\n' : '') + `Data de entrega estimada: ${new Date(deliveryDateInput).toLocaleDateString('pt-BR')}`;
+      observationsText += (observationsText ? '\n' : '') + `Data de entrega estimada: ${isoInputToBR(deliveryDateInput)}`;
+    }
+    if (paymentMethod && paymentMethod !== "A combinar") {
+      observationsText += (observationsText ? "\n" : "") + `Forma de pagamento: ${paymentMethod}`;
     }
     if (uploadedFileUrl) {
       observationsText += (observationsText ? '\n' : '') + `Arquivo/Arte: ${uploadedFileUrl}`;
@@ -536,6 +541,23 @@ Aguardo seu retorno! 😊`;
                     className="border-input"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="paymentMethod">Forma de Pagamento</Label>
+                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                  <SelectTrigger className="border-input">
+                    <SelectValue placeholder="Selecione (opcional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="A combinar">A combinar</SelectItem>
+                    <SelectItem value="Pix">Pix</SelectItem>
+                    <SelectItem value="Dinheiro">Dinheiro</SelectItem>
+                    <SelectItem value="Cartão">Cartão</SelectItem>
+                    <SelectItem value="Transferência">Transferência</SelectItem>
+                    <SelectItem value="Boleto">Boleto</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">
