@@ -1637,9 +1637,21 @@ export default function PedidoDetalhe() {
 
               {/* Lista de Itens do Pedido */}
               {(() => {
+                // Verificar se deve separar em linhas (marcador no campo observations)
+                const shouldSeparateLines = order.observations?.includes("__SEPARATE_LINES__") ?? false;
+                
                 // Função para parsear itens da descrição
                 const parseOrderItems = (description: string) => {
                   if (!description) return [];
+                  
+                  // Se não deve separar, retornar descrição como um único item
+                  if (!shouldSeparateLines) {
+                    return [{
+                      name: description.trim(),
+                      quantity: 1,
+                      fullText: description.trim()
+                    }];
+                  }
                   
                   const lines = description.split('\n').filter(line => line.trim());
                   const items: Array<{
