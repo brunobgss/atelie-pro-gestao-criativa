@@ -18,6 +18,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { useInternationalization } from "@/contexts/InternationalizationContext";
 import { useSync } from "@/contexts/SyncContext";
 import { useSyncOperations } from "@/hooks/useSyncOperations";
+import { generateWhatsAppUrl } from "@/utils/whatsappTemplates";
 
 export default function Orcamentos() {
   const navigate = useNavigate();
@@ -83,6 +84,7 @@ export default function Orcamentos() {
             internalId: r.id, // Manter ID interno para referência
             code: r.code || `ORC-${Date.now()}-${index}`,
             client: customerName || "Cliente não informado",
+            phone: r.customer_phone ?? null,
             description: r.observations?.trim() || "Sem descrição",
             value: value,
             total_value: value, // Adicionar total_value para compatibilidade
@@ -247,8 +249,18 @@ ${empresa?.nome || 'Ateliê'}`;
   };
 
   const sendWhatsAppMessage = () => {
-    const message = encodeURIComponent(customMessage);
-    window.open(`https://wa.me/?text=${message}`, "_blank");
+    const normalizeWhatsAppPhone = (phone?: string | null): string | undefined => {
+      if (!phone) return undefined;
+      const digits = String(phone).replace(/\D/g, "");
+      if (!digits) return undefined;
+      if (digits.startsWith("55")) return digits;
+      if (digits.length === 10 || digits.length === 11) return `55${digits}`;
+      return digits;
+    };
+
+    const phone = normalizeWhatsAppPhone(selectedQuote?.phone);
+    const url = generateWhatsAppUrl(customMessage, phone);
+    window.open(url, "_blank");
     setWhatsappModalOpen(false);
   };
 

@@ -12,6 +12,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { listOrders, updateOrderStatus } from "@/integrations/supabase/orders";
 import { toast } from "sonner";
+import { formatDateBR, parseISODateAsLocal } from "@/utils/dateOnly";
 import { getOrderStatusColor, ORDER_STATUS_OPTIONS } from "@/utils/statusConstants";
 import { useInternationalization } from "@/contexts/InternationalizationContext";
 
@@ -110,7 +111,7 @@ export default function Pedidos() {
       if (startDate && endDate) {
         filtered = filtered.filter(order => {
           if (!order.delivery) return false;
-          const deliveryDate = new Date(order.delivery);
+          const deliveryDate = parseISODateAsLocal(order.delivery);
           return deliveryDate >= startDate! && deliveryDate <= endDate!;
         });
       }
@@ -315,7 +316,7 @@ export default function Pedidos() {
                 </div>
                 <div class="detail-item">
                   <span class="detail-label">Entrega</span>
-                  <span class="detail-value">${order.delivery ? new Date(order.delivery).toLocaleDateString('pt-BR') : 'N/A'}</span>
+                  <span class="detail-value">${order.delivery ? formatDateBR(order.delivery) : 'N/A'}</span>
                 </div>
               </div>
               <div class="order-description">
@@ -489,7 +490,7 @@ export default function Pedidos() {
                       <div>
                         <p className="text-xs text-muted-foreground">Entrega</p>
                         <p className="text-sm font-medium text-foreground">
-                          {order.delivery ? new Date(order.delivery).toLocaleDateString('pt-BR') : 'Não definida'}
+                          {order.delivery ? formatDateBR(order.delivery) : 'Não definida'}
                         </p>
                       </div>
                     </div>

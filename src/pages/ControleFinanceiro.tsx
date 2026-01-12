@@ -16,6 +16,7 @@ import { useInternationalization } from "@/contexts/InternationalizationContext"
 import { useAuth } from "@/components/AuthProvider";
 import { PAYMENT_STATUS_OPTIONS, getPaymentStatusColor } from "@/utils/statusConstants";
 import { toast } from "sonner";
+import { parseISODateAsLocal } from "@/utils/dateOnly";
 
 interface PaymentStatus {
   id: string;
@@ -145,7 +146,7 @@ export default function ControleFinanceiro() {
       const isFullyPaid = totalValue > 0 && remainingAmount <= 0;
       
       // Verificar se está atrasado (mais de 7 dias após entrega)
-      const deliveryDate = order.delivery_date ? new Date(order.delivery_date) : null;
+      const deliveryDate = order.delivery_date ? parseISODateAsLocal(order.delivery_date) : null;
       const today = new Date();
       const isOverdue = deliveryDate && !isNaN(deliveryDate.getTime()) && today > deliveryDate && !isFullyPaid;
 
