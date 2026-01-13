@@ -758,11 +758,23 @@ export default function Estoque() {
         }
         
         console.error(`🔍 Verificando se produto "${item.name}" já existe...`);
-        // Verificar se já existe produto com esse nome
+        
+        // Obter empresa_id do usuário para buscar apenas produtos da mesma empresa
+        const { data: userEmpresa } = await supabase
+          .from("user_empresas")
+          .select("empresa_id")
+          .eq("user_id", (await supabase.auth.getUser()).data.user?.id)
+          .single();
+        
+        const userEmpresaId = userEmpresa?.empresa_id;
+        console.error(`🏢 Buscando produtos da empresa: ${userEmpresaId}`);
+        
+        // Verificar se já existe produto com esse nome E mesma empresa
         const { data: existingProducts, error: searchError } = await supabase
           .from("atelie_products")
-          .select("id")
+          .select("id, empresa_id, name")
           .eq("name", item.name.trim())
+          .eq("empresa_id", userEmpresaId || "")
           .limit(1);
 
         if (searchError) {

@@ -85,8 +85,18 @@ export default function CatalogoProdutos() {
     queryKey: ["products"],
     queryFn: async () => {
       try {
-        console.log("🔍 Buscando produtos do catálogo...");
+        console.error("🔍 [CatalogoProdutos] Buscando produtos do catálogo...");
         const productsData = await getProducts();
+        
+        console.error(`📊 [CatalogoProdutos] getProducts retornou: ${productsData.length} produto(s)`);
+        if (productsData.length > 0) {
+          console.error(`📦 [CatalogoProdutos] Primeiros produtos:`, productsData.slice(0, 5).map(p => ({ 
+            id: p.id, 
+            name: p.name, 
+            type: p.type,
+            empresa_id: p.empresa_id 
+          })));
+        }
         
         // Converter dados do Supabase para o formato da interface
         const convertedProducts: Product[] = productsData.map(product => {
@@ -123,7 +133,7 @@ export default function CatalogoProdutos() {
           }
         });
         
-        console.log("✅ Produtos carregados:", convertedProducts.length);
+        console.error(`✅ [CatalogoProdutos] Produtos convertidos: ${convertedProducts.length}`);
         return convertedProducts;
       } catch (error) {
         console.error("❌ Erro ao buscar produtos:", error);
