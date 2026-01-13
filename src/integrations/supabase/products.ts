@@ -158,14 +158,16 @@ export async function deleteProduct(id: string): Promise<{ ok: boolean; error?: 
 
 export async function getProducts(): Promise<ProductRow[]> {
   try {
-    console.log("🔍 Buscando produtos...");
+    console.error("🔍 [getProducts] Buscando produtos...");
     
     // Obter empresa do usuário
     const empresaId = await getCurrentEmpresaId();
     if (!empresaId) {
-      console.error("❌ Usuário não tem empresa associada");
+      console.error("❌ [getProducts] Usuário não tem empresa associada");
       return [];
     }
+
+    console.error(`🏢 [getProducts] Buscando produtos da empresa: ${empresaId}`);
 
     const { data, error } = await supabase
       .from("atelie_products")
@@ -174,14 +176,22 @@ export async function getProducts(): Promise<ProductRow[]> {
       .order("created_at", { ascending: false });
 
     if (error) {
-      console.error("❌ Erro ao buscar produtos:", error);
+      console.error("❌ [getProducts] Erro ao buscar produtos:", error);
       return [];
     }
 
-    console.log("✅ Produtos encontrados:", data?.length || 0);
+    console.error(`✅ [getProducts] Produtos encontrados: ${data?.length || 0}`);
+    if (data && data.length > 0) {
+      console.error(`📦 [getProducts] Primeiros produtos:`, data.slice(0, 5).map(p => ({ 
+        id: p.id, 
+        name: p.name, 
+        empresa_id: p.empresa_id,
+        type: p.type 
+      })));
+    }
     return (data as ProductRow[]) || [];
   } catch (e: unknown) {
-    console.error("❌ Erro na função getProducts:", e);
+    console.error("❌ [getProducts] Erro na função getProducts:", e);
     return [];
   }
 }
