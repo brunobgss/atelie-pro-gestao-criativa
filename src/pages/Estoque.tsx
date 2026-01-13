@@ -676,26 +676,53 @@ export default function Estoque() {
     }
 
     const selectedItemsData = items.filter(item => selectedItems.includes(item.id));
+    
+    if (selectedItemsData.length === 0) {
+      toast.error("Nenhum item válido encontrado");
+      return;
+    }
+
     let successCount = 0;
     let errorCount = 0;
+    const errors: string[] = [];
+
+    toast.loading(`Processando ${selectedItemsData.length} item(ns)...`, { id: "creating-products" });
 
     for (const item of selectedItemsData) {
       try {
+        console.log(`🔄 Processando item: ${item.name} (${item.id})`);
+        
         // Verificar se já existe produto com esse nome
-        const { data: existingProducts } = await supabase
+        const { data: existingProducts, error: searchError } = await supabase
           .from("atelie_products")
           .select("id")
           .eq("name", item.name)
           .limit(1);
 
+        if (searchError) {
+          console.error(`❌ Erro ao buscar produto existente:`, searchError);
+          errorCount++;
+          errors.push(`${item.name}: Erro ao buscar produto existente`);
+          continue;
+        }
+
         if (existingProducts && existingProducts.length > 0) {
           // Se já existe, apenas vincular
           const productId = existingProducts[0].id;
-          const { data: productData } = await supabase
+          console.log(`✅ Produto já existe: ${item.name}, vinculando item...`);
+          
+          const { data: productData, error: fetchError } = await supabase
             .from("atelie_products")
             .select("inventory_items, inventory_quantities")
             .eq("id", productId)
             .single();
+
+          if (fetchError) {
+            console.error(`❌ Erro ao buscar dados do produto:`, fetchError);
+            errorCount++;
+            errors.push(`${item.name}: Erro ao buscar dados do produto`);
+            continue;
+          }
 
           let inventoryItems: string[] = [];
           let inventoryQuantities: number[] = [];
@@ -726,15 +753,27 @@ export default function Estoque() {
           if (!inventoryItems.includes(item.id)) {
             inventoryItems.push(item.id);
             inventoryQuantities.push(1);
+          } else {
+            console.log(`ℹ️ Item ${item.name} já está vinculado ao produto`);
           }
 
-          await updateProduct(productId, {
+          const updateResult = await updateProduct(productId, {
             inventory_items: inventoryItems,
             inventory_quantities: inventoryQuantities,
           });
-          successCount++;
+
+          if (updateResult.ok) {
+            successCount++;
+            console.log(`✅ Item ${item.name} vinculado com sucesso`);
+          } else {
+            errorCount++;
+            errors.push(`${item.name}: ${updateResult.error || "Erro ao vincular"}`);
+            console.error(`❌ Erro ao vincular item:`, updateResult.error);
+          }
         } else {
           // Criar novo produto
+          console.log(`🆕 Criando novo produto: ${item.name}`);
+          
           let productType = "Personalizado";
           if (item.item_type === "produto_acabado") {
             productType = "Personalizado";
@@ -752,21 +791,38 @@ export default function Estoque() {
           });
 
           if (productResult.ok && productResult.id) {
+            console.log(`✅ Produto criado: ${item.name} (${productResult.id})`);
+            
             // Vincular item de estoque ao produto
-            await updateProduct(productResult.id, {
+            const linkResult = await updateProduct(productResult.id, {
               inventory_items: [item.id],
               inventory_quantities: [1],
             });
-            successCount++;
+
+            if (linkResult.ok) {
+              successCount++;
+              console.log(`✅ Item vinculado ao produto criado`);
+            } else {
+              errorCount++;
+              errors.push(`${item.name}: Produto criado mas erro ao vincular - ${linkResult.error}`);
+              console.error(`❌ Erro ao vincular item ao produto criado:`, linkResult.error);
+            }
           } else {
             errorCount++;
+            errors.push(`${item.name}: ${productResult.error || "Erro ao criar produto"}`);
+            console.error(`❌ Erro ao criar produto:`, productResult.error);
           }
         }
       } catch (error) {
         errorCount++;
+        const errorMessage = error instanceof Error ? error.message : "Erro desconhecido";
+        errors.push(`${item.name}: ${errorMessage}`);
         logger.error(`Erro ao criar produto para item ${item.id}:`, error);
+        console.error(`❌ Erro inesperado ao processar item ${item.name}:`, error);
       }
     }
+
+    toast.dismiss("creating-products");
 
     if (successCount > 0) {
       toast.success(`${successCount} produto(s) criado(s) e vinculado(s) com sucesso!`);
@@ -775,8 +831,18 @@ export default function Estoque() {
       setSelectedItems([]);
       setIsSelecting(false);
     }
+    
     if (errorCount > 0) {
-      toast.error(`${errorCount} produto(s) não puderam ser criados`);
+      const errorDetails = errors.slice(0, 5).join("; ");
+      const moreErrors = errors.length > 5 ? ` e mais ${errors.length - 5} erro(s)` : "";
+      toast.error(`${errorCount} produto(s) não puderam ser criados: ${errorDetails}${moreErrors}`, {
+        duration: 10000,
+      });
+      console.error("Erros detalhados:", errors);
+    }
+
+    if (successCount === 0 && errorCount === 0) {
+      toast.warning("Nenhum item foi processado");
     }
   };
 
