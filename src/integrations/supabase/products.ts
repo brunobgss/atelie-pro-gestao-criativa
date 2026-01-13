@@ -173,7 +173,8 @@ export async function getProducts(): Promise<ProductRow[]> {
       .from("atelie_products")
       .select("*")
       .eq("empresa_id", empresaId)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .limit(10000); // Aumentar limite para garantir que todos os produtos sejam retornados
 
     if (error) {
       console.error("❌ [getProducts] Erro ao buscar produtos:", error);

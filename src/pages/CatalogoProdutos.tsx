@@ -89,6 +89,15 @@ export default function CatalogoProdutos() {
         const productsData = await getProducts();
         
         console.error(`📊 [CatalogoProdutos] getProducts retornou: ${productsData.length} produto(s)`);
+        
+        // Verificar se os produtos específicos estão na lista
+        const produtosProcurados = ["CAMISETA MANGA CURTA - G-IPUC", "CAMISETA MANGA CURTA - P-IPUC", "CAMISETA MANGA CURTA - M-IPUC", "CAMISETA MANGA CURTA - GG-IPUC", "CAMISETA MANGA CURTA - XG-IPUC", "CAMISETA MANGA CURTA - XXG-IPUC"];
+        const produtosEncontrados = produtosProcurados.map(nome => {
+          const encontrado = productsData.find(p => p.name === nome);
+          return { nome, encontrado: !!encontrado, id: encontrado?.id };
+        });
+        console.error(`🔍 [CatalogoProdutos] Produtos específicos procurados:`, produtosEncontrados);
+        
         if (productsData.length > 0) {
           console.error(`📦 [CatalogoProdutos] Primeiros produtos:`, productsData.slice(0, 5).map(p => ({ 
             id: p.id, 
