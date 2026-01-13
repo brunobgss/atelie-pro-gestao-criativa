@@ -675,12 +675,38 @@ export default function Estoque() {
       return;
     }
 
-    const selectedItemsData = items.filter(item => selectedItems.includes(item.id));
-    
-    if (selectedItemsData.length === 0) {
+    // Buscar itens atualizados do banco para garantir que temos os dados mais recentes
+    const { data: currentItems, error: fetchError } = await supabase
+      .from("inventory_items")
+      .select("*")
+      .in("id", selectedItems);
+
+    if (fetchError) {
+      console.error("❌ Erro ao buscar itens:", fetchError);
+      toast.error(`Erro ao buscar itens: ${fetchError.message}`);
+      return;
+    }
+
+    if (!currentItems || currentItems.length === 0) {
       toast.error("Nenhum item válido encontrado");
       return;
     }
+
+    const selectedItemsData = currentItems.map(item => ({
+      id: item.id,
+      name: item.name || "",
+      item_type: item.item_type || "materia_prima",
+      category: item.category || null,
+      supplier: item.supplier || null,
+      cost_per_unit: item.cost_per_unit || null,
+    })).filter(item => item.name.trim() !== "");
+    
+    if (selectedItemsData.length === 0) {
+      toast.error("Nenhum item válido encontrado (itens sem nome)");
+      return;
+    }
+
+    console.log(`📦 Itens encontrados para processar: ${selectedItemsData.length}`);
 
     let successCount = 0;
     let errorCount = 0;
@@ -690,13 +716,28 @@ export default function Estoque() {
 
     for (const item of selectedItemsData) {
       try {
-        console.log(`🔄 Processando item: ${item.name} (${item.id})`);
+        console.log(`🔄 Processando item: ${item.name} (${item.id})`, item);
+        
+        // Validar dados do item
+        if (!item.name || item.name.trim() === "") {
+          console.warn(`⚠️ Item sem nome, pulando: ${item.id}`);
+          errorCount++;
+          errors.push(`Item sem nome (ID: ${item.id})`);
+          continue;
+        }
+
+        if (!item.id) {
+          console.warn(`⚠️ Item sem ID, pulando: ${item.name}`);
+          errorCount++;
+          errors.push(`${item.name}: Item sem ID`);
+          continue;
+        }
         
         // Verificar se já existe produto com esse nome
         const { data: existingProducts, error: searchError } = await supabase
           .from("atelie_products")
           .select("id")
-          .eq("name", item.name)
+          .eq("name", item.name.trim())
           .limit(1);
 
         if (searchError) {
