@@ -195,7 +195,6 @@ export async function getProducts(): Promise<ProductRow[]> {
       }
 
       allProducts.push(...(data as ProductRow[]));
-      console.error(`📦 [getProducts] Buscados ${data.length} produtos (total acumulado: ${allProducts.length})`);
 
       // Se retornou menos que o pageSize, não há mais produtos
       if (data.length < pageSize) {
@@ -203,16 +202,6 @@ export async function getProducts(): Promise<ProductRow[]> {
       } else {
         offset += pageSize;
       }
-    }
-
-    console.error(`✅ [getProducts] Total de produtos encontrados: ${allProducts.length}`);
-    if (allProducts.length > 0) {
-      console.error(`📦 [getProducts] Primeiros produtos:`, allProducts.slice(0, 5).map(p => ({ 
-        id: p.id, 
-        name: p.name, 
-        empresa_id: p.empresa_id,
-        type: p.type 
-      })));
     }
     return allProducts;
   } catch (e: unknown) {
