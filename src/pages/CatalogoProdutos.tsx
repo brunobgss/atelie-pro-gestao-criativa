@@ -8,10 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Package, Plus, Edit, Trash2, Copy, Search, Filter, Clock, Layers, Upload, X, Image as ImageIcon, Link2, Download, HelpCircle } from "lucide-react";
+import { Package, Plus, Edit, Trash2, Copy, Search, Filter, Clock, Layers, Upload, X, Image as ImageIcon, Link2, Download, HelpCircle, PackageSearch } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { toast } from "sonner";
 import { getProducts, createProduct, updateProduct, deleteProduct } from "@/integrations/supabase/products";
+import { createInventoryItem } from "@/integrations/supabase/inventory";
+import { supabase } from "@/integrations/supabase/client";
 import { uploadProductImage } from "@/integrations/supabase/storage";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { DialogVariacoesProduto } from "@/components/DialogVariacoesProduto";
@@ -74,6 +76,7 @@ export default function CatalogoProdutos() {
     inventory_items: string[];
     inventory_quantities: number[];
   }>(null);
+  const [createInventoryFromProduct, setCreateInventoryFromProduct] = useState(false);
 
   const categories = ["all", "Uniforme", "Personalizado", "Bordado", "Estampado"];
 
@@ -225,6 +228,43 @@ export default function CatalogoProdutos() {
               }
               setIsUploadingImage(false);
             }
+
+            // Se checkbox marcado, criar item no estoque e vincular
+            if (createResult.ok && createResult.id && createInventoryFromProduct) {
+              try {
+                // Determinar tipo de item baseado na categoria do produto
+                let itemType: "materia_prima" | "tecido" | "produto_acabado" = "materia_prima";
+                if (formData.category === "Estampado" || formData.materials.toLowerCase().includes("tecido")) {
+                  itemType = "tecido";
+                } else if (formData.category === "Personalizado" || formData.category === "Uniforme") {
+                  itemType = "produto_acabado";
+                }
+
+                // Criar item de estoque
+                const inventoryResult = await createInventoryItem({
+                  name: formData.name,
+                  unit: "unidades",
+                  quantity: 0,
+                  min_quantity: 0,
+                  item_type: itemType,
+                  category: formData.category,
+                  supplier: null,
+                  cost_per_unit: formData.unit_price / 2, // Custo: metade do preço de venda
+                  metadata: {},
+                });
+
+                if (inventoryResult.ok && inventoryResult.id) {
+                  // Vincular item de estoque ao produto
+                  await updateProduct(createResult.id, {
+                    inventory_items: [inventoryResult.id],
+                    inventory_quantities: [1],
+                  });
+                }
+              } catch (inventoryError) {
+                console.error("Erro ao criar item de estoque:", inventoryError);
+                // Não falhar o processo se houver erro ao criar estoque
+              }
+            }
             
             return createResult;
           }
@@ -262,6 +302,7 @@ export default function CatalogoProdutos() {
         syncAfterCreate('products', result.data);
       }
       invalidateRelated('products');
+      queryClient.invalidateQueries({ queryKey: ["inventory"] });
       refetch();
       
     } catch (error) {
@@ -274,6 +315,7 @@ export default function CatalogoProdutos() {
     setSelectedImage(null);
     setImagePreview(null);
     setCurrentImageUrl(null);
+    setCreateInventoryFromProduct(false);
     setFormData({
       name: "",
       category: "",
@@ -406,6 +448,103 @@ export default function CatalogoProdutos() {
     setIsSelecting(false);
     invalidateRelated('products');
     refetch();
+  };
+
+  const handleCreateInventoryFromSelectedProducts = async () => {
+    if (selectedProducts.length === 0) {
+      toast.error("Selecione pelo menos um produto para criar item no estoque");
+      return;
+    }
+
+    const selectedProductsData = products.filter(p => selectedProducts.includes(p.id));
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const product of selectedProductsData) {
+      try {
+        // Buscar dados completos do produto
+        const productsData = await getProducts();
+        const productFull = productsData.find(p => p.id === product.id);
+        if (!productFull) {
+          errorCount++;
+          continue;
+        }
+
+        // Verificar se já existe item de estoque com esse nome
+        const { data: existingItems } = await supabase
+          .from("inventory_items")
+          .select("id")
+          .eq("name", product.name)
+          .limit(1);
+
+        if (existingItems && existingItems.length > 0) {
+          // Se já existe, apenas vincular
+          const inventoryItemId = existingItems[0].id;
+          const parsed = parseLinksFromProductRow(productFull);
+          
+          if (!parsed.inventory_items.includes(inventoryItemId)) {
+            parsed.inventory_items.push(inventoryItemId);
+            parsed.inventory_quantities.push(1);
+          }
+
+          await updateProduct(product.id, {
+            inventory_items: parsed.inventory_items,
+            inventory_quantities: parsed.inventory_quantities,
+          });
+          successCount++;
+        } else {
+          // Determinar tipo de item baseado na categoria do produto
+          let itemType: "materia_prima" | "tecido" | "produto_acabado" = "materia_prima";
+          if (product.category === "Estampado" || productFull.materials?.some((m: string) => m.toLowerCase().includes("tecido"))) {
+            itemType = "tecido";
+          } else if (product.category === "Personalizado" || product.category === "Uniforme") {
+            itemType = "produto_acabado";
+          }
+
+          // Criar item de estoque
+          const inventoryResult = await createInventoryItem({
+            name: product.name,
+            unit: "unidades",
+            quantity: 0,
+            min_quantity: 0,
+            item_type: itemType,
+            category: product.category,
+            supplier: null,
+            cost_per_unit: product.unit_price / 2, // Custo: metade do preço de venda
+            metadata: {},
+          });
+
+          if (inventoryResult.ok && inventoryResult.id) {
+            // Vincular item de estoque ao produto
+            const parsed = parseLinksFromProductRow(productFull);
+            parsed.inventory_items.push(inventoryResult.id);
+            parsed.inventory_quantities.push(1);
+
+            await updateProduct(product.id, {
+              inventory_items: parsed.inventory_items,
+              inventory_quantities: parsed.inventory_quantities,
+            });
+            successCount++;
+          } else {
+            errorCount++;
+          }
+        }
+      } catch (error) {
+        errorCount++;
+        logger.error(`Erro ao criar item de estoque para produto ${product.id}:`, error);
+      }
+    }
+
+    if (successCount > 0) {
+      toast.success(`${successCount} item(ns) de estoque criado(s) e vinculado(s) com sucesso!`);
+      queryClient.invalidateQueries({ queryKey: ["inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      setSelectedProducts([]);
+      setIsSelecting(false);
+    }
+    if (errorCount > 0) {
+      toast.error(`${errorCount} item(ns) de estoque não puderam ser criados`);
+    }
   };
 
   const handleDuplicate = async (product: Product) => {
@@ -709,6 +848,16 @@ _Orçamento gerado pelo Ateliê Pro_
                   <Link2 className="w-4 h-4 mr-1 md:mr-2" />
                   <span className="hidden md:inline">Vincular Estoque ({selectedProducts.length})</span>
                   <span className="md:hidden">Vincular</span>
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  onClick={handleCreateInventoryFromSelectedProducts}
+                  className="w-full md:w-auto"
+                >
+                  <PackageSearch className="w-4 h-4 mr-1 md:mr-2" />
+                  <span className="hidden md:inline">Criar item no Estoque ({selectedProducts.length})</span>
+                  <span className="md:hidden">Criar Estoque</span>
                 </Button>
                 <Button
                   size="sm"
@@ -1044,6 +1193,20 @@ _Orçamento gerado pelo Ateliê Pro_
                     </p>
                   </div>
                 )}
+
+                <div className="flex items-center space-x-2 pt-2">
+                  <Checkbox
+                    id="createInventoryFromProduct"
+                    checked={createInventoryFromProduct}
+                    onCheckedChange={(checked) => setCreateInventoryFromProduct(checked === true)}
+                  />
+                  <Label
+                    htmlFor="createInventoryFromProduct"
+                    className="text-sm font-normal cursor-pointer"
+                  >
+                    Criar item no estoque
+                  </Label>
+                </div>
                 
                 <div className="flex gap-2 pt-4 border-t sticky bottom-0 bg-background pb-2 flex-shrink-0">
                   <Button type="submit" className="flex-1" disabled={isUploadingImage}>

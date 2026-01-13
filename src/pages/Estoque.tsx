@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { listInventory, updateInventoryItem, InventoryItemType, InventoryRow } from "@/integrations/supabase/inventory";
+import { listInventory, updateInventoryItem, InventoryItemType, InventoryRow, createInventoryItem } from "@/integrations/supabase/inventory";
+import { createProduct, updateProduct } from "@/integrations/supabase/products";
 import { supabase } from "@/integrations/supabase/client";
 import { useSync } from "@/contexts/SyncContext";
 import { performanceMonitor } from "@/utils/performanceMonitor";
@@ -25,6 +26,7 @@ import {
   History,
   HelpCircle,
   PackageSearch,
+  Package,
   Plus,
   TrendingDown,
   TrendingUp,
@@ -190,6 +192,7 @@ export default function Estoque() {
   const [alertForm, setAlertForm] = useState<AlertFormState>(ALERT_DEFAULTS);
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
   const [isSelecting, setIsSelecting] = useState(false);
+  const [createProductFromItem, setCreateProductFromItem] = useState(false);
 
   const [newItemState, setNewItemState] = useState<NewItemState>({
     name: "",
@@ -424,48 +427,80 @@ export default function Estoque() {
     }
     
     try {
-      const result = await performanceMonitor.measure(
-        "createInventoryItem",
-        async () => {
-          const payload = {
-            empresa_id: userEmpresa.empresa_id,
-            name: newItemState.name.trim(),
-            unit:
-              newItemState.unit.trim() ||
-              ITEM_TYPE_OPTIONS.find((i) => i.value === newItemState.itemType)?.defaultUnit ||
-              "unidades",
-            quantity: numericQuantity,
-            min_quantity: numericMin,
-            status: numericQuantity <= 0 ? "critical" : numericQuantity < numericMin ? "low" : "ok",
-            item_type: newItemState.itemType,
-            category: newItemState.category?.trim() || null,
-            supplier: newItemState.supplier?.trim() || null,
-            cost_per_unit: numericCost,
-            total_cost: numericCost !== null ? numericCost * numericQuantity : null,
-            metadata,
-          };
+      // Criar item de estoque
+      const inventoryResult = await createInventoryItem({
+        name: newItemState.name.trim(),
+        unit: newItemState.unit.trim() ||
+          ITEM_TYPE_OPTIONS.find((i) => i.value === newItemState.itemType)?.defaultUnit ||
+          "unidades",
+        quantity: numericQuantity,
+        min_quantity: numericMin,
+        item_type: newItemState.itemType,
+        category: newItemState.category?.trim() || null,
+        supplier: newItemState.supplier?.trim() || null,
+        cost_per_unit: numericCost,
+        metadata,
+      });
 
-          const { error } = await supabase.from("inventory_items").insert(payload);
-          if (error) throw error;
-          return { success: true };
-        },
-        "Estoque"
-      );
-
-      if (result?.success) {
-        toast.success("Item adicionado com sucesso!");
-        logger.userAction("inventory_item_created", "ESTOQUE", {
-          name: newItemState.name,
-          type: newItemState.itemType,
-          quantity: numericQuantity,
-        });
-        resetNewItemState();
-        setNewItemModalOpen(false);
-        invalidateRelated("inventory_items");
-        queryClient.invalidateQueries({ queryKey: ["inventory"] });
-      } else {
-        toast.error("Não foi possível salvar o item. Tente novamente.");
+      if (!inventoryResult.ok || !inventoryResult.id) {
+        toast.error(inventoryResult.error || "Não foi possível salvar o item. Tente novamente.");
+        return;
       }
+
+      const inventoryItemId = inventoryResult.id;
+
+      // Se checkbox marcado, criar produto no catálogo e vincular
+      if (createProductFromItem) {
+        try {
+          // Determinar tipo de produto baseado no tipo de item
+          let productType = "Personalizado";
+          if (newItemState.itemType === "produto_acabado") {
+            productType = "Personalizado";
+          } else if (newItemState.itemType === "tecido") {
+            productType = "Estampado";
+          }
+
+          // Criar produto
+          const productResult = await createProduct({
+            name: newItemState.name.trim(),
+            type: productType,
+            materials: newItemState.category ? [newItemState.category] : [],
+            work_hours: 0,
+            unit_price: numericCost ? numericCost * 2 : 0, // Preço padrão: 2x o custo
+            profit_margin: 0,
+          });
+
+          if (productResult.ok && productResult.id) {
+            // Vincular item de estoque ao produto
+            await updateProduct(productResult.id, {
+              inventory_items: [inventoryItemId],
+              inventory_quantities: [1], // 1 unidade do item por unidade do produto
+            });
+            toast.success("Item de estoque e produto criados e vinculados com sucesso!");
+          } else {
+            toast.success("Item de estoque criado, mas houve erro ao criar produto no catálogo.");
+          }
+        } catch (productError) {
+          console.error("Erro ao criar produto:", productError);
+          toast.success("Item de estoque criado, mas houve erro ao criar produto no catálogo.");
+        }
+      } else {
+        toast.success("Item adicionado com sucesso!");
+      }
+
+      logger.userAction("inventory_item_created", "ESTOQUE", {
+        name: newItemState.name,
+        type: newItemState.itemType,
+        quantity: numericQuantity,
+        createdProduct: createProductFromItem,
+      });
+      
+      resetNewItemState();
+      setCreateProductFromItem(false);
+      setNewItemModalOpen(false);
+      invalidateRelated("inventory_items");
+      queryClient.invalidateQueries({ queryKey: ["inventory"] });
+      queryClient.invalidateQueries({ queryKey: ["products"] });
     } catch (error: unknown) {
       console.error("Erro ao criar item de estoque:", error);
       const message = error instanceof Error ? error.message : "Erro inesperado ao salvar item";
@@ -634,6 +669,117 @@ export default function Estoque() {
     queryClient.invalidateQueries({ queryKey: ["inventory"] });
   };
 
+  const handleCreateProductsFromSelectedItems = async () => {
+    if (selectedItems.length === 0) {
+      toast.error("Selecione pelo menos um item para criar produto");
+      return;
+    }
+
+    const selectedItemsData = items.filter(item => selectedItems.includes(item.id));
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const item of selectedItemsData) {
+      try {
+        // Verificar se já existe produto com esse nome
+        const { data: existingProducts } = await supabase
+          .from("atelie_products")
+          .select("id")
+          .eq("name", item.name)
+          .limit(1);
+
+        if (existingProducts && existingProducts.length > 0) {
+          // Se já existe, apenas vincular
+          const productId = existingProducts[0].id;
+          const { data: productData } = await supabase
+            .from("atelie_products")
+            .select("inventory_items, inventory_quantities")
+            .eq("id", productId)
+            .single();
+
+          let inventoryItems: string[] = [];
+          let inventoryQuantities: number[] = [];
+
+          if (productData) {
+            if (typeof productData.inventory_items === 'string') {
+              try {
+                inventoryItems = JSON.parse(productData.inventory_items);
+              } catch {
+                inventoryItems = [];
+              }
+            } else if (Array.isArray(productData.inventory_items)) {
+              inventoryItems = productData.inventory_items;
+            }
+
+            if (typeof productData.inventory_quantities === 'string') {
+              try {
+                inventoryQuantities = JSON.parse(productData.inventory_quantities);
+              } catch {
+                inventoryQuantities = [];
+              }
+            } else if (Array.isArray(productData.inventory_quantities)) {
+              inventoryQuantities = productData.inventory_quantities;
+            }
+          }
+
+          // Adicionar item se não estiver já vinculado
+          if (!inventoryItems.includes(item.id)) {
+            inventoryItems.push(item.id);
+            inventoryQuantities.push(1);
+          }
+
+          await updateProduct(productId, {
+            inventory_items: inventoryItems,
+            inventory_quantities: inventoryQuantities,
+          });
+          successCount++;
+        } else {
+          // Criar novo produto
+          let productType = "Personalizado";
+          if (item.item_type === "produto_acabado") {
+            productType = "Personalizado";
+          } else if (item.item_type === "tecido") {
+            productType = "Estampado";
+          }
+
+          const productResult = await createProduct({
+            name: item.name,
+            type: productType,
+            materials: item.category ? [item.category] : [],
+            work_hours: 0,
+            unit_price: item.cost_per_unit ? item.cost_per_unit * 2 : 0,
+            profit_margin: 0,
+          });
+
+          if (productResult.ok && productResult.id) {
+            // Vincular item de estoque ao produto
+            await updateProduct(productResult.id, {
+              inventory_items: [item.id],
+              inventory_quantities: [1],
+            });
+            successCount++;
+          } else {
+            errorCount++;
+          }
+        }
+      } catch (error) {
+        errorCount++;
+        logger.error(`Erro ao criar produto para item ${item.id}:`, error);
+      }
+    }
+
+    if (successCount > 0) {
+      toast.success(`${successCount} produto(s) criado(s) e vinculado(s) com sucesso!`);
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["inventory"] });
+      setSelectedItems([]);
+      setIsSelecting(false);
+    }
+    if (errorCount > 0) {
+      toast.error(`${errorCount} produto(s) não puderam ser criados`);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-muted/20">
       <header className="border-b border-border bg-card/60 backdrop-blur supports-[backdrop-filter]:bg-card/70 sticky top-0 z-20">
@@ -698,14 +844,24 @@ export default function Estoque() {
             </Dialog>
 
             {isSelecting && selectedItems.length > 0 && (
-              <Button 
-                variant="destructive" 
-                size="sm" 
-                onClick={handleBulkDelete}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Excluir {selectedItems.length}
-              </Button>
+              <>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleCreateProductsFromSelectedItems}
+                >
+                  <Package className="mr-2 h-4 w-4" />
+                  Criar produto no Catálogo ({selectedItems.length})
+                </Button>
+                <Button 
+                  variant="destructive" 
+                  size="sm" 
+                  onClick={handleBulkDelete}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Excluir {selectedItems.length}
+                </Button>
+              </>
             )}
             {isSelecting && (
               <Button 
@@ -1149,6 +1305,20 @@ export default function Estoque() {
                       placeholder="Informações adicionais sobre o item"
                       rows={3}
                     />
+                  </div>
+
+                  <div className="flex items-center space-x-2 pt-2">
+                    <Checkbox
+                      id="createProductFromItem"
+                      checked={createProductFromItem}
+                      onCheckedChange={(checked) => setCreateProductFromItem(checked === true)}
+                    />
+                    <Label
+                      htmlFor="createProductFromItem"
+                      className="text-sm font-normal cursor-pointer"
+                    >
+                      Criar item no catálogo
+                    </Label>
                   </div>
                 </div>
                 <DialogFooter className="sticky bottom-0 z-10 bg-card pt-4">
