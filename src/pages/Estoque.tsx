@@ -670,10 +670,16 @@ export default function Estoque() {
   };
 
   const handleCreateProductsFromSelectedItems = async () => {
+    // Log imediato e visível
     console.log("🚀 ===== INICIANDO CRIAÇÃO DE PRODUTOS =====");
     console.log("📋 Itens selecionados:", selectedItems);
+    console.log("📋 Total de itens selecionados:", selectedItems.length);
+    
+    // Toast imediato para confirmar que a função foi chamada
+    toast.info(`Função chamada! Processando ${selectedItems.length} item(ns)...`, { duration: 3000 });
     
     if (selectedItems.length === 0) {
+      console.warn("⚠️ Nenhum item selecionado");
       toast.error("Selecione pelo menos um item para criar produto");
       return;
     }
@@ -977,7 +983,10 @@ export default function Estoque() {
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  onClick={handleCreateProductsFromSelectedItems}
+                  onClick={() => {
+                    console.log("🔘 BOTÃO CLICADO! Itens selecionados:", selectedItems);
+                    handleCreateProductsFromSelectedItems();
+                  }}
                 >
                   <Package className="mr-2 h-4 w-4" />
                   Criar produto no Catálogo ({selectedItems.length})
