@@ -782,6 +782,32 @@ export default function Estoque() {
           const productId = existingProducts[0].id;
           console.error(`✅ Produto já existe: ${item.name} (${productId}), vinculando item...`);
           
+          // Verificar empresa_id do produto existente
+          const { data: productFullData } = await supabase
+            .from("atelie_products")
+            .select("id, empresa_id, name")
+            .eq("id", productId)
+            .single();
+          
+          console.error(`🏢 Produto existente - empresa_id:`, productFullData?.empresa_id);
+          
+          // Verificar empresa_id atual do usuário
+          const { data: userEmpresa } = await supabase
+            .from("user_empresas")
+            .select("empresa_id")
+            .eq("user_id", (await supabase.auth.getUser()).data.user?.id)
+            .single();
+          
+          console.error(`🏢 Empresa do usuário:`, userEmpresa?.empresa_id);
+          
+          if (productFullData?.empresa_id !== userEmpresa?.empresa_id) {
+            console.error(`⚠️ ATENÇÃO: Produto existe mas empresa_id diferente! Produto: ${productFullData?.empresa_id}, Usuário: ${userEmpresa?.empresa_id}`);
+            console.error(`⚠️ Por isso o produto não aparece no catálogo!`);
+            errorCount++;
+            errors.push(`${item.name}: Produto existe mas pertence a outra empresa`);
+            continue;
+          }
+          
           const { data: productData, error: fetchError } = await supabase
             .from("atelie_products")
             .select("inventory_items, inventory_quantities")
@@ -874,8 +900,27 @@ export default function Estoque() {
           console.error(`📊 Resultado do createProduct:`, {
             ok: productResult.ok,
             id: productResult.id,
-            error: productResult.error
+            error: productResult.error,
+            data: productResult.data
           });
+
+          // Verificar empresa_id do produto criado
+          if (productResult.ok && productResult.id && productResult.data) {
+            console.error(`🏢 Produto criado com empresa_id:`, productResult.data.empresa_id);
+            
+            // Verificar empresa_id atual do usuário
+            const { data: userEmpresa } = await supabase
+              .from("user_empresas")
+              .select("empresa_id")
+              .eq("user_id", (await supabase.auth.getUser()).data.user?.id)
+              .single();
+            
+            console.error(`🏢 Empresa do usuário:`, userEmpresa?.empresa_id);
+            
+            if (productResult.data.empresa_id !== userEmpresa?.empresa_id) {
+              console.error(`⚠️ ATENÇÃO: empresa_id do produto (${productResult.data.empresa_id}) diferente da empresa do usuário (${userEmpresa?.empresa_id})`);
+            }
+          }
 
           if (productResult.ok && productResult.id) {
             console.error(`✅ Produto criado: ${item.name} (${productResult.id})`);
