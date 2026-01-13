@@ -169,28 +169,52 @@ export async function getProducts(): Promise<ProductRow[]> {
 
     console.error(`🏢 [getProducts] Buscando produtos da empresa: ${empresaId}`);
 
-    const { data, error } = await supabase
-      .from("atelie_products")
-      .select("*")
-      .eq("empresa_id", empresaId)
-      .order("created_at", { ascending: false })
-      .limit(10000); // Aumentar limite para garantir que todos os produtos sejam retornados
+    // Supabase tem limite máximo de 1000 registros por query
+    // Precisamos fazer paginação para buscar todos os produtos
+    const allProducts: ProductRow[] = [];
+    const pageSize = 1000;
+    let offset = 0;
+    let hasMore = true;
 
-    if (error) {
-      console.error("❌ [getProducts] Erro ao buscar produtos:", error);
-      return [];
+    while (hasMore) {
+      const { data, error } = await supabase
+        .from("atelie_products")
+        .select("*")
+        .eq("empresa_id", empresaId)
+        .order("created_at", { ascending: false })
+        .range(offset, offset + pageSize - 1);
+
+      if (error) {
+        console.error(`❌ [getProducts] Erro ao buscar produtos (offset ${offset}):`, error);
+        break;
+      }
+
+      if (!data || data.length === 0) {
+        hasMore = false;
+        break;
+      }
+
+      allProducts.push(...(data as ProductRow[]));
+      console.error(`📦 [getProducts] Buscados ${data.length} produtos (total acumulado: ${allProducts.length})`);
+
+      // Se retornou menos que o pageSize, não há mais produtos
+      if (data.length < pageSize) {
+        hasMore = false;
+      } else {
+        offset += pageSize;
+      }
     }
 
-    console.error(`✅ [getProducts] Produtos encontrados: ${data?.length || 0}`);
-    if (data && data.length > 0) {
-      console.error(`📦 [getProducts] Primeiros produtos:`, data.slice(0, 5).map(p => ({ 
+    console.error(`✅ [getProducts] Total de produtos encontrados: ${allProducts.length}`);
+    if (allProducts.length > 0) {
+      console.error(`📦 [getProducts] Primeiros produtos:`, allProducts.slice(0, 5).map(p => ({ 
         id: p.id, 
         name: p.name, 
         empresa_id: p.empresa_id,
         type: p.type 
       })));
     }
-    return (data as ProductRow[]) || [];
+    return allProducts;
   } catch (e: unknown) {
     console.error("❌ [getProducts] Erro na função getProducts:", e);
     return [];
