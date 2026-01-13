@@ -670,16 +670,23 @@ export default function Estoque() {
   };
 
   const handleCreateProductsFromSelectedItems = async () => {
+    console.log("🚀 ===== INICIANDO CRIAÇÃO DE PRODUTOS =====");
+    console.log("📋 Itens selecionados:", selectedItems);
+    
     if (selectedItems.length === 0) {
       toast.error("Selecione pelo menos um item para criar produto");
       return;
     }
+
+    toast.info(`Buscando ${selectedItems.length} item(ns) do banco de dados...`, { duration: 2000 });
 
     // Buscar itens atualizados do banco para garantir que temos os dados mais recentes
     const { data: currentItems, error: fetchError } = await supabase
       .from("inventory_items")
       .select("*")
       .in("id", selectedItems);
+
+    console.log("🔍 Resultado da busca:", { currentItems, fetchError, count: currentItems?.length });
 
     if (fetchError) {
       console.error("❌ Erro ao buscar itens:", fetchError);
@@ -688,9 +695,12 @@ export default function Estoque() {
     }
 
     if (!currentItems || currentItems.length === 0) {
+      console.warn("⚠️ Nenhum item encontrado no banco");
       toast.error("Nenhum item válido encontrado");
       return;
     }
+
+    console.log(`✅ ${currentItems.length} item(ns) encontrado(s) no banco`);
 
     const selectedItemsData = currentItems.map(item => ({
       id: item.id,
@@ -701,17 +711,21 @@ export default function Estoque() {
       cost_per_unit: item.cost_per_unit || null,
     })).filter(item => item.name.trim() !== "");
     
+    console.log("📦 Itens processados:", selectedItemsData);
+    
     if (selectedItemsData.length === 0) {
+      console.error("❌ Nenhum item válido após processamento");
       toast.error("Nenhum item válido encontrado (itens sem nome)");
       return;
     }
 
-    console.log(`📦 Itens encontrados para processar: ${selectedItemsData.length}`);
+    console.log(`✅ ${selectedItemsData.length} item(ns) válido(s) para processar`);
 
     let successCount = 0;
     let errorCount = 0;
     const errors: string[] = [];
 
+    console.log(`🔄 Iniciando processamento de ${selectedItemsData.length} item(ns)...`);
     toast.loading(`Processando ${selectedItemsData.length} item(ns)...`, { id: "creating-products" });
 
     for (const item of selectedItemsData) {
@@ -865,6 +879,11 @@ export default function Estoque() {
 
     toast.dismiss("creating-products");
 
+    console.log("📊 ===== RESULTADO FINAL =====");
+    console.log(`✅ Sucessos: ${successCount}`);
+    console.log(`❌ Erros: ${errorCount}`);
+    console.log("📝 Lista de erros:", errors);
+
     if (successCount > 0) {
       toast.success(`${successCount} produto(s) criado(s) e vinculado(s) com sucesso!`);
       queryClient.invalidateQueries({ queryKey: ["products"] });
@@ -879,12 +898,15 @@ export default function Estoque() {
       toast.error(`${errorCount} produto(s) não puderam ser criados: ${errorDetails}${moreErrors}`, {
         duration: 10000,
       });
-      console.error("Erros detalhados:", errors);
+      console.error("❌ Erros detalhados:", errors);
     }
 
     if (successCount === 0 && errorCount === 0) {
+      console.warn("⚠️ Nenhum item foi processado");
       toast.warning("Nenhum item foi processado");
     }
+
+    console.log("🏁 ===== FIM DA CRIAÇÃO DE PRODUTOS =====");
   };
 
   return (
