@@ -94,9 +94,18 @@ export default function CatalogoProdutos() {
         const produtosProcurados = ["CAMISETA MANGA CURTA - G-IPUC", "CAMISETA MANGA CURTA - P-IPUC", "CAMISETA MANGA CURTA - M-IPUC", "CAMISETA MANGA CURTA - GG-IPUC", "CAMISETA MANGA CURTA - XG-IPUC", "CAMISETA MANGA CURTA - XXG-IPUC"];
         const produtosEncontrados = produtosProcurados.map(nome => {
           const encontrado = productsData.find(p => p.name === nome);
-          return { nome, encontrado: !!encontrado, id: encontrado?.id };
+          return { nome, encontrado: !!encontrado, id: encontrado?.id, type: encontrado?.type };
         });
         console.error(`🔍 [CatalogoProdutos] Produtos específicos procurados:`, produtosEncontrados);
+        
+        const encontradosCount = produtosEncontrados.filter(p => p.encontrado).length;
+        console.error(`📊 [CatalogoProdutos] ${encontradosCount} de ${produtosProcurados.length} produtos específicos encontrados na lista`);
+        
+        if (encontradosCount < produtosProcurados.length) {
+          const naoEncontrados = produtosEncontrados.filter(p => !p.encontrado).map(p => p.nome);
+          console.error(`⚠️ [CatalogoProdutos] Produtos NÃO encontrados:`, naoEncontrados);
+          console.error(`⚠️ [CatalogoProdutos] Isso pode indicar que há mais de 1000 produtos e esses estão além do limite!`);
+        }
         
         if (productsData.length > 0) {
           console.error(`📦 [CatalogoProdutos] Primeiros produtos:`, productsData.slice(0, 5).map(p => ({ 
@@ -163,19 +172,29 @@ export default function CatalogoProdutos() {
       .trim();
 
   const filteredProducts = useMemo(() => {
+    console.error(`🔍 [CatalogoProdutos] Filtrando produtos:`, {
+      total: products.length,
+      searchTerm: searchTerm || "(vazio)",
+      selectedCategory: selectedCategory
+    });
+    
     // Se não há termo de busca, apenas filtrar por categoria
     if (!searchTerm.trim()) {
-      return products.filter((product) => selectedCategory === "all" || product.category === selectedCategory);
+      const filtrados = products.filter((product) => selectedCategory === "all" || product.category === selectedCategory);
+      console.error(`📊 [CatalogoProdutos] Após filtro de categoria: ${filtrados.length} produtos`);
+      return filtrados;
     }
 
     const search = normalizeSearch(searchTerm);
     if (!search) {
-      return products.filter((product) => selectedCategory === "all" || product.category === selectedCategory);
+      const filtrados = products.filter((product) => selectedCategory === "all" || product.category === selectedCategory);
+      console.error(`📊 [CatalogoProdutos] Após filtro de categoria (busca vazia): ${filtrados.length} produtos`);
+      return filtrados;
     }
 
     const searchWords = search.split(" ");
 
-    return products.filter((product) => {
+    const filtrados = products.filter((product) => {
       const matchesCategory = selectedCategory === "all" || product.category === selectedCategory;
       
       if (!matchesCategory) return false;
@@ -197,6 +216,18 @@ export default function CatalogoProdutos() {
 
       return matchesSearch;
     });
+    
+    console.error(`📊 [CatalogoProdutos] Após filtros (busca + categoria): ${filtrados.length} produtos`);
+    
+    // Verificar se produtos específicos passaram pelos filtros
+    const produtosProcurados = ["CAMISETA MANGA CURTA - G-IPUC", "CAMISETA MANGA CURTA - P-IPUC", "CAMISETA MANGA CURTA - M-IPUC", "CAMISETA MANGA CURTA - GG-IPUC", "CAMISETA MANGA CURTA - XG-IPUC", "CAMISETA MANGA CURTA - XXG-IPUC"];
+    const produtosFiltrados = produtosProcurados.map(nome => {
+      const encontrado = filtrados.find(p => p.name === nome);
+      return { nome, encontrado: !!encontrado };
+    });
+    console.error(`🔍 [CatalogoProdutos] Produtos específicos após filtros:`, produtosFiltrados);
+    
+    return filtrados;
   }, [products, selectedCategory, searchTerm]);
 
   const handleSubmit = async (e: React.FormEvent) => {
