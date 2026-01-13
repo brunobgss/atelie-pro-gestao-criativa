@@ -670,34 +670,32 @@ export default function Estoque() {
   };
 
   const handleCreateProductsFromSelectedItems = async () => {
-    // Alert para garantir que aparece
-    alert(`DEBUG: Função chamada! ${selectedItems.length} item(ns) selecionado(s). Verifique o console.`);
-    
-    // Log imediato e visível
-    console.log("🚀 ===== INICIANDO CRIAÇÃO DE PRODUTOS =====");
-    console.log("📋 Itens selecionados:", selectedItems);
-    console.log("📋 Total de itens selecionados:", selectedItems.length);
-    console.error("TESTE DE ERRO - Se você vê isso, o console está funcionando!");
-    console.warn("TESTE DE AVISO - Se você vê isso, o console está funcionando!");
-    
-    // Toast imediato para confirmar que a função foi chamada
-    toast.info(`Função chamada! Processando ${selectedItems.length} item(ns)...`, { duration: 3000 });
+    console.error("🚀 ===== INICIANDO CRIAÇÃO DE PRODUTOS =====");
+    console.error("📋 Itens selecionados:", selectedItems);
+    console.error("📋 Total de itens selecionados:", selectedItems.length);
     
     if (selectedItems.length === 0) {
-      console.warn("⚠️ Nenhum item selecionado");
+      console.error("⚠️ Nenhum item selecionado");
       toast.error("Selecione pelo menos um item para criar produto");
       return;
     }
 
+    console.error("✅ Validação passou, buscando itens do banco...");
     toast.info(`Buscando ${selectedItems.length} item(ns) do banco de dados...`, { duration: 2000 });
 
     // Buscar itens atualizados do banco para garantir que temos os dados mais recentes
+    console.error("🔍 Fazendo query no Supabase...");
     const { data: currentItems, error: fetchError } = await supabase
       .from("inventory_items")
       .select("*")
       .in("id", selectedItems);
 
-    console.log("🔍 Resultado da busca:", { currentItems, fetchError, count: currentItems?.length });
+    console.error("🔍 Resultado da busca:", { 
+      temItens: !!currentItems, 
+      quantidade: currentItems?.length, 
+      temErro: !!fetchError,
+      erro: fetchError 
+    });
 
     if (fetchError) {
       console.error("❌ Erro ao buscar itens:", fetchError);
@@ -706,13 +704,14 @@ export default function Estoque() {
     }
 
     if (!currentItems || currentItems.length === 0) {
-      console.warn("⚠️ Nenhum item encontrado no banco");
+      console.error("⚠️ Nenhum item encontrado no banco");
       toast.error("Nenhum item válido encontrado");
       return;
     }
 
-    console.log(`✅ ${currentItems.length} item(ns) encontrado(s) no banco`);
+    console.error(`✅ ${currentItems.length} item(ns) encontrado(s) no banco`);
 
+    console.error("🔄 Processando itens...");
     const selectedItemsData = currentItems.map(item => ({
       id: item.id,
       name: item.name || "",
@@ -722,7 +721,7 @@ export default function Estoque() {
       cost_per_unit: item.cost_per_unit || null,
     })).filter(item => item.name.trim() !== "");
     
-    console.log("📦 Itens processados:", selectedItemsData);
+    console.error("📦 Itens processados:", selectedItemsData);
     
     if (selectedItemsData.length === 0) {
       console.error("❌ Nenhum item válido após processamento");
@@ -730,34 +729,35 @@ export default function Estoque() {
       return;
     }
 
-    console.log(`✅ ${selectedItemsData.length} item(ns) válido(s) para processar`);
+    console.error(`✅ ${selectedItemsData.length} item(ns) válido(s) para processar`);
 
     let successCount = 0;
     let errorCount = 0;
     const errors: string[] = [];
 
-    console.log(`🔄 Iniciando processamento de ${selectedItemsData.length} item(ns)...`);
+    console.error(`🔄 Iniciando processamento de ${selectedItemsData.length} item(ns)...`);
     toast.loading(`Processando ${selectedItemsData.length} item(ns)...`, { id: "creating-products" });
 
     for (const item of selectedItemsData) {
       try {
-        console.log(`🔄 Processando item: ${item.name} (${item.id})`, item);
+        console.error(`🔄 Processando item: ${item.name} (${item.id})`, item);
         
         // Validar dados do item
         if (!item.name || item.name.trim() === "") {
-          console.warn(`⚠️ Item sem nome, pulando: ${item.id}`);
+          console.error(`⚠️ Item sem nome, pulando: ${item.id}`);
           errorCount++;
           errors.push(`Item sem nome (ID: ${item.id})`);
           continue;
         }
 
         if (!item.id) {
-          console.warn(`⚠️ Item sem ID, pulando: ${item.name}`);
+          console.error(`⚠️ Item sem ID, pulando: ${item.name}`);
           errorCount++;
           errors.push(`${item.name}: Item sem ID`);
           continue;
         }
         
+        console.error(`🔍 Verificando se produto "${item.name}" já existe...`);
         // Verificar se já existe produto com esse nome
         const { data: existingProducts, error: searchError } = await supabase
           .from("atelie_products")
@@ -772,10 +772,15 @@ export default function Estoque() {
           continue;
         }
 
+        console.error(`📊 Resultado da busca:`, { 
+          existe: existingProducts && existingProducts.length > 0,
+          quantidade: existingProducts?.length 
+        });
+
         if (existingProducts && existingProducts.length > 0) {
           // Se já existe, apenas vincular
           const productId = existingProducts[0].id;
-          console.log(`✅ Produto já existe: ${item.name}, vinculando item...`);
+          console.error(`✅ Produto já existe: ${item.name} (${productId}), vinculando item...`);
           
           const { data: productData, error: fetchError } = await supabase
             .from("atelie_products")
@@ -819,10 +824,12 @@ export default function Estoque() {
           if (!inventoryItems.includes(item.id)) {
             inventoryItems.push(item.id);
             inventoryQuantities.push(1);
+            console.error(`➕ Adicionando item ${item.id} aos vínculos`);
           } else {
-            console.log(`ℹ️ Item ${item.name} já está vinculado ao produto`);
+            console.error(`ℹ️ Item ${item.name} já está vinculado ao produto`);
           }
 
+          console.error(`💾 Salvando vínculos no produto ${productId}...`);
           const updateResult = await updateProduct(productId, {
             inventory_items: inventoryItems,
             inventory_quantities: inventoryQuantities,
@@ -830,7 +837,7 @@ export default function Estoque() {
 
           if (updateResult.ok) {
             successCount++;
-            console.log(`✅ Item ${item.name} vinculado com sucesso`);
+            console.error(`✅ Item ${item.name} vinculado com sucesso`);
           } else {
             errorCount++;
             errors.push(`${item.name}: ${updateResult.error || "Erro ao vincular"}`);
@@ -838,7 +845,7 @@ export default function Estoque() {
           }
         } else {
           // Criar novo produto
-          console.log(`🆕 Criando novo produto: ${item.name}`);
+          console.error(`🆕 Criando novo produto: ${item.name}`);
           
           let productType = "Personalizado";
           if (item.item_type === "produto_acabado") {
@@ -847,6 +854,12 @@ export default function Estoque() {
             productType = "Estampado";
           }
 
+          console.error(`📝 Chamando createProduct com:`, {
+            name: item.name,
+            type: productType,
+            materials: item.category ? [item.category] : [],
+          });
+          
           const productResult = await createProduct({
             name: item.name,
             type: productType,
@@ -856,18 +869,30 @@ export default function Estoque() {
             profit_margin: 0,
           });
 
+          console.error(`📊 Resultado do createProduct:`, {
+            ok: productResult.ok,
+            id: productResult.id,
+            error: productResult.error
+          });
+
           if (productResult.ok && productResult.id) {
-            console.log(`✅ Produto criado: ${item.name} (${productResult.id})`);
+            console.error(`✅ Produto criado: ${item.name} (${productResult.id})`);
             
             // Vincular item de estoque ao produto
+            console.error(`🔗 Vinculando item ${item.id} ao produto ${productResult.id}...`);
             const linkResult = await updateProduct(productResult.id, {
               inventory_items: [item.id],
               inventory_quantities: [1],
             });
 
+            console.error(`📊 Resultado do updateProduct (vínculo):`, {
+              ok: linkResult.ok,
+              error: linkResult.error
+            });
+
             if (linkResult.ok) {
               successCount++;
-              console.log(`✅ Item vinculado ao produto criado`);
+              console.error(`✅ Item vinculado ao produto criado`);
             } else {
               errorCount++;
               errors.push(`${item.name}: Produto criado mas erro ao vincular - ${linkResult.error}`);
@@ -885,15 +910,16 @@ export default function Estoque() {
         errors.push(`${item.name}: ${errorMessage}`);
         logger.error(`Erro ao criar produto para item ${item.id}:`, error);
         console.error(`❌ Erro inesperado ao processar item ${item.name}:`, error);
+        console.error(`❌ Stack trace:`, error instanceof Error ? error.stack : "N/A");
       }
     }
 
     toast.dismiss("creating-products");
 
-    console.log("📊 ===== RESULTADO FINAL =====");
-    console.log(`✅ Sucessos: ${successCount}`);
-    console.log(`❌ Erros: ${errorCount}`);
-    console.log("📝 Lista de erros:", errors);
+    console.error("📊 ===== RESULTADO FINAL =====");
+    console.error(`✅ Sucessos: ${successCount}`);
+    console.error(`❌ Erros: ${errorCount}`);
+    console.error("📝 Lista de erros:", errors);
 
     if (successCount > 0) {
       toast.success(`${successCount} produto(s) criado(s) e vinculado(s) com sucesso!`);
@@ -913,11 +939,11 @@ export default function Estoque() {
     }
 
     if (successCount === 0 && errorCount === 0) {
-      console.warn("⚠️ Nenhum item foi processado");
+      console.error("⚠️ Nenhum item foi processado");
       toast.warning("Nenhum item foi processado");
     }
 
-    console.log("🏁 ===== FIM DA CRIAÇÃO DE PRODUTOS =====");
+    console.error("🏁 ===== FIM DA CRIAÇÃO DE PRODUTOS =====");
   };
 
   return (
@@ -991,9 +1017,7 @@ export default function Estoque() {
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    alert(`DEBUG: Botão clicado! ${selectedItems.length} item(ns) selecionado(s)`);
-                    console.log("🔘 BOTÃO CLICADO! Itens selecionados:", selectedItems);
-                    console.error("TESTE ERRO - Botão clicado");
+                    console.error("🔘 BOTÃO CLICADO! Itens selecionados:", selectedItems);
                     handleCreateProductsFromSelectedItems();
                   }}
                 >
