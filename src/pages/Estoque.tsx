@@ -973,8 +973,13 @@ export default function Estoque() {
         ? `${successCount} item(ns) processado(s) com sucesso!`
         : `${successCount} item(ns) processado(s), ${errorCount} com erro`;
       toast.success(message);
-      queryClient.invalidateQueries({ queryKey: ["products"] });
+      
+      // Invalidar cache e forçar refetch
+      console.error("🔄 Invalidando cache de produtos...");
+      await queryClient.invalidateQueries({ queryKey: ["products"] });
+      await queryClient.refetchQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["inventory"] });
+      
       setSelectedItems([]);
       setIsSelecting(false);
     }
