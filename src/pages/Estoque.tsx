@@ -932,6 +932,21 @@ export default function Estoque() {
             if (productResult.data.empresa_id !== userEmpresa?.empresa_id) {
               console.error(`⚠️ ATENÇÃO: empresa_id do produto (${productResult.data.empresa_id}) diferente da empresa do usuário (${userEmpresa?.empresa_id})`);
             }
+
+            // Verificar se o produto pode ser encontrado imediatamente após criar
+            console.error(`🔍 Verificando se produto pode ser encontrado após criação...`);
+            const { data: produtoVerificado, error: erroVerificacao } = await supabase
+              .from("atelie_products")
+              .select("id, name, empresa_id")
+              .eq("id", productResult.id)
+              .eq("empresa_id", userEmpresa?.empresa_id || "")
+              .single();
+            
+            if (erroVerificacao) {
+              console.error(`❌ ERRO: Produto criado mas não pode ser encontrado!`, erroVerificacao);
+            } else {
+              console.error(`✅ Produto pode ser encontrado após criação:`, produtoVerificado);
+            }
           }
 
           if (productResult.ok && productResult.id) {
@@ -991,6 +1006,36 @@ export default function Estoque() {
       await queryClient.invalidateQueries({ queryKey: ["products"] });
       await queryClient.refetchQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["inventory"] });
+      
+      // Verificar se os produtos criados podem ser encontrados
+      console.error("🔍 Verificando se produtos criados podem ser encontrados...");
+      const { data: userEmpresa } = await supabase
+        .from("user_empresas")
+        .select("empresa_id")
+        .eq("user_id", (await supabase.auth.getUser()).data.user?.id)
+        .single();
+      
+      if (userEmpresa?.empresa_id) {
+        const produtosCriados = selectedItemsData.filter(item => {
+          // Verificar se produto foi criado (não apenas vinculado)
+          return true; // Por enquanto verificar todos
+        });
+        
+        for (const item of produtosCriados.slice(0, 3)) { // Verificar apenas os 3 primeiros
+          const { data: produtoEncontrado } = await supabase
+            .from("atelie_products")
+            .select("id, name, empresa_id")
+            .eq("name", item.name)
+            .eq("empresa_id", userEmpresa.empresa_id)
+            .limit(1);
+          
+          console.error(`🔍 Produto "${item.name}":`, {
+            encontrado: !!produtoEncontrado && produtoEncontrado.length > 0,
+            id: produtoEncontrado?.[0]?.id,
+            empresa_id: produtoEncontrado?.[0]?.empresa_id
+          });
+        }
+      }
       
       setSelectedItems([]);
       setIsSelecting(false);
