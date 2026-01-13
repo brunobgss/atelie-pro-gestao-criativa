@@ -821,27 +821,29 @@ export default function Estoque() {
           }
 
           // Adicionar item se não estiver já vinculado
-          if (!inventoryItems.includes(item.id)) {
+          const jaEstavaVinculado = inventoryItems.includes(item.id);
+          if (!jaEstavaVinculado) {
             inventoryItems.push(item.id);
             inventoryQuantities.push(1);
             console.error(`➕ Adicionando item ${item.id} aos vínculos`);
-          } else {
-            console.error(`ℹ️ Item ${item.name} já está vinculado ao produto`);
-          }
+            
+            console.error(`💾 Salvando vínculos no produto ${productId}...`);
+            const updateResult = await updateProduct(productId, {
+              inventory_items: inventoryItems,
+              inventory_quantities: inventoryQuantities,
+            });
 
-          console.error(`💾 Salvando vínculos no produto ${productId}...`);
-          const updateResult = await updateProduct(productId, {
-            inventory_items: inventoryItems,
-            inventory_quantities: inventoryQuantities,
-          });
-
-          if (updateResult.ok) {
-            successCount++;
-            console.error(`✅ Item ${item.name} vinculado com sucesso`);
+            if (updateResult.ok) {
+              successCount++;
+              console.error(`✅ Item ${item.name} vinculado com sucesso`);
+            } else {
+              errorCount++;
+              errors.push(`${item.name}: ${updateResult.error || "Erro ao vincular"}`);
+              console.error(`❌ Erro ao vincular item:`, updateResult.error);
+            }
           } else {
-            errorCount++;
-            errors.push(`${item.name}: ${updateResult.error || "Erro ao vincular"}`);
-            console.error(`❌ Erro ao vincular item:`, updateResult.error);
+            console.error(`ℹ️ Item ${item.name} já estava vinculado ao produto - pulando`);
+            successCount++; // Conta como sucesso pois já está correto
           }
         } else {
           // Criar novo produto
@@ -922,7 +924,10 @@ export default function Estoque() {
     console.error("📝 Lista de erros:", errors);
 
     if (successCount > 0) {
-      toast.success(`${successCount} produto(s) criado(s) e vinculado(s) com sucesso!`);
+      const message = errorCount === 0 
+        ? `${successCount} item(ns) processado(s) com sucesso!`
+        : `${successCount} item(ns) processado(s), ${errorCount} com erro`;
+      toast.success(message);
       queryClient.invalidateQueries({ queryKey: ["products"] });
       queryClient.invalidateQueries({ queryKey: ["inventory"] });
       setSelectedItems([]);
