@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -134,12 +134,51 @@ export default function CatalogoProdutos() {
     staleTime: 0, // Sempre buscar dados frescos
   });
 
-  const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.description.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = selectedCategory === "all" || product.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
+  // Normalizar texto para busca (remove acentos, espaços extras, caixa)
+  const normalizeSearch = (value: string) =>
+    value
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const filteredProducts = useMemo(() => {
+    // Se não há termo de busca, apenas filtrar por categoria
+    if (!searchTerm.trim()) {
+      return products.filter((product) => selectedCategory === "all" || product.category === selectedCategory);
+    }
+
+    const search = normalizeSearch(searchTerm);
+    if (!search) {
+      return products.filter((product) => selectedCategory === "all" || product.category === selectedCategory);
+    }
+
+    const searchWords = search.split(" ");
+
+    return products.filter((product) => {
+      const matchesCategory = selectedCategory === "all" || product.category === selectedCategory;
+      
+      if (!matchesCategory) return false;
+
+      // Buscar em múltiplos campos: nome, descrição, categoria, materiais
+      const searchableText = [
+        product.name || "",
+        product.description || "",
+        product.category || "",
+        Array.isArray(product.materials) ? product.materials.join(" ") : "",
+      ]
+        .join(" ")
+        .toString();
+
+      const normalizedText = normalizeSearch(searchableText);
+
+      // Cada palavra digitada deve existir em alguma parte do texto
+      const matchesSearch = searchWords.every((word) => normalizedText.includes(word));
+
+      return matchesSearch;
+    });
+  }, [products, selectedCategory, searchTerm]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
