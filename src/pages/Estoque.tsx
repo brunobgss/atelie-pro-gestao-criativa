@@ -670,10 +670,15 @@ export default function Estoque() {
   };
 
   const handleCreateProductsFromSelectedItems = async () => {
+    // Alert para garantir que aparece
+    alert(`DEBUG: Função chamada! ${selectedItems.length} item(ns) selecionado(s). Verifique o console.`);
+    
     // Log imediato e visível
     console.log("🚀 ===== INICIANDO CRIAÇÃO DE PRODUTOS =====");
     console.log("📋 Itens selecionados:", selectedItems);
     console.log("📋 Total de itens selecionados:", selectedItems.length);
+    console.error("TESTE DE ERRO - Se você vê isso, o console está funcionando!");
+    console.warn("TESTE DE AVISO - Se você vê isso, o console está funcionando!");
     
     // Toast imediato para confirmar que a função foi chamada
     toast.info(`Função chamada! Processando ${selectedItems.length} item(ns)...`, { duration: 3000 });
@@ -983,8 +988,12 @@ export default function Estoque() {
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    alert(`DEBUG: Botão clicado! ${selectedItems.length} item(ns) selecionado(s)`);
                     console.log("🔘 BOTÃO CLICADO! Itens selecionados:", selectedItems);
+                    console.error("TESTE ERRO - Botão clicado");
                     handleCreateProductsFromSelectedItems();
                   }}
                 >
