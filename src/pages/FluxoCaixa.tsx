@@ -234,63 +234,76 @@ export default function FluxoCaixa() {
     const movimentacoesPorDia: Record<string, { pagar: number; receber: number }> = {};
 
     contasPagarFiltradas.forEach(conta => {
-      const data = conta.data_vencimento.split('T')[0];
+      // Para contas pagas, usar data_pagamento se disponível, senão usar data_vencimento
+      // Para contas pendentes/atrasadas, usar data_vencimento
+      const data = (conta.status === 'pago' && conta.data_pagamento) 
+        ? conta.data_pagamento.split('T')[0] 
+        : conta.data_vencimento.split('T')[0];
+      
       if (!movimentacoesPorDia[data]) {
         movimentacoesPorDia[data] = { pagar: 0, receber: 0 };
       }
       
-      // Se o filtro de status está em "todos", mostrar todas as contas
-      // Se está em "pago", mostrar apenas as pagas
-      // Se está em "pendente" ou "atrasado", mostrar apenas essas
+      // Calcular valor baseado no status
+      let valor = 0;
       if (filtroStatus === "todos") {
-        // Mostrar todas, mas para pendentes/atrasadas mostrar o valor pendente, para pagas mostrar o valor pago
         if (conta.status === 'pendente' || conta.status === 'atrasado') {
-          movimentacoesPorDia[data].pagar += (conta.valor_total - conta.valor_pago);
+          valor = conta.valor_total - conta.valor_pago; // Valor pendente
         } else if (conta.status === 'pago') {
-          // Para contas pagas, mostrar o valor que foi pago (já realizado)
-          movimentacoesPorDia[data].pagar += conta.valor_pago;
+          valor = conta.valor_pago; // Valor já pago
         }
       } else if (filtroStatus === "pago") {
-        // Se filtro é "pago", mostrar apenas contas pagas com o valor pago
         if (conta.status === 'pago') {
-          movimentacoesPorDia[data].pagar += conta.valor_pago;
+          valor = conta.valor_pago;
         }
       } else if (filtroStatus === "recebido") {
-        // Filtro "recebido" não se aplica a contas a pagar
+        // Não se aplica a contas a pagar
       } else {
-        // Para outros filtros (pendente, atrasado), mostrar apenas o valor pendente
+        // Pendente ou atrasado
         if (conta.status === 'pendente' || conta.status === 'atrasado') {
-          movimentacoesPorDia[data].pagar += (conta.valor_total - conta.valor_pago);
+          valor = conta.valor_total - conta.valor_pago;
         }
+      }
+      
+      if (valor > 0) {
+        movimentacoesPorDia[data].pagar += valor;
       }
     });
 
     contasReceberFiltradas.forEach(conta => {
-      const data = conta.data_vencimento.split('T')[0];
+      // Para contas recebidas, usar data_recebimento se disponível, senão usar data_vencimento
+      // Para contas pendentes/atrasadas, usar data_vencimento
+      const data = (conta.status === 'recebido' && conta.data_recebimento) 
+        ? conta.data_recebimento.split('T')[0] 
+        : conta.data_vencimento.split('T')[0];
+      
       if (!movimentacoesPorDia[data]) {
         movimentacoesPorDia[data] = { pagar: 0, receber: 0 };
       }
       
-      // Mesma lógica para contas a receber
+      // Calcular valor baseado no status
+      let valor = 0;
       if (filtroStatus === "todos") {
         if (conta.status === 'pendente' || conta.status === 'atrasado') {
-          movimentacoesPorDia[data].receber += (conta.valor_total - conta.valor_recebido);
+          valor = conta.valor_total - conta.valor_recebido; // Valor pendente
         } else if (conta.status === 'recebido') {
-          // Para contas recebidas, mostrar o valor que foi recebido (já realizado)
-          movimentacoesPorDia[data].receber += conta.valor_recebido;
+          valor = conta.valor_recebido; // Valor já recebido
         }
       } else if (filtroStatus === "recebido") {
-        // Se filtro é "recebido", mostrar apenas contas recebidas com o valor recebido
         if (conta.status === 'recebido') {
-          movimentacoesPorDia[data].receber += conta.valor_recebido;
+          valor = conta.valor_recebido;
         }
       } else if (filtroStatus === "pago") {
-        // Filtro "pago" não se aplica a contas a receber
+        // Não se aplica a contas a receber
       } else {
-        // Para outros filtros (pendente, atrasado), mostrar apenas o valor pendente
+        // Pendente ou atrasado
         if (conta.status === 'pendente' || conta.status === 'atrasado') {
-          movimentacoesPorDia[data].receber += (conta.valor_total - conta.valor_recebido);
+          valor = conta.valor_total - conta.valor_recebido;
         }
+      }
+      
+      if (valor > 0) {
+        movimentacoesPorDia[data].receber += valor;
       }
     });
 
@@ -400,7 +413,17 @@ export default function FluxoCaixa() {
                 {formatCurrency({ value: calculosFiltrados.totalPagar, currency: 'BRL' })}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Contas pendentes e atrasadas
+                {filtroStatus === "todos" 
+                  ? "Pendentes e atrasadas" 
+                  : filtroStatus === "pago" 
+                    ? "Contas pagas" 
+                    : filtroStatus === "recebido"
+                      ? "Contas recebidas"
+                      : filtroStatus === "pendente"
+                        ? "Contas pendentes"
+                        : filtroStatus === "atrasado"
+                          ? "Contas atrasadas"
+                          : "Contas pendentes e atrasadas"}
               </p>
             </CardContent>
           </Card>
@@ -417,7 +440,17 @@ export default function FluxoCaixa() {
                 {formatCurrency({ value: calculosFiltrados.totalReceber, currency: 'BRL' })}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Contas pendentes e atrasadas
+                {filtroStatus === "todos" 
+                  ? "Pendentes e atrasadas" 
+                  : filtroStatus === "recebido" 
+                    ? "Contas recebidas" 
+                    : filtroStatus === "pago"
+                      ? "Contas pagas"
+                      : filtroStatus === "pendente"
+                        ? "Contas pendentes"
+                        : filtroStatus === "atrasado"
+                          ? "Contas atrasadas"
+                          : "Contas pendentes e atrasadas"}
               </p>
             </CardContent>
           </Card>
@@ -668,13 +701,17 @@ export default function FluxoCaixa() {
                         {mov.receber > 0 && (
                           <div className="flex items-center gap-2 text-green-600">
                             <TrendingUp className="h-4 w-4" />
-                            <span>Receber: {formatCurrency({ value: mov.receber, currency: 'BRL' })}</span>
+                            <span>
+                              {filtroStatus === "recebido" ? "Recebido" : "Receber"}: {formatCurrency({ value: mov.receber, currency: 'BRL' })}
+                            </span>
                           </div>
                         )}
                         {mov.pagar > 0 && (
                           <div className="flex items-center gap-2 text-red-600">
                             <TrendingDown className="h-4 w-4" />
-                            <span>Pagar: {formatCurrency({ value: mov.pagar, currency: 'BRL' })}</span>
+                            <span>
+                              {filtroStatus === "pago" ? "Pago" : "Pagar"}: {formatCurrency({ value: mov.pagar, currency: 'BRL' })}
+                            </span>
                           </div>
                         )}
                       </div>

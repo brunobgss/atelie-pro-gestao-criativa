@@ -207,6 +207,13 @@ export default function ContasReceber() {
         if (result.ok) {
           toast.success("Conta atualizada com sucesso!");
           invalidateRelated('contas_receber');
+          // Invalidar também queries do Fluxo de Caixa
+          queryClient.invalidateQueries({ 
+            predicate: (query) => {
+              const key = query.queryKey[0];
+              return key === 'contas_receber' && query.queryKey[1] === 'fluxo';
+            }
+          });
           handleCloseDialog();
         } else {
           toast.error(result.error || "Erro ao atualizar conta");
@@ -217,6 +224,13 @@ export default function ContasReceber() {
         if (result.ok) {
           toast.success("Conta criada com sucesso!");
           invalidateRelated('contas_receber');
+          // Invalidar também queries do Fluxo de Caixa
+          queryClient.invalidateQueries({ 
+            predicate: (query) => {
+              const key = query.queryKey[0];
+              return key === 'contas_receber' && query.queryKey[1] === 'fluxo';
+            }
+          });
           handleCloseDialog();
         } else {
           toast.error(result.error || "Erro ao criar conta");
@@ -241,6 +255,13 @@ export default function ContasReceber() {
       if (result.ok) {
         toast.success("Conta excluída com sucesso!");
         invalidateRelated('contas_receber');
+        // Invalidar também queries do Fluxo de Caixa
+        queryClient.invalidateQueries({ 
+          predicate: (query) => {
+            const key = query.queryKey[0];
+            return key === 'contas_receber' && query.queryKey[1] === 'fluxo';
+          }
+        });
       } else {
         toast.error(result.error || "Erro ao excluir conta");
       }
@@ -261,6 +282,13 @@ export default function ContasReceber() {
     if (result.ok) {
       toast.success("Conta marcada como recebida!");
       invalidateRelated('contas_receber');
+      // Invalidar também queries do Fluxo de Caixa
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          return key === 'contas_receber' && query.queryKey[1] === 'fluxo';
+        }
+      });
     } else {
       toast.error(result.error || "Erro ao atualizar conta");
     }

@@ -80,8 +80,8 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       'medidas': ['customers', 'orders', 'quotes'],
       // Novas páginas - Fase 1
       'fornecedores': ['contas_pagar', 'pedidos_compra'],
-      'contas_pagar': ['dashboard'], // Fluxo de caixa será atualizado automaticamente via queryKey ["contas_pagar", "fluxo", ...]
-      'contas_receber': ['dashboard'], // Fluxo de caixa será atualizado automaticamente via queryKey ["contas_receber", "fluxo", ...]
+      'contas_pagar': ['dashboard', 'fluxo_caixa'],
+      'contas_receber': ['dashboard', 'fluxo_caixa'],
       'pedidos_compra': ['fornecedores', 'products', 'inventory_items'],
       'movimentacoes_estoque': ['products', 'variacoes', 'inventory_items'],
       'variacoes': ['products', 'movimentacoes_estoque'],
@@ -107,6 +107,16 @@ export function SyncProvider({ children }: { children: ReactNode }) {
         }
       });
     });
+    
+    // Invalidar Fluxo de Caixa quando contas são atualizadas
+    if (resource === 'contas_pagar' || resource === 'contas_receber') {
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          return key === resource && query.queryKey[1] === 'fluxo';
+        }
+      });
+    }
   };
 
   const forceRefresh = (resource: string) => {
