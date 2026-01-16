@@ -220,19 +220,52 @@ export default function FluxoCaixa() {
 
   // Recalcular totais com contas filtradas
   const calculosFiltrados = useMemo(() => {
+    console.error(`[FluxoCaixa] Calculando totais:`, {
+      filtroStatus,
+      contasPagarFiltradas: contasPagarFiltradas.length,
+      contasReceberFiltradas: contasReceberFiltradas.length,
+      detalhesPagar: contasPagarFiltradas.map(c => ({
+        id: c.id,
+        descricao: c.descricao,
+        status: c.status,
+        valor_total: c.valor_total,
+        valor_pago: c.valor_pago,
+        valor_pendente: c.valor_total - c.valor_pago
+      })),
+      detalhesReceber: contasReceberFiltradas.map(c => ({
+        id: c.id,
+        descricao: c.descricao,
+        status: c.status,
+        valor_total: c.valor_total,
+        valor_recebido: c.valor_recebido,
+        valor_pendente: c.valor_total - c.valor_recebido
+      }))
+    });
+    
     // Calcular totais baseado no filtro de status
     let totalPagar = 0;
     let totalReceber = 0;
 
     if (filtroStatus === "todos") {
       // Se filtro é "todos", mostrar pendentes/atrasadas como valor pendente e pagas como valor pago
-      totalPagar = contasPagarFiltradas
-        .filter(c => c.status === 'pendente' || c.status === 'atrasado')
-        .reduce((acc, conta) => acc + (conta.valor_total - conta.valor_pago), 0);
+      const contasPendentesPagar = contasPagarFiltradas.filter(c => c.status === 'pendente' || c.status === 'atrasado');
+      totalPagar = contasPendentesPagar.reduce((acc, conta) => acc + (conta.valor_total - conta.valor_pago), 0);
+      console.error(`[FluxoCaixa] Total a pagar (pendentes/atrasadas): ${totalPagar}`, {
+        contasPendentes: contasPendentesPagar.length,
+        detalhes: contasPendentesPagar.map(c => ({
+          descricao: c.descricao,
+          status: c.status,
+          valor_total: c.valor_total,
+          valor_pago: c.valor_pago,
+          valor_pendente: c.valor_total - c.valor_pago
+        }))
+      });
       
-      totalReceber = contasReceberFiltradas
-        .filter(c => c.status === 'pendente' || c.status === 'atrasado')
-        .reduce((acc, conta) => acc + (conta.valor_total - conta.valor_recebido), 0);
+      const contasPendentesReceber = contasReceberFiltradas.filter(c => c.status === 'pendente' || c.status === 'atrasado');
+      totalReceber = contasPendentesReceber.reduce((acc, conta) => acc + (conta.valor_total - conta.valor_recebido), 0);
+      console.error(`[FluxoCaixa] Total a receber (pendentes/atrasadas): ${totalReceber}`, {
+        contasPendentes: contasPendentesReceber.length
+      });
     } else if (filtroStatus === "pago") {
       // Se filtro é "pago", mostrar apenas valores pagos
       totalPagar = contasPagarFiltradas
@@ -259,6 +292,13 @@ export default function FluxoCaixa() {
     }
 
     const saldo = totalReceber - totalPagar;
+    
+    console.error(`[FluxoCaixa] Totais calculados:`, {
+      totalPagar,
+      totalReceber,
+      saldo,
+      filtroStatus
+    });
 
     // Agrupar por dia
     const movimentacoesPorDia: Record<string, { pagar: number; receber: number }> = {};
