@@ -145,17 +145,6 @@ export default function FluxoCaixa() {
       return await listarContasReceber({ data_inicio: dataInicio, data_fim: dataFim });
     }
   });
-          descricao: c.descricao,
-          status: c.status,
-          data_vencimento: c.data_vencimento,
-          data_recebimento: c.data_recebimento,
-          valor_total: c.valor_total,
-          valor_recebido: c.valor_recebido
-        }))
-      });
-      return contas;
-    }
-  });
 
   const isLoading = loadingPagar || loadingReceber;
 
@@ -271,13 +260,6 @@ export default function FluxoCaixa() {
     }
 
     const saldo = totalReceber - totalPagar;
-    
-    console.error(`[FluxoCaixa] Totais calculados:`, {
-      totalPagar,
-      totalReceber,
-      saldo,
-      filtroStatus
-    });
 
     // Agrupar por dia
     const movimentacoesPorDia: Record<string, { pagar: number; receber: number }> = {};
