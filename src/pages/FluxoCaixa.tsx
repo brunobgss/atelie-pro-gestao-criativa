@@ -134,12 +134,42 @@ export default function FluxoCaixa() {
 
   const { data: contasPagar = [], isLoading: loadingPagar } = useQuery({
     queryKey: ["contas_pagar", "fluxo", dataInicio, dataFim],
-    queryFn: () => listarContasPagar({ data_inicio: dataInicio, data_fim: dataFim })
+    queryFn: async () => {
+      const contas = await listarContasPagar({ data_inicio: dataInicio, data_fim: dataFim });
+      console.error(`[FluxoCaixa] Contas a pagar encontradas: ${contas.length}`, {
+        periodo: `${dataInicio} - ${dataFim}`,
+        contas: contas.map(c => ({
+          id: c.id,
+          descricao: c.descricao,
+          status: c.status,
+          data_vencimento: c.data_vencimento,
+          data_pagamento: c.data_pagamento,
+          valor_total: c.valor_total,
+          valor_pago: c.valor_pago
+        }))
+      });
+      return contas;
+    }
   });
 
   const { data: contasReceber = [], isLoading: loadingReceber } = useQuery({
     queryKey: ["contas_receber", "fluxo", dataInicio, dataFim],
-    queryFn: () => listarContasReceber({ data_inicio: dataInicio, data_fim: dataFim })
+    queryFn: async () => {
+      const contas = await listarContasReceber({ data_inicio: dataInicio, data_fim: dataFim });
+      console.error(`[FluxoCaixa] Contas a receber encontradas: ${contas.length}`, {
+        periodo: `${dataInicio} - ${dataFim}`,
+        contas: contas.map(c => ({
+          id: c.id,
+          descricao: c.descricao,
+          status: c.status,
+          data_vencimento: c.data_vencimento,
+          data_recebimento: c.data_recebimento,
+          valor_total: c.valor_total,
+          valor_recebido: c.valor_recebido
+        }))
+      });
+      return contas;
+    }
   });
 
   const isLoading = loadingPagar || loadingReceber;
