@@ -135,33 +135,16 @@ export default function FluxoCaixa() {
   const { data: contasPagar = [], isLoading: loadingPagar } = useQuery({
     queryKey: ["contas_pagar", "fluxo", dataInicio, dataFim],
     queryFn: async () => {
-      const contas = await listarContasPagar({ data_inicio: dataInicio, data_fim: dataFim });
-      console.error(`[FluxoCaixa] Contas a pagar encontradas: ${contas.length}`);
-      console.error(`[FluxoCaixa] Período: ${dataInicio} - ${dataFim}`);
-      contas.forEach((c, index) => {
-        console.error(`[FluxoCaixa] Conta ${index + 1}:`, {
-          id: c.id,
-          descricao: c.descricao,
-          status: c.status,
-          data_vencimento: c.data_vencimento,
-          data_pagamento: c.data_pagamento,
-          valor_total: c.valor_total,
-          valor_pago: c.valor_pago,
-          valor_pendente: c.valor_total - c.valor_pago
-        });
-      });
-      return contas;
+      return await listarContasPagar({ data_inicio: dataInicio, data_fim: dataFim });
     }
   });
 
   const { data: contasReceber = [], isLoading: loadingReceber } = useQuery({
     queryKey: ["contas_receber", "fluxo", dataInicio, dataFim],
     queryFn: async () => {
-      const contas = await listarContasReceber({ data_inicio: dataInicio, data_fim: dataFim });
-      console.error(`[FluxoCaixa] Contas a receber encontradas: ${contas.length}`, {
-        periodo: `${dataInicio} - ${dataFim}`,
-        contas: contas.map(c => ({
-          id: c.id,
+      return await listarContasReceber({ data_inicio: dataInicio, data_fim: dataFim });
+    }
+  });
           descricao: c.descricao,
           status: c.status,
           data_vencimento: c.data_vencimento,
@@ -222,28 +205,6 @@ export default function FluxoCaixa() {
 
   // Recalcular totais com contas filtradas
   const calculosFiltrados = useMemo(() => {
-    console.error(`[FluxoCaixa] Calculando totais:`, {
-      filtroStatus,
-      contasPagarFiltradas: contasPagarFiltradas.length,
-      contasReceberFiltradas: contasReceberFiltradas.length,
-      detalhesPagar: contasPagarFiltradas.map(c => ({
-        id: c.id,
-        descricao: c.descricao,
-        status: c.status,
-        valor_total: c.valor_total,
-        valor_pago: c.valor_pago,
-        valor_pendente: c.valor_total - c.valor_pago
-      })),
-      detalhesReceber: contasReceberFiltradas.map(c => ({
-        id: c.id,
-        descricao: c.descricao,
-        status: c.status,
-        valor_total: c.valor_total,
-        valor_recebido: c.valor_recebido,
-        valor_pendente: c.valor_total - c.valor_recebido
-      }))
-    });
-    
     // Calcular totais baseado no filtro de status
     let totalPagar = 0;
     let totalReceber = 0;
@@ -265,15 +226,10 @@ export default function FluxoCaixa() {
       totalPagar = contasPendentesPagar.reduce((acc, conta) => {
         // Se status é "pago" mas valor_pago = 0, tratar como se fosse pendente
         if (conta.status === 'pago' && conta.valor_pago === 0) {
-          console.error(`[FluxoCaixa] ⚠️ Conta "${conta.descricao}" tem status "pago" mas valor_pago = 0. Tratando como pendente.`);
           return acc + conta.valor_total;
         }
         return acc + (conta.valor_total - conta.valor_pago);
       }, 0);
-      
-      console.error(`[FluxoCaixa] Total a pagar (pendentes/atrasadas): ${totalPagar}`);
-      console.error(`[FluxoCaixa] Contas pendentes/atrasadas: ${contasPendentesPagar.length} de ${contasPagarFiltradas.length}`);
-      console.error(`[FluxoCaixa] Status das contas a pagar:`, contasPagarFiltradas.map(c => `${c.descricao}: ${c.status} (total: ${c.valor_total}, pago: ${c.valor_pago}, pendente: ${c.valor_total - c.valor_pago})`));
       
       // Corrigir inconsistências: se status é "recebido" mas valor_recebido = 0, tratar como pendente
       const contasPendentesReceber = contasReceberFiltradas.filter(c => {
@@ -285,14 +241,10 @@ export default function FluxoCaixa() {
       totalReceber = contasPendentesReceber.reduce((acc, conta) => {
         // Se status é "recebido" mas valor_recebido = 0, tratar como se fosse pendente
         if (conta.status === 'recebido' && conta.valor_recebido === 0) {
-          console.error(`[FluxoCaixa] ⚠️ Conta "${conta.descricao}" tem status "recebido" mas valor_recebido = 0. Tratando como pendente.`);
           return acc + conta.valor_total;
         }
         return acc + (conta.valor_total - conta.valor_recebido);
       }, 0);
-      
-      console.error(`[FluxoCaixa] Total a receber (pendentes/atrasadas): ${totalReceber}`);
-      console.error(`[FluxoCaixa] Contas pendentes/atrasadas: ${contasPendentesReceber.length} de ${contasReceberFiltradas.length}`);
     } else if (filtroStatus === "pago") {
       // Se filtro é "pago", mostrar apenas valores pagos
       totalPagar = contasPagarFiltradas
