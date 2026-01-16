@@ -249,19 +249,48 @@ export default function FluxoCaixa() {
     let totalReceber = 0;
 
     if (filtroStatus === "todos") {
-      // Se filtro é "todos", mostrar pendentes/atrasadas como valor pendente e pagas como valor pago
-      const contasPendentesPagar = contasPagarFiltradas.filter(c => c.status === 'pendente' || c.status === 'atrasado');
-      totalPagar = contasPendentesPagar.reduce((acc, conta) => acc + (conta.valor_total - conta.valor_pago), 0);
+      // Se filtro é "todos", mostrar:
+      // - Pendentes/atrasadas: valor pendente (o que ainda falta pagar/receber)
+      // - Pagas/recebidas: valor pago/recebido (o que já foi realizado)
+      // Mas para os cards de resumo "Total a Pagar" e "Total a Receber", 
+      // faz mais sentido mostrar apenas o que está pendente (o que ainda precisa ser pago/recebido)
+      
+      // Corrigir inconsistências: se status é "pago" mas valor_pago = 0, tratar como pendente
+      const contasPendentesPagar = contasPagarFiltradas.filter(c => {
+        const isPendenteOuAtrasado = c.status === 'pendente' || c.status === 'atrasado';
+        const isPagoMasNaoPago = c.status === 'pago' && c.valor_pago === 0;
+        return isPendenteOuAtrasado || isPagoMasNaoPago;
+      });
+      
+      totalPagar = contasPendentesPagar.reduce((acc, conta) => {
+        // Se status é "pago" mas valor_pago = 0, tratar como se fosse pendente
+        if (conta.status === 'pago' && conta.valor_pago === 0) {
+          console.error(`[FluxoCaixa] ⚠️ Conta "${conta.descricao}" tem status "pago" mas valor_pago = 0. Tratando como pendente.`);
+          return acc + conta.valor_total;
+        }
+        return acc + (conta.valor_total - conta.valor_pago);
+      }, 0);
+      
       console.error(`[FluxoCaixa] Total a pagar (pendentes/atrasadas): ${totalPagar}`);
       console.error(`[FluxoCaixa] Contas pendentes/atrasadas: ${contasPendentesPagar.length} de ${contasPagarFiltradas.length}`);
       console.error(`[FluxoCaixa] Status das contas a pagar:`, contasPagarFiltradas.map(c => `${c.descricao}: ${c.status} (total: ${c.valor_total}, pago: ${c.valor_pago}, pendente: ${c.valor_total - c.valor_pago})`));
-      if (contasPendentesPagar.length === 0 && contasPagarFiltradas.length > 0) {
-        console.error(`[FluxoCaixa] ⚠️ ATENÇÃO: ${contasPagarFiltradas.length} contas encontradas mas nenhuma é pendente/atrasada!`);
-        console.error(`[FluxoCaixa] Status das contas:`, contasPagarFiltradas.map(c => c.status));
-      }
       
-      const contasPendentesReceber = contasReceberFiltradas.filter(c => c.status === 'pendente' || c.status === 'atrasado');
-      totalReceber = contasPendentesReceber.reduce((acc, conta) => acc + (conta.valor_total - conta.valor_recebido), 0);
+      // Corrigir inconsistências: se status é "recebido" mas valor_recebido = 0, tratar como pendente
+      const contasPendentesReceber = contasReceberFiltradas.filter(c => {
+        const isPendenteOuAtrasado = c.status === 'pendente' || c.status === 'atrasado';
+        const isRecebidoMasNaoRecebido = c.status === 'recebido' && c.valor_recebido === 0;
+        return isPendenteOuAtrasado || isRecebidoMasNaoRecebido;
+      });
+      
+      totalReceber = contasPendentesReceber.reduce((acc, conta) => {
+        // Se status é "recebido" mas valor_recebido = 0, tratar como se fosse pendente
+        if (conta.status === 'recebido' && conta.valor_recebido === 0) {
+          console.error(`[FluxoCaixa] ⚠️ Conta "${conta.descricao}" tem status "recebido" mas valor_recebido = 0. Tratando como pendente.`);
+          return acc + conta.valor_total;
+        }
+        return acc + (conta.valor_total - conta.valor_recebido);
+      }, 0);
+      
       console.error(`[FluxoCaixa] Total a receber (pendentes/atrasadas): ${totalReceber}`);
       console.error(`[FluxoCaixa] Contas pendentes/atrasadas: ${contasPendentesReceber.length} de ${contasReceberFiltradas.length}`);
     } else if (filtroStatus === "pago") {
@@ -315,7 +344,10 @@ export default function FluxoCaixa() {
       // Calcular valor baseado no status
       let valor = 0;
       if (filtroStatus === "todos") {
-        if (conta.status === 'pendente' || conta.status === 'atrasado') {
+        // Corrigir inconsistência: se status é "pago" mas valor_pago = 0, tratar como pendente
+        if (conta.status === 'pago' && conta.valor_pago === 0) {
+          valor = conta.valor_total; // Tratar como pendente
+        } else if (conta.status === 'pendente' || conta.status === 'atrasado') {
           valor = conta.valor_total - conta.valor_pago; // Valor pendente
         } else if (conta.status === 'pago') {
           valor = conta.valor_pago; // Valor já pago
@@ -327,9 +359,11 @@ export default function FluxoCaixa() {
       } else if (filtroStatus === "recebido") {
         // Não se aplica a contas a pagar
       } else {
-        // Pendente ou atrasado
+        // Pendente ou atrasado (ou pago com valor_pago = 0)
         if (conta.status === 'pendente' || conta.status === 'atrasado') {
           valor = conta.valor_total - conta.valor_pago;
+        } else if (conta.status === 'pago' && conta.valor_pago === 0) {
+          valor = conta.valor_total; // Tratar como pendente
         }
       }
       
@@ -352,7 +386,10 @@ export default function FluxoCaixa() {
       // Calcular valor baseado no status
       let valor = 0;
       if (filtroStatus === "todos") {
-        if (conta.status === 'pendente' || conta.status === 'atrasado') {
+        // Corrigir inconsistência: se status é "recebido" mas valor_recebido = 0, tratar como pendente
+        if (conta.status === 'recebido' && conta.valor_recebido === 0) {
+          valor = conta.valor_total; // Tratar como pendente
+        } else if (conta.status === 'pendente' || conta.status === 'atrasado') {
           valor = conta.valor_total - conta.valor_recebido; // Valor pendente
         } else if (conta.status === 'recebido') {
           valor = conta.valor_recebido; // Valor já recebido
@@ -364,9 +401,11 @@ export default function FluxoCaixa() {
       } else if (filtroStatus === "pago") {
         // Não se aplica a contas a receber
       } else {
-        // Pendente ou atrasado
+        // Pendente ou atrasado (ou recebido com valor_recebido = 0)
         if (conta.status === 'pendente' || conta.status === 'atrasado') {
           valor = conta.valor_total - conta.valor_recebido;
+        } else if (conta.status === 'recebido' && conta.valor_recebido === 0) {
+          valor = conta.valor_total; // Tratar como pendente
         }
       }
       
