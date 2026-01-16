@@ -5,29 +5,122 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { Label } from "@/components/ui/label";
 import { 
   TrendingUp, 
   TrendingDown,
-  Calendar,
+  Calendar as CalendarIcon,
   Filter,
   DollarSign,
   ArrowUp,
   ArrowDown,
-  Search
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  X
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { listarContasPagar } from "@/integrations/supabase/contas-pagar";
 import { listarContasReceber } from "@/integrations/supabase/contas-receber";
 import { formatCurrency } from "@/utils/formatCurrency";
-import { format, startOfMonth, endOfMonth, subMonths, addMonths } from "date-fns";
+import { 
+  format, 
+  startOfMonth, 
+  endOfMonth, 
+  subMonths, 
+  addMonths,
+  startOfWeek,
+  endOfWeek,
+  startOfYear,
+  endOfYear,
+  subDays,
+  subWeeks,
+  subYears,
+  startOfQuarter,
+  endOfQuarter,
+  startOfDay,
+  endOfDay
+} from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { DateRange } from "react-day-picker";
+
+type PeriodoPredefinido = 
+  | "hoje"
+  | "ultimos_7_dias"
+  | "ultimos_30_dias"
+  | "mes_atual"
+  | "mes_anterior"
+  | "trimestre_atual"
+  | "semestre_atual"
+  | "ano_atual"
+  | "customizado";
 
 export default function FluxoCaixa() {
-  const [mesSelecionado, setMesSelecionado] = useState(new Date());
+  const [periodoPredefinido, setPeriodoPredefinido] = useState<PeriodoPredefinido>("mes_atual");
+  const [dataRange, setDataRange] = useState<DateRange | undefined>({
+    from: startOfMonth(new Date()),
+    to: endOfMonth(new Date())
+  });
   const [filtroTipo, setFiltroTipo] = useState<string>("todos");
+  const [filtroStatus, setFiltroStatus] = useState<string>("todos");
+  const [buscaTexto, setBuscaTexto] = useState<string>("");
 
-  const dataInicio = format(startOfMonth(mesSelecionado), "yyyy-MM-dd");
-  const dataFim = format(endOfMonth(mesSelecionado), "yyyy-MM-dd");
+  // Calcular datas baseado no período selecionado
+  const { dataInicio, dataFim } = useMemo(() => {
+    const hoje = new Date();
+    let inicio: Date;
+    let fim: Date;
+
+    switch (periodoPredefinido) {
+      case "hoje":
+        inicio = startOfDay(hoje);
+        fim = endOfDay(hoje);
+        break;
+      case "ultimos_7_dias":
+        inicio = startOfDay(subDays(hoje, 6));
+        fim = endOfDay(hoje);
+        break;
+      case "ultimos_30_dias":
+        inicio = startOfDay(subDays(hoje, 29));
+        fim = endOfDay(hoje);
+        break;
+      case "mes_atual":
+        inicio = startOfMonth(hoje);
+        fim = endOfMonth(hoje);
+        break;
+      case "mes_anterior":
+        inicio = startOfMonth(subMonths(hoje, 1));
+        fim = endOfMonth(subMonths(hoje, 1));
+        break;
+      case "trimestre_atual":
+        inicio = startOfQuarter(hoje);
+        fim = endOfQuarter(hoje);
+        break;
+      case "semestre_atual":
+        const semestre = Math.floor(hoje.getMonth() / 6);
+        inicio = new Date(hoje.getFullYear(), semestre * 6, 1);
+        fim = new Date(hoje.getFullYear(), (semestre + 1) * 6, 0, 23, 59, 59);
+        break;
+      case "ano_atual":
+        inicio = startOfYear(hoje);
+        fim = endOfYear(hoje);
+        break;
+      case "customizado":
+        inicio = dataRange?.from || startOfMonth(hoje);
+        fim = dataRange?.to || endOfMonth(hoje);
+        break;
+      default:
+        inicio = startOfMonth(hoje);
+        fim = endOfMonth(hoje);
+    }
+
+    return {
+      dataInicio: format(inicio, "yyyy-MM-dd"),
+      dataFim: format(fim, "yyyy-MM-dd")
+    };
+  }, [periodoPredefinido, dataRange]);
 
   const { data: contasPagar = [], isLoading: loadingPagar } = useQuery({
     queryKey: ["contas_pagar", "fluxo", dataInicio, dataFim],
@@ -41,13 +134,57 @@ export default function FluxoCaixa() {
 
   const isLoading = loadingPagar || loadingReceber;
 
-  // Calcular totais
-  const calculos = useMemo(() => {
-    const totalPagar = contasPagar
+
+  // Filtrar contas por status e busca
+  const contasPagarFiltradas = useMemo(() => {
+    let filtradas = contasPagar;
+
+    // Filtro por status
+    if (filtroStatus !== "todos") {
+      filtradas = filtradas.filter(c => c.status === filtroStatus);
+    }
+
+    // Busca por texto
+    if (buscaTexto.trim()) {
+      const busca = buscaTexto.toLowerCase();
+      filtradas = filtradas.filter(c => 
+        c.descricao?.toLowerCase().includes(busca) ||
+        c.observacoes?.toLowerCase().includes(busca) ||
+        c.categoria?.toLowerCase().includes(busca)
+      );
+    }
+
+    return filtradas;
+  }, [contasPagar, filtroStatus, buscaTexto]);
+
+  const contasReceberFiltradas = useMemo(() => {
+    let filtradas = contasReceber;
+
+    // Filtro por status
+    if (filtroStatus !== "todos") {
+      filtradas = filtradas.filter(c => c.status === filtroStatus);
+    }
+
+    // Busca por texto
+    if (buscaTexto.trim()) {
+      const busca = buscaTexto.toLowerCase();
+      filtradas = filtradas.filter(c => 
+        c.descricao?.toLowerCase().includes(busca) ||
+        c.observacoes?.toLowerCase().includes(busca) ||
+        c.categoria?.toLowerCase().includes(busca)
+      );
+    }
+
+    return filtradas;
+  }, [contasReceber, filtroStatus, buscaTexto]);
+
+  // Recalcular totais com contas filtradas
+  const calculosFiltrados = useMemo(() => {
+    const totalPagar = contasPagarFiltradas
       .filter(c => c.status === 'pendente' || c.status === 'atrasado')
       .reduce((acc, conta) => acc + (conta.valor_total - conta.valor_pago), 0);
 
-    const totalReceber = contasReceber
+    const totalReceber = contasReceberFiltradas
       .filter(c => c.status === 'pendente' || c.status === 'atrasado')
       .reduce((acc, conta) => acc + (conta.valor_total - conta.valor_recebido), 0);
 
@@ -56,7 +193,7 @@ export default function FluxoCaixa() {
     // Agrupar por dia
     const movimentacoesPorDia: Record<string, { pagar: number; receber: number }> = {};
 
-    contasPagar.forEach(conta => {
+    contasPagarFiltradas.forEach(conta => {
       const data = conta.data_vencimento.split('T')[0];
       if (!movimentacoesPorDia[data]) {
         movimentacoesPorDia[data] = { pagar: 0, receber: 0 };
@@ -66,7 +203,7 @@ export default function FluxoCaixa() {
       }
     });
 
-    contasReceber.forEach(conta => {
+    contasReceberFiltradas.forEach(conta => {
       const data = conta.data_vencimento.split('T')[0];
       if (!movimentacoesPorDia[data]) {
         movimentacoesPorDia[data] = { pagar: 0, receber: 0 };
@@ -85,19 +222,76 @@ export default function FluxoCaixa() {
       movimentacoesPorDia,
       diasOrdenados
     };
-  }, [contasPagar, contasReceber]);
+  }, [contasPagarFiltradas, contasReceberFiltradas]);
 
   const movimentacoesFiltradas = useMemo(() => {
     if (filtroTipo === "todos") {
-      return calculos.diasOrdenados;
+      return calculosFiltrados.diasOrdenados;
     }
-    return calculos.diasOrdenados.filter(dia => {
-      const mov = calculos.movimentacoesPorDia[dia];
+    return calculosFiltrados.diasOrdenados.filter(dia => {
+      const mov = calculosFiltrados.movimentacoesPorDia[dia];
       if (filtroTipo === "receber") return mov.receber > 0;
       if (filtroTipo === "pagar") return mov.pagar > 0;
       return true;
     });
-  }, [calculos, filtroTipo]);
+  }, [calculosFiltrados, filtroTipo]);
+
+  // Atualizar dataRange quando período predefinido muda
+  const handlePeriodoChange = (novoPeriodo: PeriodoPredefinido) => {
+    setPeriodoPredefinido(novoPeriodo);
+    if (novoPeriodo !== "customizado") {
+      const hoje = new Date();
+      let inicio: Date;
+      let fim: Date;
+
+      switch (novoPeriodo) {
+        case "hoje":
+          inicio = startOfDay(hoje);
+          fim = endOfDay(hoje);
+          break;
+        case "ultimos_7_dias":
+          inicio = startOfDay(subDays(hoje, 6));
+          fim = endOfDay(hoje);
+          break;
+        case "ultimos_30_dias":
+          inicio = startOfDay(subDays(hoje, 29));
+          fim = endOfDay(hoje);
+          break;
+        case "mes_atual":
+          inicio = startOfMonth(hoje);
+          fim = endOfMonth(hoje);
+          break;
+        case "mes_anterior":
+          inicio = startOfMonth(subMonths(hoje, 1));
+          fim = endOfMonth(subMonths(hoje, 1));
+          break;
+        case "trimestre_atual":
+          inicio = startOfQuarter(hoje);
+          fim = endOfQuarter(hoje);
+          break;
+        case "semestre_atual":
+          const semestre = Math.floor(hoje.getMonth() / 6);
+          inicio = new Date(hoje.getFullYear(), semestre * 6, 1);
+          fim = new Date(hoje.getFullYear(), (semestre + 1) * 6, 0, 23, 59, 59);
+          break;
+        case "ano_atual":
+          inicio = startOfYear(hoje);
+          fim = endOfYear(hoje);
+          break;
+        default:
+          inicio = startOfMonth(hoje);
+          fim = endOfMonth(hoje);
+      }
+      setDataRange({ from: inicio, to: fim });
+    }
+  };
+
+  const limparFiltros = () => {
+    setFiltroTipo("todos");
+    setFiltroStatus("todos");
+    setBuscaTexto("");
+    setPeriodoPredefinido("mes_atual");
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-slate-100">
@@ -122,7 +316,7 @@ export default function FluxoCaixa() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-red-600">
-                {formatCurrency({ value: calculos.totalPagar, currency: 'BRL' })}
+                {formatCurrency({ value: calculosFiltrados.totalPagar, currency: 'BRL' })}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 Contas pendentes e atrasadas
@@ -139,7 +333,7 @@ export default function FluxoCaixa() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
-                {formatCurrency({ value: calculos.totalReceber, currency: 'BRL' })}
+                {formatCurrency({ value: calculosFiltrados.totalReceber, currency: 'BRL' })}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 Contas pendentes e atrasadas
@@ -155,58 +349,164 @@ export default function FluxoCaixa() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className={`text-2xl font-bold ${calculos.saldo >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {formatCurrency({ value: calculos.saldo, currency: 'BRL' })}
+              <div className={`text-2xl font-bold ${calculosFiltrados.saldo >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {formatCurrency({ value: calculosFiltrados.saldo, currency: 'BRL' })}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                {calculos.saldo >= 0 ? 'Saldo positivo' : 'Saldo negativo'}
+                {calculosFiltrados.saldo >= 0 ? 'Saldo positivo' : 'Saldo negativo'}
               </p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Filtros */}
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setMesSelecionado(subMonths(mesSelecionado, 1))}
-            >
-              ←
-            </Button>
-            <div className="flex items-center gap-2 px-4 py-2 border rounded-lg">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium">
-                {format(mesSelecionado, "MMMM 'de' yyyy", { locale: ptBR })}
-              </span>
+        {/* Filtros Melhorados */}
+        <Card className="bg-white border border-gray-200/50 shadow-sm">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Filter className="h-5 w-5 text-purple-600" />
+                Filtros
+              </CardTitle>
+              {(filtroTipo !== "todos" || filtroStatus !== "todos" || buscaTexto.trim() || periodoPredefinido !== "mes_atual") && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={limparFiltros}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  Limpar Filtros
+                </Button>
+              )}
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setMesSelecionado(addMonths(mesSelecionado, 1))}
-            >
-              →
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setMesSelecionado(new Date())}
-            >
-              Hoje
-            </Button>
-          </div>
-          <Select value={filtroTipo} onValueChange={setFiltroTipo}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Filtro" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos</SelectItem>
-              <SelectItem value="receber">Apenas Receitas</SelectItem>
-              <SelectItem value="pagar">Apenas Despesas</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Linha 1: Período e Tipo */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Seletor de Período */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Período</Label>
+                <div className="flex gap-2">
+                  <Select value={periodoPredefinido} onValueChange={(value) => handlePeriodoChange(value as PeriodoPredefinido)}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="hoje">Hoje</SelectItem>
+                      <SelectItem value="ultimos_7_dias">Últimos 7 dias</SelectItem>
+                      <SelectItem value="ultimos_30_dias">Últimos 30 dias</SelectItem>
+                      <SelectItem value="mes_atual">Mês Atual</SelectItem>
+                      <SelectItem value="mes_anterior">Mês Anterior</SelectItem>
+                      <SelectItem value="trimestre_atual">Trimestre Atual</SelectItem>
+                      <SelectItem value="semestre_atual">Semestre Atual</SelectItem>
+                      <SelectItem value="ano_atual">Ano Atual</SelectItem>
+                      <SelectItem value="customizado">Período Customizado</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  
+                  {periodoPredefinido === "customizado" && (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-[280px] justify-start text-left font-normal"
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {dataRange?.from ? (
+                            dataRange.to ? (
+                              <>
+                                {format(dataRange.from, "dd/MM/yyyy", { locale: ptBR })} -{" "}
+                                {format(dataRange.to, "dd/MM/yyyy", { locale: ptBR })}
+                              </>
+                            ) : (
+                              format(dataRange.from, "dd/MM/yyyy", { locale: ptBR })
+                            )
+                          ) : (
+                            <span>Selecione o período</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          initialFocus
+                          mode="range"
+                          defaultMonth={dataRange?.from}
+                          selected={dataRange}
+                          onSelect={setDataRange}
+                          numberOfMonths={2}
+                          locale={ptBR}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  )}
+                </div>
+                {periodoPredefinido !== "customizado" && (
+                  <p className="text-xs text-muted-foreground">
+                    {format(new Date(dataInicio), "dd/MM/yyyy", { locale: ptBR })} - {format(new Date(dataFim), "dd/MM/yyyy", { locale: ptBR })}
+                  </p>
+                )}
+              </div>
+
+              {/* Filtro por Tipo */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Tipo de Movimentação</Label>
+                <Select value={filtroTipo} onValueChange={setFiltroTipo}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Filtro" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos</SelectItem>
+                    <SelectItem value="receber">Apenas Receitas</SelectItem>
+                    <SelectItem value="pagar">Apenas Despesas</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Linha 2: Status e Busca */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Filtro por Status */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Status</Label>
+                <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos</SelectItem>
+                    <SelectItem value="pendente">Pendente</SelectItem>
+                    <SelectItem value="atrasado">Atrasado</SelectItem>
+                    <SelectItem value="pago">Pago/Recebido</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Busca por Texto */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Buscar</Label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Input
+                    placeholder="Descrição, categoria, observações..."
+                    value={buscaTexto}
+                    onChange={(e) => setBuscaTexto(e.target.value)}
+                    className="pl-10"
+                  />
+                  {buscaTexto && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7 p-0"
+                      onClick={() => setBuscaTexto("")}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Gráfico de Fluxo */}
         {isLoading ? (
@@ -227,13 +527,13 @@ export default function FluxoCaixa() {
             <CardHeader>
               <CardTitle>Fluxo de Caixa por Dia</CardTitle>
               <CardDescription>
-                Movimentações previstas para {format(mesSelecionado, "MMMM 'de' yyyy", { locale: ptBR })}
+                Movimentações previstas de {format(new Date(dataInicio), "dd/MM/yyyy", { locale: ptBR })} até {format(new Date(dataFim), "dd/MM/yyyy", { locale: ptBR })}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {movimentacoesFiltradas.map((dia) => {
-                  const mov = calculos.movimentacoesPorDia[dia];
+                  const mov = calculosFiltrados.movimentacoesPorDia[dia];
                   const saldoDia = mov.receber - mov.pagar;
                   
                   return (
