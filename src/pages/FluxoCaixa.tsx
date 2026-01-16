@@ -58,10 +58,11 @@ type PeriodoPredefinido =
   | "customizado";
 
 export default function FluxoCaixa() {
+  const hoje = new Date();
   const [periodoPredefinido, setPeriodoPredefinido] = useState<PeriodoPredefinido>("mes_atual");
   const [dataRange, setDataRange] = useState<DateRange | undefined>({
-    from: startOfMonth(new Date()),
-    to: endOfMonth(new Date())
+    from: startOfMonth(hoje),
+    to: endOfMonth(hoje)
   });
   const [filtroTipo, setFiltroTipo] = useState<string>("todos");
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
@@ -108,8 +109,13 @@ export default function FluxoCaixa() {
         fim = endOfYear(hoje);
         break;
       case "customizado":
-        inicio = dataRange?.from || startOfMonth(hoje);
-        fim = dataRange?.to || endOfMonth(hoje);
+        if (dataRange?.from && dataRange?.to) {
+          inicio = startOfDay(dataRange.from);
+          fim = endOfDay(dataRange.to);
+        } else {
+          inicio = startOfMonth(hoje);
+          fim = endOfMonth(hoje);
+        }
         break;
       default:
         inicio = startOfMonth(hoje);
@@ -527,7 +533,11 @@ export default function FluxoCaixa() {
             <CardHeader>
               <CardTitle>Fluxo de Caixa por Dia</CardTitle>
               <CardDescription>
-                Movimentações previstas de {format(new Date(dataInicio), "dd/MM/yyyy", { locale: ptBR })} até {format(new Date(dataFim), "dd/MM/yyyy", { locale: ptBR })}
+                {(() => {
+                  const inicio = new Date(dataInicio + 'T00:00:00');
+                  const fim = new Date(dataFim + 'T23:59:59');
+                  return `Movimentações previstas de ${format(inicio, "dd/MM/yyyy", { locale: ptBR })} até ${format(fim, "dd/MM/yyyy", { locale: ptBR })}`;
+                })()}
               </CardDescription>
             </CardHeader>
             <CardContent>
