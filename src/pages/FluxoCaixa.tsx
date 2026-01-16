@@ -440,13 +440,18 @@ export default function FluxoCaixa() {
                         <Calendar
                           initialFocus
                           mode="range"
-                          defaultMonth={dataRange?.from || new Date()}
+                          defaultMonth={dataRange?.from ? new Date(dataRange.from.getFullYear(), dataRange.from.getMonth(), 1) : new Date()}
                           selected={dataRange}
                           onSelect={(range) => {
                             if (range?.from && range?.to) {
                               setDataRange({
                                 from: startOfDay(range.from),
                                 to: endOfDay(range.to)
+                              });
+                            } else if (range?.from) {
+                              setDataRange({
+                                from: startOfDay(range.from),
+                                to: undefined
                               });
                             } else {
                               setDataRange(range);
@@ -461,7 +466,14 @@ export default function FluxoCaixa() {
                 </div>
                 {periodoPredefinido !== "customizado" && (
                   <p className="text-xs text-muted-foreground">
-                    {format(new Date(dataInicio), "dd/MM/yyyy", { locale: ptBR })} - {format(new Date(dataFim), "dd/MM/yyyy", { locale: ptBR })}
+                    {(() => {
+                      // Parsear a data corretamente para evitar problemas de timezone
+                      const [anoInicio, mesInicio, diaInicio] = dataInicio.split('-').map(Number);
+                      const [anoFim, mesFim, diaFim] = dataFim.split('-').map(Number);
+                      const inicio = new Date(anoInicio, mesInicio - 1, diaInicio);
+                      const fim = new Date(anoFim, mesFim - 1, diaFim);
+                      return `${format(inicio, "dd/MM/yyyy", { locale: ptBR })} - ${format(fim, "dd/MM/yyyy", { locale: ptBR })}`;
+                    })()}
                   </p>
                 )}
               </div>
@@ -547,8 +559,11 @@ export default function FluxoCaixa() {
               <CardTitle>Fluxo de Caixa por Dia</CardTitle>
               <CardDescription>
                 {(() => {
-                  const inicio = new Date(dataInicio + 'T00:00:00');
-                  const fim = new Date(dataFim + 'T23:59:59');
+                  // Parsear a data corretamente para evitar problemas de timezone
+                  const [anoInicio, mesInicio, diaInicio] = dataInicio.split('-').map(Number);
+                  const [anoFim, mesFim, diaFim] = dataFim.split('-').map(Number);
+                  const inicio = new Date(anoInicio, mesInicio - 1, diaInicio);
+                  const fim = new Date(anoFim, mesFim - 1, diaFim);
                   return `Movimentações previstas de ${format(inicio, "dd/MM/yyyy", { locale: ptBR })} até ${format(fim, "dd/MM/yyyy", { locale: ptBR })}`;
                 })()}
               </CardDescription>
@@ -563,9 +578,14 @@ export default function FluxoCaixa() {
                     <div key={dia} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                          <CalendarIcon className="h-4 w-4 text-muted-foreground" />
                           <span className="font-semibold">
-                            {format(new Date(dia), "dd/MM/yyyy", { locale: ptBR })}
+                            {(() => {
+                              // Parsear a data corretamente para evitar problemas de timezone
+                              const [ano, mes, diaNum] = dia.split('-').map(Number);
+                              const data = new Date(ano, mes - 1, diaNum);
+                              return format(data, "dd/MM/yyyy", { locale: ptBR });
+                            })()}
                           </span>
                         </div>
                         <Badge variant={saldoDia >= 0 ? "default" : "destructive"}>
