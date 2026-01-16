@@ -136,17 +136,19 @@ export default function FluxoCaixa() {
     queryKey: ["contas_pagar", "fluxo", dataInicio, dataFim],
     queryFn: async () => {
       const contas = await listarContasPagar({ data_inicio: dataInicio, data_fim: dataFim });
-      console.error(`[FluxoCaixa] Contas a pagar encontradas: ${contas.length}`, {
-        periodo: `${dataInicio} - ${dataFim}`,
-        contas: contas.map(c => ({
+      console.error(`[FluxoCaixa] Contas a pagar encontradas: ${contas.length}`);
+      console.error(`[FluxoCaixa] Período: ${dataInicio} - ${dataFim}`);
+      contas.forEach((c, index) => {
+        console.error(`[FluxoCaixa] Conta ${index + 1}:`, {
           id: c.id,
           descricao: c.descricao,
           status: c.status,
           data_vencimento: c.data_vencimento,
           data_pagamento: c.data_pagamento,
           valor_total: c.valor_total,
-          valor_pago: c.valor_pago
-        }))
+          valor_pago: c.valor_pago,
+          valor_pendente: c.valor_total - c.valor_pago
+        });
       });
       return contas;
     }
@@ -250,22 +252,18 @@ export default function FluxoCaixa() {
       // Se filtro é "todos", mostrar pendentes/atrasadas como valor pendente e pagas como valor pago
       const contasPendentesPagar = contasPagarFiltradas.filter(c => c.status === 'pendente' || c.status === 'atrasado');
       totalPagar = contasPendentesPagar.reduce((acc, conta) => acc + (conta.valor_total - conta.valor_pago), 0);
-      console.error(`[FluxoCaixa] Total a pagar (pendentes/atrasadas): ${totalPagar}`, {
-        contasPendentes: contasPendentesPagar.length,
-        detalhes: contasPendentesPagar.map(c => ({
-          descricao: c.descricao,
-          status: c.status,
-          valor_total: c.valor_total,
-          valor_pago: c.valor_pago,
-          valor_pendente: c.valor_total - c.valor_pago
-        }))
-      });
+      console.error(`[FluxoCaixa] Total a pagar (pendentes/atrasadas): ${totalPagar}`);
+      console.error(`[FluxoCaixa] Contas pendentes/atrasadas: ${contasPendentesPagar.length} de ${contasPagarFiltradas.length}`);
+      console.error(`[FluxoCaixa] Status das contas a pagar:`, contasPagarFiltradas.map(c => `${c.descricao}: ${c.status} (total: ${c.valor_total}, pago: ${c.valor_pago}, pendente: ${c.valor_total - c.valor_pago})`));
+      if (contasPendentesPagar.length === 0 && contasPagarFiltradas.length > 0) {
+        console.error(`[FluxoCaixa] ⚠️ ATENÇÃO: ${contasPagarFiltradas.length} contas encontradas mas nenhuma é pendente/atrasada!`);
+        console.error(`[FluxoCaixa] Status das contas:`, contasPagarFiltradas.map(c => c.status));
+      }
       
       const contasPendentesReceber = contasReceberFiltradas.filter(c => c.status === 'pendente' || c.status === 'atrasado');
       totalReceber = contasPendentesReceber.reduce((acc, conta) => acc + (conta.valor_total - conta.valor_recebido), 0);
-      console.error(`[FluxoCaixa] Total a receber (pendentes/atrasadas): ${totalReceber}`, {
-        contasPendentes: contasPendentesReceber.length
-      });
+      console.error(`[FluxoCaixa] Total a receber (pendentes/atrasadas): ${totalReceber}`);
+      console.error(`[FluxoCaixa] Contas pendentes/atrasadas: ${contasPendentesReceber.length} de ${contasReceberFiltradas.length}`);
     } else if (filtroStatus === "pago") {
       // Se filtro é "pago", mostrar apenas valores pagos
       totalPagar = contasPagarFiltradas
