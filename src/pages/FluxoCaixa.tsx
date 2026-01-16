@@ -122,9 +122,13 @@ export default function FluxoCaixa() {
         fim = endOfMonth(hoje);
     }
 
+    // Garantir que as datas estão no início e fim do dia para evitar problemas de timezone
+    const inicioFormatado = format(startOfDay(inicio), "yyyy-MM-dd");
+    const fimFormatado = format(endOfDay(fim), "yyyy-MM-dd");
+    
     return {
-      dataInicio: format(inicio, "yyyy-MM-dd"),
-      dataFim: format(fim, "yyyy-MM-dd")
+      dataInicio: inicioFormatado,
+      dataFim: fimFormatado
     };
   }, [periodoPredefinido, dataRange]);
 
@@ -436,9 +440,18 @@ export default function FluxoCaixa() {
                         <Calendar
                           initialFocus
                           mode="range"
-                          defaultMonth={dataRange?.from}
+                          defaultMonth={dataRange?.from || new Date()}
                           selected={dataRange}
-                          onSelect={setDataRange}
+                          onSelect={(range) => {
+                            if (range?.from && range?.to) {
+                              setDataRange({
+                                from: startOfDay(range.from),
+                                to: endOfDay(range.to)
+                              });
+                            } else {
+                              setDataRange(range);
+                            }
+                          }}
                           numberOfMonths={2}
                           locale={ptBR}
                         />
