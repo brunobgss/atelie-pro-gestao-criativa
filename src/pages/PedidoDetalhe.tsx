@@ -708,26 +708,26 @@ export default function PedidoDetalhe() {
               padding: 20px; 
             }
             .container { max-width: 800px; margin: 0 auto; }
-            .header { 
-              text-align: center; 
-              margin-bottom: 40px; 
-              border-bottom: 3px solid #059669; 
-              padding-bottom: 20px; 
+            .header {
+              text-align: center;
+              margin-bottom: 20px;
+              border-bottom: 3px solid #059669;
+              padding-bottom: 10px;
             }
-            .header h1 { font-size: 28px; font-weight: bold; margin: 0; margin-bottom: 10px; color: #059669; }
-            .header .subtitle { font-size: 16px; color: #6b7280; }
-            .section { 
-              margin-bottom: 30px; 
+            .header h1 { font-size: 84px; font-weight: bold; margin: 0; margin-bottom: 30px; color: #059669; }
+            .header .subtitle { font-size: 48px; color: #6b7280; }
+            .section {
+              margin-bottom: 15px;
               background: #f0fdf4;
-              padding: 20px;
+              padding: 15px;
               border-radius: 8px;
               border-left: 4px solid #059669;
             }
-            .section h2 { 
-              font-size: 20px; 
-              font-weight: bold; 
-              margin-bottom: 15px; 
-              color: #059669; 
+            .section h2 {
+              font-size: 60px;
+              font-weight: bold;
+              margin-bottom: 45px;
+              color: #059669;
             }
             .grid { 
               display: grid; 
@@ -739,17 +739,17 @@ export default function PedidoDetalhe() {
               display: flex; 
               flex-direction: column; 
             }
-            .label { 
-              font-size: 12px; 
-              color: #6b7280; 
-              font-weight: bold; 
-              text-transform: uppercase; 
-              margin-bottom: 5px; 
+            .label {
+              font-size: 36px;
+              color: #6b7280;
+              font-weight: bold;
+              text-transform: uppercase;
+              margin-bottom: 15px;
             }
-            .value { 
-              font-size: 16px; 
-              color: #1f2937; 
-              font-weight: 500; 
+            .value {
+              font-size: 48px;
+              color: #1f2937;
+              font-weight: 500;
             }
             .status-badge { 
               display: inline-block; 
@@ -781,20 +781,20 @@ export default function PedidoDetalhe() {
               border-radius: 8px; 
               border-left: 4px solid #f59e0b; 
             }
-            .technical-specs h3 { 
-              margin-bottom: 15px; 
-              color: #92400e; 
-              font-size: 18px; 
+            .technical-specs h3 {
+              margin-bottom: 45px;
+              color: #92400e;
+              font-size: 54px;
             }
             .technical-specs ul { 
               list-style: none; 
               padding: 0; 
             }
-            .technical-specs li { 
-              margin-bottom: 10px; 
-              display: flex; 
-              align-items: center; 
-              font-size: 14px;
+            .technical-specs li {
+              margin-bottom: 30px;
+              display: flex;
+              align-items: center;
+              font-size: 42px;
             }
             .technical-specs li span { 
               color: #059669; 
@@ -809,8 +809,8 @@ export default function PedidoDetalhe() {
             .personal-table th,
             .personal-table td {
               border: 1px solid #d1d5db;
-              padding: 8px;
-              font-size: 13px;
+              padding: 12px;
+              font-size: 39px;
               text-align: left;
             }
             .personal-table th {
@@ -822,10 +822,10 @@ export default function PedidoDetalhe() {
             .personal-table td:first-child {
               font-weight: 600;
             }
-            .footer { 
-              margin-top: 40px; 
-              text-align: center; 
-              font-size: 12px; 
+            .footer {
+              margin-top: 120px;
+              text-align: center;
+              font-size: 36px;
               color: #6b7280; 
               border-top: 1px solid #e5e7eb; 
               padding-top: 20px; 
@@ -840,12 +840,12 @@ export default function PedidoDetalhe() {
             }
             .employee-notice h3 {
               color: #1e40af;
-              font-size: 16px;
-              margin-bottom: 5px;
+              font-size: 48px;
+              margin-bottom: 15px;
             }
             .employee-notice p {
               color: #1e40af;
-              font-size: 14px;
+              font-size: 42px;
             }
             @media print {
               body { padding: 0; }
@@ -901,11 +901,19 @@ export default function PedidoDetalhe() {
                   <div class="value">${order.client}</div>
                 </div>
                 <div class="item">
+                  <div class="label">Telefone</div>
+                  <div class="value">${order.customer_phone || 'Não informado'}</div>
+                </div>
+                <div class="item">
                   <div class="label">Data de Entrega</div>
                   <div class="value">${order.delivery ? (() => {
                     const [year, month, day] = order.delivery.split('T')[0].split('-');
                     return day + '/' + month + '/' + year;
                   })() : 'N/A'}</div>
+                </div>
+                <div class="item">
+                  <div class="label">CPF/CNPJ</div>
+                  <div class="value">${order.customer_cpf_cnpj || 'Não informado'}</div>
                 </div>
               </div>
             </div>
@@ -1023,7 +1031,22 @@ export default function PedidoDetalhe() {
                 </ul>
               </div>
             </div>
-            
+
+            <div class="section">
+              <h2>📝 Anotações da Produção</h2>
+              <div style="border: 2px dashed #d1d5db; padding: 20px; min-height: 120px; background: white;">
+                <p style="color: #6b7280; font-style: italic; margin: 0; font-size: 42px;">
+                  Espaço para anotações durante o processo de produção...
+                </p>
+                <br><br><br><br><br>
+                <div style="border-top: 1px solid #e5e7eb; padding-top: 10px; margin-top: 20px;">
+                  <p style="font-size: 36px; color: #6b7280; margin: 0;">
+                    <strong>Responsável:</strong> ___________________________ <strong>Data:</strong> ____/____/____
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <div class="footer">
               <p>Gerado em ${new Date().toLocaleString('pt-BR')} - Ateliê Pro</p>
               <p><strong>Documento interno - Não contém informações financeiras</strong></p>
