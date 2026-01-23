@@ -403,7 +403,7 @@ export async function approveQuote(quoteCode: string): Promise<{ ok: boolean; er
     console.log("Código do pedido gerado:", orderCode);
 
     // Criar descrição com detalhes dos itens
-    const itemsDescription = items.map(item => 
+    const itemsDescription = items.map(item =>
       `${item.description} (Qtd: ${item.quantity})`
     ).join(', ');
 
@@ -472,7 +472,7 @@ export async function approveQuote(quoteCode: string): Promise<{ ok: boolean; er
         code: orderCode,
         customer_name: quote.customer_name,
         customer_phone: quote.customer_phone,
-        description: `Orçamento aprovado - ${itemsDescription}`,
+        description: `Orçamento aprovado ${quoteCode} - ${itemsDescription}`,
         value: totalValue,
         paid: 0,
         type: "catalogo", // Adicionar campo type obrigatório
@@ -499,7 +499,7 @@ export async function approveQuote(quoteCode: string): Promise<{ ok: boolean; er
             code: orderCode,
             customer_name: quote.customer_name,
             customer_phone: quote.customer_phone,
-            description: `Orçamento aprovado - ${itemsDescription}`,
+            description: `Orçamento aprovado ${quoteCode} - ${itemsDescription}`,
             value: totalValue,
             paid: 0,
             type: "catalogo", // Adicionar campo type obrigatório
@@ -803,9 +803,14 @@ export async function updateQuote(quoteCode: string, input: {
       }
     }
 
-    // Se o orçamento foi aprovado, sincronizar com o pedido
-    if (quote.status === 'approved') {
+    // Sempre tentar sincronizar com pedido relacionado (se existir)
+    // Isso garante que mesmo se o orçamento for atualizado depois de aprovado,
+    // o pedido será atualizado também
+    try {
       await syncQuoteToOrder(quoteCode, input);
+    } catch (syncError) {
+      console.error("Erro ao sincronizar com pedido (não crítico):", syncError);
+      // Não falhar a atualização do orçamento se a sincronização falhar
     }
 
     return { ok: true };

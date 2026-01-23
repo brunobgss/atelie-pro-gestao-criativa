@@ -6,6 +6,7 @@ import { ArrowLeft, Printer } from "lucide-react";
 import PrintLayout from "@/components/PrintLayout";
 import { useAuth } from "@/components/AuthProvider";
 import { parseISODateAsLocal } from "@/utils/dateOnly";
+import { supabase } from "@/integrations/supabase/client";
 
 // Função para formatar moeda
 const formatCurrency = (value: number) => {
@@ -42,9 +43,32 @@ export default function OrcamentoImpressaoNovo() {
       console.log("Iniciando busca de orçamento para impressão:", id);
       const result = await getQuoteByCode(id!);
       console.log("Resultado da busca:", result);
+      
+      // Buscar dados do cliente se existir
+      if (result?.quote?.customer_name) {
+        try {
+          const empresa_id = empresa?.id;
+          if (empresa_id) {
+            const { data: customerData } = await supabase
+              .from("customers")
+              .select("address, phone, email, cpf_cnpj, endereco_logradouro, endereco_numero, endereco_complemento, endereco_bairro, endereco_cidade, endereco_uf, endereco_cep")
+              .eq("empresa_id", empresa_id)
+              .ilike("name", result.quote.customer_name)
+              .limit(1)
+              .maybeSingle();
+            
+            if (customerData) {
+              return { ...result, customerData };
+            }
+          }
+        } catch (err) {
+          console.warn("Erro ao buscar dados do cliente:", err);
+        }
+      }
+      
       return result;
     },
-    enabled: !!id,
+    enabled: !!id && !!empresa?.id,
     retry: 3,
     staleTime: 0
   });
@@ -267,7 +291,7 @@ export default function OrcamentoImpressaoNovo() {
         
         <div className="flex items-center gap-3">
           <Button
-            onClick={() => {
+            onClick={async () => {
               console.log("=== GERANDO PDF ORÇAMENTO PROFISSIONAL ===");
               console.log("Safe Quote:", safeQuote);
               console.log("Safe Items:", safeItems);
@@ -287,12 +311,64 @@ export default function OrcamentoImpressaoNovo() {
 
               const extractDeliveryDateBR = (observations?: string | null): string | null => {
                 if (!observations) return null;
-                const match = observations.match(/Data de entrega estimada:\s*(\d{1,2}\/\d{1,2}\/\d{4})/i);
-                return match?.[1]?.trim() || null;
+                // Tentar vários formatos
+                const patterns = [
+                  /Data de entrega[:\s]+(\d{1,2}\/\d{1,2}\/\d{4})/i,
+                  /Prazo de entrega[:\s]+(\d{1,2}\/\d{1,2}\/\d{4})/i,
+                  /Entrega[:\s]+(\d{1,2}\/\d{1,2}\/\d{4})/i,
+                  /Data de entrega estimada[:\s]+(\d{1,2}\/\d{1,2}\/\d{4})/i
+                ];
+                
+                for (const pattern of patterns) {
+                  const match = observations.match(pattern);
+                  if (match?.[1]) {
+                    return match[1].trim();
+                  }
+                }
+                return null;
               };
 
               const paymentMethodText = extractPaymentMethod(safeQuote.observations) ?? "A combinar";
               const deliveryDateText = extractDeliveryDateBR(safeQuote.observations) ?? "A combinar";
+
+              // Buscar dados do cliente
+              let customerAddress = "Não informado";
+              let customerPhone = safeQuote.customer_phone || "Não informado";
+              let customerCpfCnpj = "Não informado";
+              
+              if (empresa?.id && safeQuote.customer_name) {
+                try {
+                  const { data: customerData } = await supabase
+                    .from("customers")
+                    .select("address, phone, email, cpf_cnpj, endereco_logradouro, endereco_numero, endereco_complemento, endereco_bairro, endereco_cidade, endereco_uf, endereco_cep")
+                    .eq("empresa_id", empresa.id)
+                    .ilike("name", safeQuote.customer_name)
+                    .limit(1)
+                    .maybeSingle();
+                  
+                  if (customerData) {
+                    // Montar endereço completo
+                    if (customerData.endereco_logradouro) {
+                      const parts = [
+                        customerData.endereco_logradouro,
+                        customerData.endereco_numero,
+                        customerData.endereco_complemento,
+                        customerData.endereco_bairro,
+                        customerData.endereco_cidade ? `${customerData.endereco_cidade}${customerData.endereco_uf ? '/' + customerData.endereco_uf : ''}` : '',
+                        customerData.endereco_cep ? `CEP: ${customerData.endereco_cep}` : ''
+                      ].filter(Boolean);
+                      customerAddress = parts.join(', ');
+                    } else if (customerData.address) {
+                      customerAddress = customerData.address;
+                    }
+                    
+                    customerPhone = customerData.phone || customerPhone;
+                    customerCpfCnpj = customerData.cpf_cnpj || customerCpfCnpj;
+                  }
+                } catch (err) {
+                  console.warn("Erro ao buscar dados do cliente:", err);
+                }
+              }
 
               // Dados da empresa
               const empresaNome = empresa?.nome || "Empresa";
@@ -521,10 +597,9 @@ export default function OrcamentoImpressaoNovo() {
                       <div class="cliente-section" style="border-bottom: 1px solid #ccc; padding-bottom: 3px;">
                         <div style="font-size: 10px; line-height: 1.4;">
                           <div><span style="font-weight: bold;">Cliente: </span>${safeQuote.customer_name}</div>
-                          <div>Endereço: Não informado</div>
-                          <div>Telefone: </div>
-                          <div>CPF/CNPJ: Não informado</div>
-                          <div>Celular: ${safeQuote.customer_phone}</div>
+                          <div>Endereço: ${customerAddress}</div>
+                          <div>Telefone: ${customerPhone}</div>
+                          <div>CPF/CNPJ: ${customerCpfCnpj}</div>
                         </div>
                       </div>
 

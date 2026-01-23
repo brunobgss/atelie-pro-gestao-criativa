@@ -4,7 +4,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -31,6 +30,7 @@ import { uploadOrderFile } from "@/integrations/supabase/storage";
 import { CLOTHING_SIZES } from "@/constants/sizes";
 import { cn } from "@/lib/utils";
 import { isoInputToBR } from "@/utils/dateOnly";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 
 export default function NovoOrcamento() {
   const navigate = useNavigate();
@@ -46,6 +46,20 @@ export default function NovoOrcamento() {
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<string>("A combinar");
+  const [showNewClientModal, setShowNewClientModal] = useState(false);
+  const [newClientName, setNewClientName] = useState("");
+  const [newClientPhone, setNewClientPhone] = useState("");
+  const [newClientEmail, setNewClientEmail] = useState("");
+  const [newClientCpfCnpj, setNewClientCpfCnpj] = useState("");
+  const [newClientAddress, setNewClientAddress] = useState("");
+  const [newClientEnderecoLogradouro, setNewClientEnderecoLogradouro] = useState("");
+  const [newClientEnderecoNumero, setNewClientEnderecoNumero] = useState("");
+  const [newClientEnderecoComplemento, setNewClientEnderecoComplemento] = useState("");
+  const [newClientEnderecoBairro, setNewClientEnderecoBairro] = useState("");
+  const [newClientEnderecoCidade, setNewClientEnderecoCidade] = useState("");
+  const [newClientEnderecoUf, setNewClientEnderecoUf] = useState("");
+  const [newClientEnderecoCep, setNewClientEnderecoCep] = useState("");
+  const [creatingClient, setCreatingClient] = useState(false);
   const [quantityModalOpen, setQuantityModalOpen] = useState(false);
   const [selectedQuantity, setSelectedQuantity] = useState(1);
   const [whatsappModalOpen, setWhatsappModalOpen] = useState(false);
@@ -506,6 +520,10 @@ Aguardo seu retorno! 😊`;
                     buscarMedidasCliente(value);
                   }}
                   onPhoneChange={setClientPhone}
+                  onCreateNew={(name) => {
+                    setNewClientName(name);
+                    setShowNewClientModal(true);
+                  }}
                   placeholder="Nome do cliente"
                   required
                 />
@@ -1245,6 +1263,243 @@ Aguardo seu retorno! 😊`;
                 </Button>
               </div>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Modal Criar Novo Cliente */}
+        <Dialog open={showNewClientModal} onOpenChange={setShowNewClientModal}>
+          <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Criar Novo Cliente</DialogTitle>
+              <DialogDescription>
+                Preencha os dados do cliente. Campos marcados com * são obrigatórios.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="new-client-name">Nome *</Label>
+                  <Input
+                    id="new-client-name"
+                    value={newClientName}
+                    onChange={(e) => setNewClientName(e.target.value)}
+                    placeholder="Nome completo"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-client-phone">Telefone</Label>
+                  <Input
+                    id="new-client-phone"
+                    value={newClientPhone}
+                    onChange={(e) => setNewClientPhone(e.target.value)}
+                    placeholder="(11) 99999-9999"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="new-client-email">E-mail</Label>
+                  <Input
+                    id="new-client-email"
+                    type="email"
+                    value={newClientEmail}
+                    onChange={(e) => setNewClientEmail(e.target.value)}
+                    placeholder="email@exemplo.com"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-client-cpf-cnpj">CPF/CNPJ</Label>
+                  <Input
+                    id="new-client-cpf-cnpj"
+                    value={newClientCpfCnpj}
+                    onChange={(e) => setNewClientCpfCnpj(e.target.value)}
+                    placeholder="000.000.000-00 ou 00.000.000/0000-00"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="new-client-address">Endereço Completo</Label>
+                <Textarea
+                  id="new-client-address"
+                  value={newClientAddress}
+                  onChange={(e) => setNewClientAddress(e.target.value)}
+                  placeholder="Rua, número, complemento, bairro, cidade - UF, CEP"
+                  rows={2}
+                />
+              </div>
+
+              <div className="border-t pt-4">
+                <Label className="text-sm font-semibold mb-3 block">Endereço Detalhado (Opcional)</Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="new-client-logradouro">Logradouro</Label>
+                    <Input
+                      id="new-client-logradouro"
+                      value={newClientEnderecoLogradouro}
+                      onChange={(e) => setNewClientEnderecoLogradouro(e.target.value)}
+                      placeholder="Rua, Avenida, etc."
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="new-client-numero">Número</Label>
+                    <Input
+                      id="new-client-numero"
+                      value={newClientEnderecoNumero}
+                      onChange={(e) => setNewClientEnderecoNumero(e.target.value)}
+                      placeholder="123"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="new-client-complemento">Complemento</Label>
+                    <Input
+                      id="new-client-complemento"
+                      value={newClientEnderecoComplemento}
+                      onChange={(e) => setNewClientEnderecoComplemento(e.target.value)}
+                      placeholder="Apto, bloco, etc."
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="new-client-bairro">Bairro</Label>
+                    <Input
+                      id="new-client-bairro"
+                      value={newClientEnderecoBairro}
+                      onChange={(e) => setNewClientEnderecoBairro(e.target.value)}
+                      placeholder="Bairro"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="new-client-cidade">Cidade</Label>
+                    <Input
+                      id="new-client-cidade"
+                      value={newClientEnderecoCidade}
+                      onChange={(e) => setNewClientEnderecoCidade(e.target.value)}
+                      placeholder="Cidade"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="new-client-uf">UF</Label>
+                    <Input
+                      id="new-client-uf"
+                      value={newClientEnderecoUf}
+                      onChange={(e) => setNewClientEnderecoUf(e.target.value.toUpperCase())}
+                      placeholder="SP"
+                      maxLength={2}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="new-client-cep">CEP</Label>
+                    <Input
+                      id="new-client-cep"
+                      value={newClientEnderecoCep}
+                      onChange={(e) => setNewClientEnderecoCep(e.target.value)}
+                      placeholder="00000-000"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowNewClientModal(false);
+                  // Limpar campos
+                  setNewClientName("");
+                  setNewClientPhone("");
+                  setNewClientEmail("");
+                  setNewClientCpfCnpj("");
+                  setNewClientAddress("");
+                  setNewClientEnderecoLogradouro("");
+                  setNewClientEnderecoNumero("");
+                  setNewClientEnderecoComplemento("");
+                  setNewClientEnderecoBairro("");
+                  setNewClientEnderecoCidade("");
+                  setNewClientEnderecoUf("");
+                  setNewClientEnderecoCep("");
+                }}
+                disabled={creatingClient}
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={async () => {
+                  if (!newClientName.trim()) {
+                    toast.error("Nome do cliente é obrigatório");
+                    return;
+                  }
+
+                  setCreatingClient(true);
+                  try {
+                    const empresa_id = empresa?.id;
+                    if (!empresa_id) {
+                      toast.error("Erro ao obter dados da empresa");
+                      return;
+                    }
+
+                    const { data, error } = await supabase
+                      .from("customers")
+                      .insert({
+                        empresa_id,
+                        name: newClientName.trim(),
+                        phone: newClientPhone.trim() || null,
+                        email: newClientEmail.trim() || null,
+                        address: newClientAddress.trim() || null,
+                        cpf_cnpj: newClientCpfCnpj.trim() || null,
+                        endereco_logradouro: newClientEnderecoLogradouro.trim() || null,
+                        endereco_numero: newClientEnderecoNumero.trim() || null,
+                        endereco_complemento: newClientEnderecoComplemento.trim() || null,
+                        endereco_bairro: newClientEnderecoBairro.trim() || null,
+                        endereco_cidade: newClientEnderecoCidade.trim() || null,
+                        endereco_uf: newClientEnderecoUf.trim() || null,
+                        endereco_cep: newClientEnderecoCep.trim() || null,
+                      })
+                      .select()
+                      .single();
+
+                    if (error) {
+                      console.error("Erro ao criar cliente:", error);
+                      toast.error(error.message || "Erro ao criar cliente");
+                      return;
+                    }
+
+                    toast.success("Cliente criado com sucesso!");
+                    setClientName(newClientName.trim());
+                    if (newClientPhone.trim()) {
+                      setClientPhone(newClientPhone.trim());
+                    }
+                    setShowNewClientModal(false);
+                    
+                    // Limpar campos
+                    setNewClientName("");
+                    setNewClientPhone("");
+                    setNewClientEmail("");
+                    setNewClientCpfCnpj("");
+                    setNewClientAddress("");
+                    setNewClientEnderecoLogradouro("");
+                    setNewClientEnderecoNumero("");
+                    setNewClientEnderecoComplemento("");
+                    setNewClientEnderecoBairro("");
+                    setNewClientEnderecoCidade("");
+                    setNewClientEnderecoUf("");
+                    setNewClientEnderecoCep("");
+
+                    // Invalidar cache de clientes
+                    queryClient.invalidateQueries({ queryKey: ["customers"] });
+                  } catch (err: any) {
+                    console.error("Erro ao criar cliente:", err);
+                    toast.error(err.message || "Erro ao criar cliente");
+                  } finally {
+                    setCreatingClient(false);
+                  }
+                }}
+                disabled={creatingClient || !newClientName.trim()}
+              >
+                {creatingClient ? "Criando..." : "Criar Cliente"}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>

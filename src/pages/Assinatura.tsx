@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Check, Crown, Zap, Star, ArrowLeft, CreditCard, CheckCircle, User, MessageCircle, Mail, FileText, RefreshCw, Loader2, ArrowUpDown, AlertTriangle } from "lucide-react";
+import { Check, Crown, Zap, Star, ArrowLeft, CreditCard, CheckCircle, User, MessageCircle, Mail, FileText, RefreshCw, Loader2, ArrowUpDown, AlertTriangle, XCircle } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -19,6 +19,9 @@ import { Label } from "@/components/ui/label";
 import { asaasService } from "@/integrations/asaas/service";
 import { useInternationalization, useTranslations } from "@/contexts/InternationalizationContext";
 import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 interface Plan {
   id: string;
@@ -130,9 +133,43 @@ export default function Assinatura() {
   const [assinaturaAtiva, setAssinaturaAtiva] = useState<any>(null);
   const [novoPlanoSelecionado, setNovoPlanoSelecionado] = useState<string | null>(null);
   const [novaFormaPagamento, setNovaFormaPagamento] = useState<'PIX' | 'CREDIT_CARD' | 'BOLETO' | null>(null);
+  const [dialogCancelarAssinaturaOpen, setDialogCancelarAssinaturaOpen] = useState(false);
+  const [cancelandoAssinatura, setCancelandoAssinatura] = useState(false);
 
   // Verificar se o usuário já tem assinatura ativa
   const isPremium = empresa?.is_premium === true;
+
+  // Buscar dados de pagamento para obter data de expiração
+  const { data: paymentData } = useQuery({
+    queryKey: ["payment", empresa?.id],
+    queryFn: async () => {
+      if (!empresa?.id) return null;
+      const { data, error } = await supabase
+        .from("payments")
+        .select("next_due_date, status, asaas_subscription_id")
+        .eq("empresa_id", empresa.id)
+        .eq("status", "active")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (error) {
+        console.error("Erro ao buscar dados de pagamento:", error);
+        return null;
+      }
+      return data;
+    },
+    enabled: !!empresa?.id && isPremium,
+  });
+
+  // Calcular data de expiração
+  const expirationDate = paymentData?.next_due_date 
+    ? new Date(paymentData.next_due_date) 
+    : empresa?.trial_end_date 
+      ? new Date(empresa.trial_end_date)
+      : empresa?.current_period_end
+        ? new Date(empresa.current_period_end)
+        : null;
   const instructionPaymentMethod = paymentInfo?.paymentMethod || selectedPaymentMethod;
   
   // Detectar o plano baseado no valor pago (se disponível) ou usar padrão
@@ -282,6 +319,65 @@ export default function Assinatura() {
       loadAssinaturaAtiva();
     }
   }, [empresa?.id, isPremium]);
+
+  const handleCancelarAssinatura = async () => {
+    setCancelandoAssinatura(true);
+    
+    try {
+      // Buscar subscription ID
+      const subscriptionId = paymentData?.asaas_subscription_id || empresa?.asaas_subscription_id;
+      
+      if (!subscriptionId) {
+        toast.error("Não foi possível encontrar a assinatura para cancelar. Entre em contato com o suporte.");
+        setCancelandoAssinatura(false);
+        return;
+      }
+
+      // Cancelar no ASAAS
+      const response = await fetch('/api/asaas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'cancelSubscription',
+          data: { subscriptionId }
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro ao cancelar assinatura');
+      }
+
+      // Atualizar status no banco
+      if (empresa?.id) {
+        await supabase
+          .from('payments')
+          .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+          .eq('empresa_id', empresa.id)
+          .eq('status', 'active');
+
+        // Não desativar premium imediatamente - deixar expirar naturalmente
+        // O sistema vai desativar quando a data de expiração chegar
+      }
+
+      // Atualizar dados da empresa
+      await refreshEmpresa(true);
+
+      toast.success("Assinatura cancelada com sucesso! Você continuará com acesso até a data de expiração.");
+      setDialogCancelarAssinaturaOpen(false);
+      
+      // Recarregar página após 2 segundos para atualizar status
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
+
+    } catch (error: any) {
+      console.error("Erro ao cancelar assinatura:", error);
+      toast.error(error.message || "Erro ao cancelar assinatura. Tente novamente ou entre em contato com o suporte.");
+    } finally {
+      setCancelandoAssinatura(false);
+    }
+  };
 
   const handleTrocarPlano = async () => {
     if (!novoPlanoSelecionado || !assinaturaAtiva?.asaas_subscription_id) {
@@ -619,7 +715,7 @@ export default function Assinatura() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div>
                   <p className="text-sm text-gray-600">Plano Atual</p>
                   <p className="text-xl font-bold text-green-800">
@@ -629,6 +725,14 @@ export default function Assinatura() {
                 <div>
                   <p className="text-sm text-gray-600">Valor</p>
                   <p className="text-xl font-bold text-green-800">{planPrice}/{planPeriod}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Data de Expiração</p>
+                  <p className="text-xl font-bold text-green-800">
+                    {expirationDate 
+                      ? format(expirationDate, "dd/MM/yyyy", { locale: ptBR })
+                      : "Não informado"}
+                  </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Status</p>
@@ -734,6 +838,14 @@ export default function Assinatura() {
                 >
                   <CreditCard className="w-4 h-4 mr-2" />
                   Portal de Pagamentos
+                </Button>
+                <Button 
+                  variant="destructive" 
+                  className="w-full justify-start"
+                  onClick={() => setDialogCancelarAssinaturaOpen(true)}
+                >
+                  <XCircle className="w-4 h-4 mr-2" />
+                  Cancelar Assinatura
                 </Button>
                 {empresa?.tem_nota_fiscal && (
                   <Button 
@@ -854,6 +966,52 @@ export default function Assinatura() {
                   </>
                 ) : (
                   'Confirmar Troca'
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog Cancelar Assinatura */}
+        <Dialog open={dialogCancelarAssinaturaOpen} onOpenChange={setDialogCancelarAssinaturaOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Cancelar Assinatura</DialogTitle>
+              <DialogDescription>
+                Tem certeza que deseja cancelar sua assinatura? Você perderá acesso aos recursos premium ao final do período pago.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <Alert className="mt-4">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                <strong>Atenção:</strong> Ao cancelar, você continuará com acesso até {expirationDate ? format(expirationDate, "dd/MM/yyyy", { locale: ptBR }) : "a data de expiração"}. Após essa data, perderá acesso aos recursos premium.
+              </AlertDescription>
+            </Alert>
+
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setDialogCancelarAssinaturaOpen(false)}
+                disabled={cancelandoAssinatura}
+              >
+                Não, manter assinatura
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleCancelarAssinatura}
+                disabled={cancelandoAssinatura}
+              >
+                {cancelandoAssinatura ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Cancelando...
+                  </>
+                ) : (
+                  <>
+                    <XCircle className="w-4 h-4 mr-2" />
+                    Sim, cancelar assinatura
+                  </>
                 )}
               </Button>
             </DialogFooter>

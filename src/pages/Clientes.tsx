@@ -574,12 +574,19 @@ export default function Clientes() {
                   <Input id="email" className="col-span-3" placeholder="cliente@email.com" />
                 </div>
               </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="cpf_cnpj" className="text-right">
+                  CPF/CNPJ <span className="text-gray-400">(opcional)</span>
+                </Label>
+                <Input id="cpf_cnpj" className="col-span-3" placeholder="Digite o CPF ou CNPJ" />
+              </div>
               <DialogFooter>
                 <Button
                   onClick={async () => {
                     const name = (document.getElementById("name") as HTMLInputElement)?.value;
                     const phone = (document.getElementById("phone") as HTMLInputElement)?.value;
                     const email = (document.getElementById("email") as HTMLInputElement)?.value;
+                    const cpf_cnpj = (document.getElementById("cpf_cnpj") as HTMLInputElement)?.value;
                     
                     // Validação robusta
                     const validation = validateForm(
@@ -596,7 +603,7 @@ export default function Clientes() {
                       return;
                     }
                     
-                    const res = await createCustomerReal({ name, phone, email });
+                    const res = await createCustomerReal({ name, phone, email, cpf_cnpj });
                     if (!res.ok) {
                       const appError = errorHandler.handleSupabaseError(
                         { message: res.error, code: 'CREATE_CUSTOMER_ERROR' },
@@ -612,6 +619,7 @@ export default function Clientes() {
                     (document.getElementById("name") as HTMLInputElement).value = "";
                     (document.getElementById("phone") as HTMLInputElement).value = "";
                     (document.getElementById("email") as HTMLInputElement).value = "";
+                    (document.getElementById("cpf_cnpj") as HTMLInputElement).value = "";
                     
                     // Fechar o modal
                     const dialog = document.querySelector('[role="dialog"]');

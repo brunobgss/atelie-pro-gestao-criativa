@@ -13,6 +13,7 @@ interface ClientSearchProps {
   onPhoneChange?: (phone: string) => void;
   placeholder?: string;
   required?: boolean;
+  onCreateNew?: (name: string) => void; // Callback quando usuário quer criar novo cliente
 }
 
 export function ClientSearch({ 
@@ -20,7 +21,8 @@ export function ClientSearch({
   onChange, 
   onPhoneChange, 
   placeholder = "Nome do cliente",
-  required = false 
+  required = false,
+  onCreateNew
 }: ClientSearchProps) {
   const [open, setOpen] = useState(false);
   const [clients, setClients] = useState<Array<{ id: string; name: string; phone?: string; email?: string }>>([]);
@@ -86,6 +88,15 @@ export function ClientSearch({
       return;
     }
 
+    // Se tem callback onCreateNew, usar ele (para abrir modal)
+    if (onCreateNew) {
+      onCreateNew(searchTerm.trim());
+      setOpen(false);
+      setSearchTerm("");
+      return;
+    }
+
+    // Caso contrário, criar diretamente (comportamento antigo)
     try {
       setLoading(true);
       const result = await createCustomer({ name: searchTerm.trim() });
