@@ -717,9 +717,9 @@ export default function PedidoDetalhe() {
             .header h1 { font-size: 42px; font-weight: bold; margin: 0; margin-bottom: 15px; color: #059669; }
             .header .subtitle { font-size: 24px; color: #6b7280; }
             .section {
-              margin-bottom: 15px;
+              margin-bottom: 10px;
               background: #f0fdf4;
-              padding: 15px;
+              padding: 10px;
               border-radius: 8px;
               border-left: 4px solid #059669;
             }
@@ -729,11 +729,11 @@ export default function PedidoDetalhe() {
               margin-bottom: 20px;
               color: #059669;
             }
-            .grid { 
-              display: grid; 
-              grid-template-columns: 1fr 1fr; 
-              gap: 20px; 
-              margin-bottom: 20px; 
+            .grid {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 15px;
+              margin-bottom: 15px;
             }
             .item { 
               display: flex; 
@@ -775,11 +775,11 @@ export default function PedidoDetalhe() {
               border-radius: 8px; 
               box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             }
-            .technical-specs { 
-              background: #fef3c7; 
-              padding: 20px; 
-              border-radius: 8px; 
-              border-left: 4px solid #f59e0b; 
+            .technical-specs {
+              background: #fef3c7;
+              padding: 12px;
+              border-radius: 8px;
+              border-left: 4px solid #f59e0b;
             }
             .technical-specs h3 {
               margin-bottom: 45px;
@@ -791,10 +791,11 @@ export default function PedidoDetalhe() {
               padding: 0; 
             }
             .technical-specs li {
-              margin-bottom: 30px;
+              margin-bottom: 8px;
               display: flex;
               align-items: center;
               font-size: 18px;
+              line-height: 1.2;
             }
             .technical-specs li span { 
               color: #059669; 
@@ -834,8 +835,8 @@ export default function PedidoDetalhe() {
               background: #dbeafe;
               border: 2px solid #3b82f6;
               border-radius: 8px;
-              padding: 15px;
-              margin-bottom: 20px;
+              padding: 8px;
+              margin-bottom: 15px;
               text-align: center;
             }
             .employee-notice h3 {
@@ -1034,12 +1035,12 @@ export default function PedidoDetalhe() {
 
             <div class="section">
               <h2>📝 Anotações da Produção</h2>
-              <div style="border: 2px dashed #d1d5db; padding: 20px; min-height: 120px; background: white;">
-                <p style="color: #6b7280; font-style: italic; margin: 0; font-size: 42px;">
+              <div style="border: 2px dashed #d1d5db; padding: 12px; min-height: 80px; background: white;">
+                <p style="color: #6b7280; font-style: italic; margin: 0; font-size: 16px;">
                   Espaço para anotações durante o processo de produção...
                 </p>
-                <br><br><br><br><br>
-                <div style="border-top: 1px solid #e5e7eb; padding-top: 10px; margin-top: 20px;">
+                <br><br><br>
+                <div style="border-top: 1px solid #e5e7eb; padding-top: 5px; margin-top: 10px;">
                   <p style="font-size: 14px; color: #6b7280; margin: 0;">
                     <strong>Responsável:</strong> ___________________________ <strong>Data:</strong> ____/____/____
                   </p>
