@@ -710,30 +710,30 @@ export default function PedidoDetalhe() {
             .container { max-width: 800px; margin: 0 auto; }
             .header {
               text-align: center;
-              margin-bottom: 20px;
-              border-bottom: 3px solid #059669;
-              padding-bottom: 10px;
+              margin-bottom: 10px;
+              border-bottom: 2px solid #059669;
+              padding-bottom: 5px;
             }
             .header h1 { font-size: 42px; font-weight: bold; margin: 0; margin-bottom: 15px; color: #059669; }
             .header .subtitle { font-size: 24px; color: #6b7280; }
             .section {
-              margin-bottom: 10px;
+              margin-bottom: 5px;
               background: #f0fdf4;
-              padding: 10px;
-              border-radius: 8px;
-              border-left: 4px solid #059669;
+              padding: 6px;
+              border-radius: 6px;
+              border-left: 3px solid #059669;
             }
             .section h2 {
-              font-size: 30px;
+              font-size: 24px;
               font-weight: bold;
-              margin-bottom: 20px;
+              margin-bottom: 8px;
               color: #059669;
             }
             .grid {
               display: grid;
               grid-template-columns: 1fr 1fr;
-              gap: 15px;
-              margin-bottom: 15px;
+              gap: 10px;
+              margin-bottom: 8px;
             }
             .item { 
               display: flex; 
@@ -777,25 +777,25 @@ export default function PedidoDetalhe() {
             }
             .technical-specs {
               background: #fef3c7;
-              padding: 12px;
-              border-radius: 8px;
-              border-left: 4px solid #f59e0b;
+              padding: 8px;
+              border-radius: 6px;
+              border-left: 3px solid #f59e0b;
             }
             .technical-specs h3 {
-              margin-bottom: 45px;
+              margin-bottom: 8px;
               color: #92400e;
-              font-size: 24px;
+              font-size: 18px;
             }
             .technical-specs ul { 
               list-style: none; 
               padding: 0; 
             }
             .technical-specs li {
-              margin-bottom: 8px;
+              margin-bottom: 4px;
               display: flex;
               align-items: center;
-              font-size: 18px;
-              line-height: 1.2;
+              font-size: 16px;
+              line-height: 1.1;
             }
             .technical-specs li span { 
               color: #059669; 
