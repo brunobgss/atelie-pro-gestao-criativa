@@ -1332,7 +1332,10 @@ Aguardo seu retorno! 😊`;
               </div>
 
               <div className="border-t pt-4">
-                <Label className="text-sm font-semibold mb-3 block">Endereço Detalhado (Opcional)</Label>
+                <Label className="text-sm font-semibold mb-3 block flex items-center gap-2">
+                  Endereço Detalhado (Campos Separados)
+                  <span className="text-xs text-muted-foreground font-normal">Opcional - Facilita preenchimento</span>
+                </Label>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2 md:col-span-2">
                     <Label htmlFor="new-client-logradouro">Logradouro</Label>
