@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Search, Phone, Mail, Package, Plus, Edit, Trash2, FileText, ShoppingCart, ExternalLink, Eye, MapPin, RefreshCw, Trash } from "lucide-react";
@@ -206,9 +207,22 @@ export default function Clientes() {
   };
 
   // Função para criar cliente (modo real)
-  const createCustomerReal = async (data: { name: string; phone: string; email: string }) => {
+  const createCustomerReal = async (data: {
+    name: string;
+    phone: string;
+    email: string;
+    cpf_cnpj?: string;
+    address?: string;
+    endereco_logradouro?: string;
+    endereco_numero?: string;
+    endereco_complemento?: string;
+    endereco_bairro?: string;
+    endereco_cidade?: string;
+    endereco_uf?: string;
+    endereco_cep?: string;
+  }) => {
     console.log("➕ Criando cliente real no banco:", data);
-    
+
     try {
       const result = await createCustomer(data);
       return result;
@@ -580,6 +594,82 @@ export default function Clientes() {
                 </Label>
                 <Input id="cpf_cnpj" className="col-span-3" placeholder="Digite o CPF ou CNPJ" />
               </div>
+
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="address" className="text-right">
+                  Endereço <span className="text-gray-400">(opcional)</span>
+                </Label>
+                <Textarea
+                  id="address"
+                  className="col-span-3"
+                  placeholder="Rua, número, complemento, bairro, cidade - UF, CEP"
+                  rows={2}
+                />
+              </div>
+
+              <div className="border-t pt-4 col-span-4">
+                <Label className="text-sm font-semibold mb-3 block flex items-center gap-2">
+                  Endereço Detalhado (Campos Separados)
+                  <span className="text-xs text-muted-foreground font-normal">Opcional - Facilita preenchimento</span>
+                </Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="endereco_logradouro" className="text-sm">Logradouro</Label>
+                    <Input
+                      id="endereco_logradouro"
+                      placeholder="Rua, Avenida, etc."
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="endereco_numero" className="text-sm">Número</Label>
+                    <Input
+                      id="endereco_numero"
+                      placeholder="123"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="endereco_complemento" className="text-sm">Complemento</Label>
+                    <Input
+                      id="endereco_complemento"
+                      placeholder="Apto, bloco, etc."
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="endereco_bairro" className="text-sm">Bairro</Label>
+                    <Input
+                      id="endereco_bairro"
+                      placeholder="Bairro"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="endereco_cidade" className="text-sm">Cidade</Label>
+                    <Input
+                      id="endereco_cidade"
+                      placeholder="Cidade"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="endereco_uf" className="text-sm">UF</Label>
+                    <Input
+                      id="endereco_uf"
+                      placeholder="SP"
+                      maxLength={2}
+                      onChange={(e) => {
+                        const input = e.target as HTMLInputElement;
+                        input.value = input.value.toUpperCase();
+                      }}
+                    />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="endereco_cep" className="text-sm">CEP</Label>
+                    <Input
+                      id="endereco_cep"
+                      placeholder="00000-000"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <DialogFooter>
                 <Button
                   onClick={async () => {
@@ -587,7 +677,15 @@ export default function Clientes() {
                     const phone = (document.getElementById("phone") as HTMLInputElement)?.value;
                     const email = (document.getElementById("email") as HTMLInputElement)?.value;
                     const cpf_cnpj = (document.getElementById("cpf_cnpj") as HTMLInputElement)?.value;
-                    
+                    const address = (document.getElementById("address") as HTMLTextAreaElement)?.value;
+                    const endereco_logradouro = (document.getElementById("endereco_logradouro") as HTMLInputElement)?.value;
+                    const endereco_numero = (document.getElementById("endereco_numero") as HTMLInputElement)?.value;
+                    const endereco_complemento = (document.getElementById("endereco_complemento") as HTMLInputElement)?.value;
+                    const endereco_bairro = (document.getElementById("endereco_bairro") as HTMLInputElement)?.value;
+                    const endereco_cidade = (document.getElementById("endereco_cidade") as HTMLInputElement)?.value;
+                    const endereco_uf = (document.getElementById("endereco_uf") as HTMLInputElement)?.value;
+                    const endereco_cep = (document.getElementById("endereco_cep") as HTMLInputElement)?.value;
+
                     // Validação robusta
                     const validation = validateForm(
                       { name, phone, email },
@@ -597,13 +695,26 @@ export default function Clientes() {
                         email: (value) => value && typeof value === 'string' ? validateEmail(value) : { isValid: true, errors: [] }
                       }
                     );
-                    
+
                     if (!validation.isValid) {
                       validation.errors.forEach(error => toast.error(error));
                       return;
                     }
-                    
-                    const res = await createCustomerReal({ name, phone, email, cpf_cnpj });
+
+                    const res = await createCustomerReal({
+                      name,
+                      phone,
+                      email,
+                      cpf_cnpj,
+                      address,
+                      endereco_logradouro,
+                      endereco_numero,
+                      endereco_complemento,
+                      endereco_bairro,
+                      endereco_cidade,
+                      endereco_uf,
+                      endereco_cep
+                    });
                     if (!res.ok) {
                       const appError = errorHandler.handleSupabaseError(
                         { message: res.error, code: 'CREATE_CUSTOMER_ERROR' },
@@ -612,14 +723,22 @@ export default function Clientes() {
                       toast.error(appError.message);
                       return;
                     }
-                    
+
                     toast.success(`Cliente "${name}" criado com sucesso!`);
-                    
+
                     // Limpar os campos
                     (document.getElementById("name") as HTMLInputElement).value = "";
                     (document.getElementById("phone") as HTMLInputElement).value = "";
                     (document.getElementById("email") as HTMLInputElement).value = "";
                     (document.getElementById("cpf_cnpj") as HTMLInputElement).value = "";
+                    (document.getElementById("address") as HTMLTextAreaElement).value = "";
+                    (document.getElementById("endereco_logradouro") as HTMLInputElement).value = "";
+                    (document.getElementById("endereco_numero") as HTMLInputElement).value = "";
+                    (document.getElementById("endereco_complemento") as HTMLInputElement).value = "";
+                    (document.getElementById("endereco_bairro") as HTMLInputElement).value = "";
+                    (document.getElementById("endereco_cidade") as HTMLInputElement).value = "";
+                    (document.getElementById("endereco_uf") as HTMLInputElement).value = "";
+                    (document.getElementById("endereco_cep") as HTMLInputElement).value = "";
                     
                     // Fechar o modal
                     const dialog = document.querySelector('[role="dialog"]');

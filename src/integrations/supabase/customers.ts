@@ -10,7 +10,20 @@ export type CustomerRow = {
   address?: string | null;
 };
 
-export async function createCustomer(input: { name: string; phone?: string; email?: string }): Promise<{ ok: boolean; id?: string; data?: CustomerRow; error?: string }> {
+export async function createCustomer(input: {
+  name: string;
+  phone?: string;
+  email?: string;
+  cpf_cnpj?: string;
+  address?: string;
+  endereco_logradouro?: string;
+  endereco_numero?: string;
+  endereco_complemento?: string;
+  endereco_bairro?: string;
+  endereco_cidade?: string;
+  endereco_uf?: string;
+  endereco_cep?: string;
+}): Promise<{ ok: boolean; id?: string; data?: CustomerRow; error?: string }> {
   try {
     console.log("➕ Criando cliente no banco:", input);
     
@@ -37,9 +50,18 @@ export async function createCustomer(input: { name: string; phone?: string; emai
       .from("customers")
       .insert({
         empresa_id: empresa_id,
-        name: input.name, 
-        phone: input.phone ?? null, 
-        email: input.email ?? null
+        name: input.name,
+        phone: input.phone ?? null,
+        email: input.email ?? null,
+        cpf_cnpj: input.cpf_cnpj ?? null,
+        address: input.address ?? null,
+        endereco_logradouro: input.endereco_logradouro ?? null,
+        endereco_numero: input.endereco_numero ?? null,
+        endereco_complemento: input.endereco_complemento ?? null,
+        endereco_bairro: input.endereco_bairro ?? null,
+        endereco_cidade: input.endereco_cidade ?? null,
+        endereco_uf: input.endereco_uf ?? null,
+        endereco_cep: input.endereco_cep ?? null
       })
       .select("*")
       .single();
