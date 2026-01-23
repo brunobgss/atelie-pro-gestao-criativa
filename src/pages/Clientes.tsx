@@ -564,108 +564,115 @@ export default function Clientes() {
                   <span className="md:hidden">Novo</span>
                 </Button>
               </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Novo Cliente</DialogTitle>
               </DialogHeader>
-              <div className="grid gap-4 py-2">
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="name" className="text-right">
-                    Nome <span className="text-red-500">*</span>
-                  </Label>
-                  <Input id="name" className="col-span-3" placeholder="Nome completo do cliente" />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="phone" className="text-right">
-                    Telefone <span className="text-red-500">*</span>
-                  </Label>
-                  <Input id="phone" className="col-span-3" placeholder="(11) 99999-9999" />
-                </div>
-                <div className="grid grid-cols-4 items-center gap-4">
-                  <Label htmlFor="email" className="text-right">
-                    Email <span className="text-gray-400">(opcional)</span>
-                  </Label>
-                  <Input id="email" className="col-span-3" placeholder="cliente@email.com" />
-                </div>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="cpf_cnpj" className="text-right">
-                  CPF/CNPJ <span className="text-gray-400">(opcional)</span>
-                </Label>
-                <Input id="cpf_cnpj" className="col-span-3" placeholder="Digite o CPF ou CNPJ" />
-              </div>
-
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="address" className="text-right">
-                  Endereço <span className="text-gray-400">(opcional)</span>
-                </Label>
-                <Textarea
-                  id="address"
-                  className="col-span-3"
-                  placeholder="Rua, número, complemento, bairro, cidade - UF, CEP"
-                  rows={2}
-                />
-              </div>
-
-              <div className="border-t pt-4 col-span-4">
-                <Label className="text-sm font-semibold mb-3 block flex items-center gap-2">
-                  Endereço Detalhado (Campos Separados)
-                  <span className="text-xs text-muted-foreground font-normal">Opcional - Facilita preenchimento</span>
-                </Label>
+              <div className="space-y-4 py-2">
+                {/* Dados básicos */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="endereco_logradouro" className="text-sm">Logradouro</Label>
-                    <Input
-                      id="endereco_logradouro"
-                      placeholder="Rua, Avenida, etc."
-                    />
+                  <div className="space-y-2">
+                    <Label htmlFor="name">
+                      Nome <span className="text-red-500">*</span>
+                    </Label>
+                    <Input id="name" placeholder="Nome completo do cliente" />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="endereco_numero" className="text-sm">Número</Label>
-                    <Input
-                      id="endereco_numero"
-                      placeholder="123"
-                    />
+                    <Label htmlFor="phone">
+                      Telefone <span className="text-red-500">*</span>
+                    </Label>
+                    <Input id="phone" placeholder="(11) 99999-9999" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">
+                      Email <span className="text-gray-400">(opcional)</span>
+                    </Label>
+                    <Input id="email" type="email" placeholder="cliente@email.com" />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="endereco_complemento" className="text-sm">Complemento</Label>
-                    <Input
-                      id="endereco_complemento"
-                      placeholder="Apto, bloco, etc."
-                    />
+                    <Label htmlFor="cpf_cnpj">
+                      CPF/CNPJ <span className="text-gray-400">(opcional)</span>
+                    </Label>
+                    <Input id="cpf_cnpj" placeholder="Digite o CPF ou CNPJ" />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="endereco_bairro" className="text-sm">Bairro</Label>
-                    <Input
-                      id="endereco_bairro"
-                      placeholder="Bairro"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="endereco_cidade" className="text-sm">Cidade</Label>
-                    <Input
-                      id="endereco_cidade"
-                      placeholder="Cidade"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="endereco_uf" className="text-sm">UF</Label>
-                    <Input
-                      id="endereco_uf"
-                      placeholder="SP"
-                      maxLength={2}
-                      onChange={(e) => {
-                        const input = e.target as HTMLInputElement;
-                        input.value = input.value.toUpperCase();
-                      }}
-                    />
-                  </div>
-                  <div className="space-y-2 md:col-span-2">
-                    <Label htmlFor="endereco_cep" className="text-sm">CEP</Label>
-                    <Input
-                      id="endereco_cep"
-                      placeholder="00000-000"
-                    />
+                </div>
+
+                {/* Endereço completo */}
+                <div className="space-y-2">
+                  <Label htmlFor="address">
+                    Endereço Completo <span className="text-gray-400">(opcional)</span>
+                  </Label>
+                  <Textarea
+                    id="address"
+                    placeholder="Rua, número, complemento, bairro, cidade - UF, CEP"
+                    rows={2}
+                  />
+                </div>
+
+                {/* Endereço detalhado */}
+                <div className="border-t pt-4">
+                  <Label className="text-sm font-semibold mb-3 block flex items-center gap-2">
+                    Endereço Detalhado (Campos Separados)
+                    <span className="text-xs text-muted-foreground font-normal">Opcional - Facilita preenchimento</span>
+                  </Label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="endereco_logradouro" className="text-sm">Logradouro</Label>
+                      <Input
+                        id="endereco_logradouro"
+                        placeholder="Rua, Avenida, etc."
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="endereco_numero" className="text-sm">Número</Label>
+                      <Input
+                        id="endereco_numero"
+                        placeholder="123"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="endereco_complemento" className="text-sm">Complemento</Label>
+                      <Input
+                        id="endereco_complemento"
+                        placeholder="Apto, bloco, etc."
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="endereco_bairro" className="text-sm">Bairro</Label>
+                      <Input
+                        id="endereco_bairro"
+                        placeholder="Bairro"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="endereco_cidade" className="text-sm">Cidade</Label>
+                      <Input
+                        id="endereco_cidade"
+                        placeholder="Cidade"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="endereco_uf" className="text-sm">UF</Label>
+                      <Input
+                        id="endereco_uf"
+                        placeholder="SP"
+                        maxLength={2}
+                        onChange={(e) => {
+                          const input = e.target as HTMLInputElement;
+                          input.value = input.value.toUpperCase();
+                        }}
+                      />
+                    </div>
+                    <div className="space-y-2 md:col-span-2">
+                      <Label htmlFor="endereco_cep" className="text-sm">CEP</Label>
+                      <Input
+                        id="endereco_cep"
+                        placeholder="00000-000"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
