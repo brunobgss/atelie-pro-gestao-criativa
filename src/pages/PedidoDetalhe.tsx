@@ -896,23 +896,23 @@ export default function PedidoDetalhe() {
             
             <div class="section">
               <h2>👤 Informações do Cliente</h2>
-              <div class="grid">
-                <div class="item">
+              <div class="grid" style="margin-bottom: 8px;">
+                <div class="item" style="margin-bottom: 8px;">
                   <div class="label">Nome</div>
                   <div class="value">${order.client}</div>
                 </div>
-                <div class="item">
+                <div class="item" style="margin-bottom: 8px;">
                   <div class="label">Telefone</div>
                   <div class="value">${order.customer_phone || 'Não informado'}</div>
                 </div>
-                <div class="item">
-                  <div class="label">Data de Entrega</div>
+                <div class="item" style="margin-bottom: 8px;">
+                  <div class="label">Entrega</div>
                   <div class="value">${order.delivery ? (() => {
                     const [year, month, day] = order.delivery.split('T')[0].split('-');
                     return day + '/' + month + '/' + year;
                   })() : 'N/A'}</div>
                 </div>
-                <div class="item">
+                <div class="item" style="margin-bottom: 8px;">
                   <div class="label">CPF/CNPJ</div>
                   <div class="value">${order.customer_cpf_cnpj || 'Não informado'}</div>
                 </div>
