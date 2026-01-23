@@ -45,7 +45,14 @@ export default function Clientes() {
     name: "",
     phone: "",
     email: "",
-    address: ""
+    cpf_cnpj: "",
+    endereco_logradouro: "",
+    endereco_numero: "",
+    endereco_complemento: "",
+    endereco_bairro: "",
+    endereco_cidade: "",
+    endereco_uf: "",
+    endereco_cep: ""
   });
 
   const handleViewClient = (client: ClientWithHistory) => {
@@ -59,7 +66,14 @@ export default function Clientes() {
       name: client.name || "",
       phone: client.phone || "",
       email: client.email || "",
-      address: client.address || ""
+      cpf_cnpj: (client as any).cpf_cnpj || "",
+      endereco_logradouro: (client as any).endereco_logradouro || "",
+      endereco_numero: (client as any).endereco_numero || "",
+      endereco_complemento: (client as any).endereco_complemento || "",
+      endereco_bairro: (client as any).endereco_bairro || "",
+      endereco_cidade: (client as any).endereco_cidade || "",
+      endereco_uf: (client as any).endereco_uf || "",
+      endereco_cep: (client as any).endereco_cep || ""
     });
     setIsEditDialogOpen(true);
   };
@@ -102,22 +116,54 @@ export default function Clientes() {
         name: string;
         phone: string;
         email?: string;
-        address?: string | null;
+        cpf_cnpj?: string;
+        endereco_logradouro?: string;
+        endereco_numero?: string;
+        endereco_complemento?: string;
+        endereco_bairro?: string;
+        endereco_cidade?: string;
+        endereco_uf?: string;
+        endereco_cep?: string;
       } = {
         name: editForm.name.trim(),
         phone: editForm.phone.trim()
       };
-      
+
       // Adicionar campos opcionais apenas se preenchidos
       if (editForm.email && editForm.email.trim()) {
         updateData.email = editForm.email.trim();
       }
-      
-      if (editForm.address && editForm.address.trim()) {
-        updateData.address = editForm.address.trim();
-      } else {
-        // Se o campo estiver vazio, definir como null para limpar o valor
-        updateData.address = null;
+
+      if (editForm.cpf_cnpj && editForm.cpf_cnpj.trim()) {
+        updateData.cpf_cnpj = editForm.cpf_cnpj.trim();
+      }
+
+      if (editForm.endereco_logradouro && editForm.endereco_logradouro.trim()) {
+        updateData.endereco_logradouro = editForm.endereco_logradouro.trim();
+      }
+
+      if (editForm.endereco_numero && editForm.endereco_numero.trim()) {
+        updateData.endereco_numero = editForm.endereco_numero.trim();
+      }
+
+      if (editForm.endereco_complemento && editForm.endereco_complemento.trim()) {
+        updateData.endereco_complemento = editForm.endereco_complemento.trim();
+      }
+
+      if (editForm.endereco_bairro && editForm.endereco_bairro.trim()) {
+        updateData.endereco_bairro = editForm.endereco_bairro.trim();
+      }
+
+      if (editForm.endereco_cidade && editForm.endereco_cidade.trim()) {
+        updateData.endereco_cidade = editForm.endereco_cidade.trim();
+      }
+
+      if (editForm.endereco_uf && editForm.endereco_uf.trim()) {
+        updateData.endereco_uf = editForm.endereco_uf.trim().toUpperCase();
+      }
+
+      if (editForm.endereco_cep && editForm.endereco_cep.trim()) {
+        updateData.endereco_cep = editForm.endereco_cep.trim();
       }
       
       console.log("📝 Dados preparados para atualização:", updateData);
@@ -601,16 +647,6 @@ export default function Clientes() {
                 </div>
 
                 {/* Endereço completo */}
-                <div className="space-y-2">
-                  <Label htmlFor="address">
-                    Endereço Completo <span className="text-gray-400">(opcional)</span>
-                  </Label>
-                  <Textarea
-                    id="address"
-                    placeholder="Rua, número, complemento, bairro, cidade - UF, CEP"
-                    rows={2}
-                  />
-                </div>
 
                 {/* Endereço detalhado */}
                 <div className="border-t pt-4">
@@ -684,7 +720,6 @@ export default function Clientes() {
                     const phone = (document.getElementById("phone") as HTMLInputElement)?.value;
                     const email = (document.getElementById("email") as HTMLInputElement)?.value;
                     const cpf_cnpj = (document.getElementById("cpf_cnpj") as HTMLInputElement)?.value;
-                    const address = (document.getElementById("address") as HTMLTextAreaElement)?.value;
                     const endereco_logradouro = (document.getElementById("endereco_logradouro") as HTMLInputElement)?.value;
                     const endereco_numero = (document.getElementById("endereco_numero") as HTMLInputElement)?.value;
                     const endereco_complemento = (document.getElementById("endereco_complemento") as HTMLInputElement)?.value;
@@ -713,7 +748,6 @@ export default function Clientes() {
                       phone,
                       email,
                       cpf_cnpj,
-                      address,
                       endereco_logradouro,
                       endereco_numero,
                       endereco_complemento,
@@ -738,7 +772,6 @@ export default function Clientes() {
                     (document.getElementById("phone") as HTMLInputElement).value = "";
                     (document.getElementById("email") as HTMLInputElement).value = "";
                     (document.getElementById("cpf_cnpj") as HTMLInputElement).value = "";
-                    (document.getElementById("address") as HTMLTextAreaElement).value = "";
                     (document.getElementById("endereco_logradouro") as HTMLInputElement).value = "";
                     (document.getElementById("endereco_numero") as HTMLInputElement).value = "";
                     (document.getElementById("endereco_complemento") as HTMLInputElement).value = "";
@@ -1138,55 +1171,135 @@ export default function Clientes() {
 
       {/* Modal de Edição de Cliente */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Editar Cliente</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="edit-name">
-                Nome <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="edit-name"
-                value={editForm.name}
-                onChange={(e) => setEditForm({...editForm, name: e.target.value})}
-                placeholder="Nome do cliente"
-              />
+          <div className="space-y-4 py-2">
+            {/* Dados básicos */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">
+                  Nome <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="edit-name"
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({...editForm, name: e.target.value})}
+                  placeholder="Nome completo do cliente"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-phone">
+                  Telefone <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="edit-phone"
+                  value={editForm.phone}
+                  onChange={(e) => setEditForm({...editForm, phone: e.target.value})}
+                  placeholder="(11) 99999-9999"
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-phone">
-                Telefone <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="edit-phone"
-                value={editForm.phone}
-                onChange={(e) => setEditForm({...editForm, phone: e.target.value})}
-                placeholder="(11) 99999-9999"
-              />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-email">
+                  Email <span className="text-gray-400">(opcional)</span>
+                </Label>
+                <Input
+                  id="edit-email"
+                  type="email"
+                  value={editForm.email}
+                  onChange={(e) => setEditForm({...editForm, email: e.target.value})}
+                  placeholder="cliente@email.com"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-cpf_cnpj">
+                  CPF/CNPJ <span className="text-gray-400">(opcional)</span>
+                </Label>
+                <Input
+                  id="edit-cpf_cnpj"
+                  value={editForm.cpf_cnpj}
+                  onChange={(e) => setEditForm({...editForm, cpf_cnpj: e.target.value})}
+                  placeholder="Digite o CPF ou CNPJ"
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-email">
-                Email <span className="text-gray-400">(opcional)</span>
+
+            {/* Endereço detalhado */}
+            <div className="border-t pt-4">
+              <Label className="text-sm font-semibold mb-3 block flex items-center gap-2">
+                Endereço Detalhado (Campos Separados)
+                <span className="text-xs text-muted-foreground font-normal">Opcional - Facilita preenchimento</span>
               </Label>
-              <Input
-                id="edit-email"
-                type="email"
-                value={editForm.email}
-                onChange={(e) => setEditForm({...editForm, email: e.target.value})}
-                placeholder="cliente@email.com"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-address">
-                Endereço <span className="text-gray-400">(opcional)</span>
-              </Label>
-              <Input
-                id="edit-address"
-                value={editForm.address}
-                onChange={(e) => setEditForm({...editForm, address: e.target.value})}
-                placeholder="Endereço completo"
-              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="edit-endereco_logradouro" className="text-sm">Logradouro</Label>
+                  <Input
+                    id="edit-endereco_logradouro"
+                    value={editForm.endereco_logradouro}
+                    onChange={(e) => setEditForm({...editForm, endereco_logradouro: e.target.value})}
+                    placeholder="Rua, Avenida, etc."
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-endereco_numero" className="text-sm">Número</Label>
+                  <Input
+                    id="edit-endereco_numero"
+                    value={editForm.endereco_numero}
+                    onChange={(e) => setEditForm({...editForm, endereco_numero: e.target.value})}
+                    placeholder="123"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-endereco_complemento" className="text-sm">Complemento</Label>
+                  <Input
+                    id="edit-endereco_complemento"
+                    value={editForm.endereco_complemento}
+                    onChange={(e) => setEditForm({...editForm, endereco_complemento: e.target.value})}
+                    placeholder="Apto, bloco, etc."
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-endereco_bairro" className="text-sm">Bairro</Label>
+                  <Input
+                    id="edit-endereco_bairro"
+                    value={editForm.endereco_bairro}
+                    onChange={(e) => setEditForm({...editForm, endereco_bairro: e.target.value})}
+                    placeholder="Bairro"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-endereco_cidade" className="text-sm">Cidade</Label>
+                  <Input
+                    id="edit-endereco_cidade"
+                    value={editForm.endereco_cidade}
+                    onChange={(e) => setEditForm({...editForm, endereco_cidade: e.target.value})}
+                    placeholder="Cidade"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-endereco_uf" className="text-sm">UF</Label>
+                  <Input
+                    id="edit-endereco_uf"
+                    value={editForm.endereco_uf}
+                    onChange={(e) => setEditForm({...editForm, endereco_uf: e.target.value.toUpperCase()})}
+                    placeholder="SP"
+                    maxLength={2}
+                  />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="edit-endereco_cep" className="text-sm">CEP</Label>
+                  <Input
+                    id="edit-endereco_cep"
+                    value={editForm.endereco_cep}
+                    onChange={(e) => setEditForm({...editForm, endereco_cep: e.target.value})}
+                    placeholder="00000-000"
+                  />
+                </div>
+              </div>
             </div>
           </div>
           <DialogFooter>
